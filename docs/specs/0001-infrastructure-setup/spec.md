@@ -79,6 +79,7 @@ Hub is the only piece with user-observable behavior (a rendered page), so it get
 
 **Work:**
 - Install nx and set up `project.json` in root, `src/hub/`, `src/runner-web/` per the 3-scope split (R001)
+- Fold `src/hub`'s independent `package.json`/`package-lock.json` (added as a Step 1 scaffolding artifact) into the single root `package.json` per R005
 - Install missing deps for eslint/tsconfig/stylelint starter configs
 - Add `guard`/`autofix` npm+nx tasks per R003/R004 for eslint (all 3 scopes), typescript (all 3 scopes, type-check only, no autofix), stylelint (hub only)
 
