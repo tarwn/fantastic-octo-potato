@@ -1,0 +1,21 @@
+# Local settings
+.env
+.env.*
+!.env.example
+
+# Agents
+.claude/settings.local.json
+
+# Local artifacts
+.tmp
+.experiments
+
+
+# Tools
+.eslintcache
+.stylelintcache
+node_modules
+
+# le sigh
+.DS_Store
+Thumbs.db

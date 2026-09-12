@@ -1,0 +1,8 @@
+{
+  "name": "computer-use-automation",
+  "version": "0.1.0",
+  "author": "Eli Weinstock-Herman",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

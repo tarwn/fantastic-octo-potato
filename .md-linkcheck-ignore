@@ -1,0 +1,8 @@
+# Files whose markdown links are intentionally illustrative (templates,
+# example output, prompt snippets) rather than real navigable references.
+# One path per line, relative to the project root. Lines starting with #
+# are comments.
+.claude/skills/write-spec/templates/plan.template.md
+.claude/skills/write-spec/templates/spec.template.md
+.claude/skills/write-agent-context/_example.md
+.claude/skills/make-changes/SKILL.md
