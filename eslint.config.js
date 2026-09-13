@@ -115,5 +115,12 @@ export default tseslint.config(
 			"@typescript-eslint/no-require-imports": "off",
 			"no-console": "off"
 		}
+	},
+	{
+		// runner-web's sanctioned console sink — its whole job is console output
+		files: ["src/runner-web/logger.ts"],
+		rules: {
+			"no-console": "off"
+		}
 	}
 );

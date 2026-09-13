@@ -123,6 +123,7 @@ Hub is the only piece with user-observable behavior (a rendered page), so it get
 - Move the SvelteKit and Playwright-for-hub-e2e draft ADRs from the spec folder into `docs/adrs/hub/`, add their rows to `docs/adrs/hub/_index.md`
 - Update README.md's "Setup"/"Run the Apps" sections to match the single shared `package.json` (no per-project `npm install`) and the `dev:runner-web` task name
 - Complete CLAUDE.md's truncated "Build & Run" line and add the `dev:runner-web` task
+- Add the `guard:runner-web`/`guard:runner-web:lint`/`guard:runner-web:test`/`guard:runner-web:tsc` rows to CLAUDE.md's Guards & Sensors table (added in Step 5, not yet documented)
 
 ---
 
