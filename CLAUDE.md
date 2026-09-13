@@ -27,19 +27,27 @@ Run all autofix commands with `npm run autofix` or run individual commands below
 
 | Command | Fixes | Runs |
 |---|---|---|
-| `npm run autofix:hub:lint` | ESLint fixable TypeScript/JS formatting issues | manual |
+| `npm run autofix:hub:lint` | ESLint fixable TypeScript/JS formatting issues (hub scope) | manual |
+| `npm run autofix:hub:stylelint` | Stylelint fixable SCSS formatting issues | manual |
+| `npm run autofix:tools:lint` | ESLint fixable TypeScript/JS formatting issues (tools scope) | manual |
 
 ### Guards & Sensors
 
-Use `npm run guards` to quickly run all "pre-commit" guards in parallel. Use individual commands below to run a single specific guard.
+Use `npm run guard` to quickly run every pre-commit guard across all scopes (nx run-many, so each scope's checks still run/cache independently). Use an individual command to run a specific guard and `--` to pass through arguments.
 
-Every guard below is nx-cached; see [tools reference](./docs/context/tools/_index.md) if something unexpected occurs.
+Every guard below is nx-cached.
 
 | Command | Checks | Runs |
 |---|---|---|
-| `npm run guards` | all pre-commit guards below | pre-commit |
-| `npm run guards:hub:check` | svelte-check / type errors + Svelte compiler a11y warnings (`--fail-on-warnings`) | pre-commit |
-| `npm run guards:hub:e2e` | Playwright E2E | manual, before PR |
+| `npm run guard` | every guard below | pre-commit |
+| `npm run guard:hub:check` | svelte-check: type errors + Svelte compiler a11y warnings | pre-commit |
+| `npm run guard:hub:lint` | ESLint checks (hub scope) | pre-commit |
+| `npm run guard:hub:stylelint` | Stylelint checks (hub scope) | pre-commit |
+| `npm run guard:hub:test` | vitest unit tests (hub scope) | pre-commit |
+| `npm run guard:tools:lint` | ESLint checks (tools scope: tools/docs/test-e2e/top-level) | pre-commit |
+| `npm run guard:tools:tsc` | TypeScript type-check (tools scope) | pre-commit |
+| `npm run guard:hub:e2e` | Playwright E2E (not yet wired up as an npm task — lands in a later step) | manual, before PR |
+| `npm run guard:tools:e2e` | multi-service e2e tests under `test-e2e/` (not yet wired up — lands in a later step) | manual, before PR |
 
 For adhoc manual checks against the running app (e.g. a design-comparison screenshot), use the `verify-ui` skill
 

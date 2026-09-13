@@ -13,5 +13,12 @@
 		"types": [
 			"node"
 		]
-	}
+	},
+	"exclude": [
+		"node_modules",
+		"src/hub",
+		"src/runner-web",
+		".claude",
+		"**/*.cjs"
+	]
 }

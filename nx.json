@@ -1,0 +1,10 @@
+{
+	"$schema": "./node_modules/nx/schemas/nx-schema.json",
+	"targetDefaults": {
+		"lint": { "cache": true },
+		"type-check": { "cache": true },
+		"check": { "cache": true },
+		"style-lint": { "cache": true },
+		"test": { "cache": true }
+	}
+}
