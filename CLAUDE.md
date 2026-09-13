@@ -21,7 +21,29 @@ Be intentional and frugal with commands:
 - `npm install` installs for all projects
 - `npm run dev:hub` runs the backend and frontend for 
 
-## Code Quality Standards
+## AutoFix
+
+Run all autofix commands with `npm run autofix` or run individual commands below:
+
+| Command | Fixes | Runs |
+|---|---|---|
+| `npm run autofix:hub:lint` | ESLint fixable TypeScript/JS formatting issues | manual |
+
+### Guards & Sensors
+
+Use `npm run guards` to quickly run all "pre-commit" guards in parallel. Use individual commands below to run a single specific guard.
+
+Every guard below is nx-cached; see [tools reference](./docs/context/tools/_index.md) if something unexpected occurs.
+
+| Command | Checks | Runs |
+|---|---|---|
+| `npm run guards` | all pre-commit guards below | pre-commit |
+| `npm run guards:hub:check` | svelte-check / type errors + Svelte compiler a11y warnings (`--fail-on-warnings`) | pre-commit |
+| `npm run guards:hub:e2e` | Playwright E2E | manual, before PR |
+
+For adhoc manual checks against the running app (e.g. a design-comparison screenshot), use the `verify-ui` skill
+
+### Code Quality Standards
 
 - Always use common language conventions, informed by local eslint and stylelint rules
 - Always start with the smallest change that satisfies the goal. YAGNI. Listen to your inner Kent Beck.
