@@ -65,6 +65,20 @@
 				"command": "vite preview --port 4173",
 				"cwd": "{workspaceRoot}/src/hub"
 			}
+		},
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vite dev",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"e2e": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "playwright test",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
 		}
 	}
 }

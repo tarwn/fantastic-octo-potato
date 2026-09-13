@@ -5,6 +5,9 @@
 		"type-check": { "cache": true },
 		"check": { "cache": true },
 		"style-lint": { "cache": true },
-		"test": { "cache": true }
+		"test": { "cache": true },
+		"md-links": { "cache": true },
+		"test-file-size": { "cache": true },
+		"e2e": { "cache": true }
 	}
 }

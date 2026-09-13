@@ -23,9 +23,23 @@
 				"cwd": "{workspaceRoot}"
 			}
 		},
+		"md-links": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "node tools/guards/check-md-links.cjs",
+				"cwd": "{workspaceRoot}"
+			}
+		},
+		"test-file-size": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "node tools/guards/check-test-file-size.cjs",
+				"cwd": "{workspaceRoot}"
+			}
+		},
 		"guard": {
 			"executor": "nx:noop",
-			"dependsOn": ["lint", "type-check"]
+			"dependsOn": ["lint", "type-check", "md-links", "test-file-size"]
 		},
 		"autofix": {
 			"executor": "nx:noop",

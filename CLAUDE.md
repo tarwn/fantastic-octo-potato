@@ -45,8 +45,10 @@ Every guard below is nx-cached.
 | `npm run guard:hub:stylelint` | Stylelint checks (hub scope) | pre-commit |
 | `npm run guard:hub:test` | vitest unit tests (hub scope) | pre-commit |
 | `npm run guard:tools:lint` | ESLint checks (tools scope: tools/docs/test-e2e/top-level) | pre-commit |
+| `npm run guard:tools:md-links` | markdown link checker (tools scope) | pre-commit |
+| `npm run guard:tools:test-file-size` | test file line-count limit (tools scope) | pre-commit |
 | `npm run guard:tools:tsc` | TypeScript type-check (tools scope) | pre-commit |
-| `npm run guard:hub:e2e` | Playwright E2E (not yet wired up as an npm task — lands in a later step) | manual, before PR |
+| `npm run guard:hub:e2e` | Playwright E2E | manual, before PR |
 | `npm run guard:tools:e2e` | multi-service e2e tests under `test-e2e/` (not yet wired up — lands in a later step) | manual, before PR |
 
 For adhoc manual checks against the running app (e.g. a design-comparison screenshot), use the `verify-ui` skill
