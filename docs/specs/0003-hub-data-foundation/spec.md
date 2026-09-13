@@ -157,6 +157,7 @@ Step 1's e2e guards stay red until Step 6 (nav/list pages) and Step 7 (modal) la
 - Run `write-agent-context` for topic `database-handling`, area `hub`: migration workflow (`db:migrate:up/down/new`), the `HUB_DATABASE_URL` env var and test override, and the `db:reset` fast-path for tests.
 - Move the Step 2 draft ADR into `docs/adrs/hub/`.
 - Confirm every file under `docs/context/hub` is linked from `_index.md`; fix any that aren't.
+- Fix `docs/context/hub/conventions.md`'s test-file-suffix rule: it says `*.spec.ts`, but hub's actual convention (and vitest's `include` glob) is `*.test.ts` — update the doc to match practice.
 
 ---
 
