@@ -59,4 +59,4 @@ The starting open can reference input.startUrl. The Job separately supplies the 
 
 Every Recipe finish has a non-null checkpoint and validates outputs before Completed-Success. Unmet completion/action requirements request intervention; unexpected technical/allowlist errors are Completed-Error. Intentional sensitive results go to the Hub Results store; transcript/LLM projections mask them. No LLM generates new Steps during Trial/Execute.
 
-See [ARCHITECTURE.md](../c../../ARCHITECTURE.md) for the lifecycle; deferred expansion is in the [extended DSL](./steps-dsl-extended.md).
+See [ARCHITECTURE.md](../../../ARCHITECTURE.md) for the lifecycle; deferred expansion is in the [extended DSL](./steps-dsl-extended.md).
