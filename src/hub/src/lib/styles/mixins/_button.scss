@@ -1,0 +1,157 @@
+@use "../variables" as *;
+
+// == button
+// == pattern: button-base + variant mixin, composed together.
+// one size only — this app's buttons are all page-level or panel-level actions.
+
+@mixin button-base {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: $button-all-gap;
+  height: $button-all-height;
+  padding: 0 $button-all-padding-x;
+  font-family: $font-family-ui;
+  font-size: $button-all-font-size;
+  font-weight: $button-all-font-weight;
+  line-height: 1;
+  border-width: $button-all-border-width;
+  border-style: solid;
+  border-radius: $button-all-border-radius;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+
+  &:focus-visible {
+    outline: $button-all-focus-outline;
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    background-color: $button-all-disabled-background-color !important;
+    border-color: $button-all-disabled-border-color !important;
+    color: $button-all-disabled-color !important;
+  }
+}
+
+@mixin button-variant-primary {
+  background-color: $button-primary-background-color;
+  border-color: $button-primary-background-color;
+  color: $button-primary-color;
+
+  &:hover {
+    background-color: $button-primary-hover-background-color;
+    border-color: $button-primary-hover-background-color;
+  }
+  &:active { background-color: $button-primary-hover-background-color; }
+}
+
+@mixin button-variant-secondary {
+  background-color: $button-secondary-background-color;
+  border-color: $button-secondary-border-color;
+  color: $button-secondary-color;
+
+  &:hover { background-color: $button-secondary-hover-background-color; }
+  &:active { background-color: $button-secondary-hover-background-color; }
+}
+
+// the "a human must act now" action (Take control). rust, never used for
+// ordinary primary actions, so its appearance stays meaningful.
+@mixin button-variant-caution {
+  background-color: $button-caution-background-color;
+  border-color: $button-caution-background-color;
+  color: $button-caution-color;
+
+  &:hover {
+    background-color: $button-caution-hover-background-color;
+    border-color: $button-caution-hover-background-color;
+  }
+}
+
+@mixin button-variant-danger {
+  background-color: $button-danger-background-color;
+  border-color: $button-danger-background-color;
+  color: $button-danger-color;
+
+  &:hover {
+    background-color: $button-danger-hover-background-color;
+    border-color: $button-danger-hover-background-color;
+  }
+}
+
+// arbitrary-color variant, for a status-derived action that should match the
+// state it acts on. pass an ink color; the fill is derived from it.
+@mixin button-variant-tinted($color, $hover-color: $color) {
+  background-color: transparent;
+  border-color: $color;
+  color: $color;
+
+  &:hover {
+    background-color: color-mix(in oklab, $color 8%, $color-white);
+    border-color: $hover-color;
+    color: $hover-color;
+  }
+}
+
+// == icon button
+// deliberately NOT a variant of button-base: it is square, has no label, no
+// min-width or horizontal padding, and sits at a smaller size than any text
+// button so it can live inside a dense strip or transcript row. sharing
+// button-base would mean overriding height, padding, min-width, font-size and
+// gap at every call site.
+@mixin button-icon-base {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  background-color: transparent;
+  border: $button-all-border-width solid transparent;
+  border-radius: $button-all-border-radius;
+  color: $button-icon-color;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+
+  > svg {
+    width: $button-icon-glyph-size;
+    height: $button-icon-glyph-size;
+  }
+
+  &:focus-visible {
+    outline: $button-all-focus-outline;
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    color: $button-all-disabled-color;
+  }
+}
+
+// inline affordance with no chrome at rest — recipe magnifier in the strip
+@mixin button-icon-bare {
+  @include button-icon-base;
+  width: $button-icon-bare-size;
+  height: $button-icon-bare-size;
+
+  &:hover {
+    background-color: $button-icon-hover-background-color;
+    color: $button-icon-hover-color;
+  }
+}
+
+// scannable affordance, hairline border at rest — screenshot viewer in a row
+@mixin button-icon-outlined {
+  @include button-icon-base;
+  width: $button-icon-outlined-size;
+  height: $button-icon-outlined-size;
+  border-color: $button-icon-border-color;
+
+  &:hover {
+    background-color: $button-icon-hover-background-color;
+    border-color: $button-icon-hover-border-color;
+    color: $button-icon-hover-color;
+  }
+}

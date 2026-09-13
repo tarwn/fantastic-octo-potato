@@ -1,0 +1,57 @@
+@use "../variables" as *;
+
+// == status change
+// the badge that marks the transcript record which CHANGED the job's state:
+// "→ RUNNING". one record, one badge — a state change is never a second row,
+// because it was not a second action. the badge's ink matches the status cell
+// in the identity strip, which is how the two tie together.
+
+@mixin status-change {
+  display: inline-flex;
+  align-items: center;
+  gap: $status-change-arrow-gap;
+  padding: $status-change-padding-y $status-change-padding-x;
+  border-width: $status-change-border-width;
+  border-style: solid;
+  border-radius: 0;
+  font-family: $font-family-ui;
+  font-size: $status-change-font-size;
+  font-weight: $status-change-font-weight;
+  letter-spacing: $status-change-letter-spacing;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+// $emphasis: true on rows that already carry the status surface as their row
+// background (HALT, terminal STATUS) — the badge then goes white so it still
+// separates from the row.
+@mixin status-change-state($color, $surface, $border, $emphasis: false) {
+  color: $color;
+  border-color: $border;
+
+  @if $emphasis {
+    background-color: $status-change-emphasis-background-color;
+  } @else {
+    background-color: $surface;
+  }
+}
+
+@mixin status-change-pending { @include status-change-state($status-pending-color, $status-pending-surface, $status-pending-border); }
+@mixin status-change-running { @include status-change-state($status-running-color, $status-running-surface, $status-running-border); }
+@mixin status-change-intervention { @include status-change-state($status-intervention-color, $status-intervention-surface, $status-intervention-border, true); }
+@mixin status-change-interactive { @include status-change-state($status-interactive-color, $status-interactive-surface, $status-interactive-border); }
+@mixin status-change-success { @include status-change-state($status-success-color, $status-success-surface, $status-success-border, true); }
+@mixin status-change-failed { @include status-change-state($status-failed-color, $status-failed-surface, $status-failed-border, true); }
+@mixin status-change-error { @include status-change-state($status-error-color, $status-error-surface, $status-error-border, true); }
+@mixin status-change-stale { @include status-change-state($status-stale-color, $status-stale-surface, $status-stale-border); }
+@mixin status-change-cancelled { @include status-change-state($status-cancelled-color, $status-cancelled-surface, $status-cancelled-border); }
+
+// square dot in the status ink — the shape shared by the strip's status cell
+// and the transcript rail, so one state reads as one colour + one shape.
+@mixin status-dot($color, $size: $space-s) {
+  display: inline-block;
+  flex: none;
+  width: $size;
+  height: $size;
+  background-color: $color;
+}

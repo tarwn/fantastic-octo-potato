@@ -1,0 +1,32 @@
+@use "../variables" as *;
+
+// == status bar
+// segmented horizontal progress: completed steps, an optional attention
+// segment where the run stopped, and the remaining steps. no labels, no
+// percentages — it reads as position within a run.
+// used full height on the job page and compact inside the jobs list table.
+
+@mixin status-bar {
+  display: flex;
+  gap: $status-bar-gap;
+  width: 100%;
+  height: $status-bar-height;
+}
+
+@mixin status-bar-compact {
+  @include status-bar;
+  height: $status-bar-compact-height;
+  gap: $space-xxs;
+}
+
+// each segment is flex-weighted by step count: style="flex: 13"
+@mixin status-bar-segment($color) {
+  flex: 1 1 0;
+  min-width: 2px;
+  background-color: $color;
+}
+
+@mixin status-bar-segment-done { @include status-bar-segment($status-bar-done-color); }
+@mixin status-bar-segment-attention { @include status-bar-segment($status-bar-attention-color); }
+@mixin status-bar-segment-failed { @include status-bar-segment($status-bar-failed-color); }
+@mixin status-bar-segment-remaining { @include status-bar-segment($status-bar-remaining-color); }
