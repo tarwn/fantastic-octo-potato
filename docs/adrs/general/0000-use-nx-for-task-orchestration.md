@@ -1,4 +1,4 @@
-# ADR N: Use Nx for task orchestration and caching
+# ADR 0000: Use Nx for task orchestration and caching
 
 **Author:** Agent (Eli Weinstock-Herman)
 
@@ -20,7 +20,7 @@ Nx provides task caching and dependency-aware task graphs without requiring npm 
 
 ## Status
 
-Proposed
+Accepted
 
 ## Consequences
 

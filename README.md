@@ -9,18 +9,13 @@ An application that can learn how to navigate an application interface to achiev
 **Prerequisites**
 
 - Node.js 24.x
-- Run `npm prepare` to initialize husky and playwright
-
-Prepare to run:
-
-- hub: `cd hub && npm install`
-- runner: `cd hub && npm install`
-- seed data: TBD
+- Run `npm install`
+- Run `npm run prepare` to initialize husky and playwright (runs automatically on `npm install`)
 
 **Run the Apps**
 
 - Run the hub web ui: `npm run dev:hub`
-- Run the runner: `npm run dev:runner`
+- Run the runner: `npm run dev:runner-web`
 - Run the sample app: TBD
 
 # Making Changes

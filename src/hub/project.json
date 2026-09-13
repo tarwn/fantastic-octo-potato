@@ -1,0 +1,84 @@
+{
+	"name": "hub",
+	"root": "src/hub",
+	"targets": {
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "eslint src/hub",
+				"cwd": "{workspaceRoot}"
+			}
+		},
+		"lint-fix": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "eslint src/hub --fix",
+				"cwd": "{workspaceRoot}"
+			}
+		},
+		"check": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"style-lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "stylelint \"src/hub/**/*.svelte\"",
+				"cwd": "{workspaceRoot}"
+			}
+		},
+		"style-lint-fix": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "stylelint \"src/hub/**/*.svelte\" --fix",
+				"cwd": "{workspaceRoot}"
+			}
+		},
+		"guard": {
+			"executor": "nx:noop",
+			"dependsOn": ["lint", "check", "style-lint", "test"]
+		},
+		"autofix": {
+			"executor": "nx:noop",
+			"dependsOn": ["lint-fix", "style-lint-fix"]
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"build": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vite build",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"preview": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vite preview --port 4173",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vite dev",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"e2e": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "playwright test",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		}
+	}
+}

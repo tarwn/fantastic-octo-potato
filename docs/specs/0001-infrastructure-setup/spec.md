@@ -6,19 +6,19 @@ A developer (or agent) working in any of the 3 project scopes (tools, hub, runne
 
 ## Requirements
 
-- R001: nx orchestrates guard/autofix tasks with caching across 3 scopes: root (tools/docs/test-e2e/top-level), `src/hub`, `src/runner-web`
+- R001: nx orchestrates guard/autofix tasks with caching across 3 scopes: `tools` (tools/docs/test-e2e/top-level), `hub` (`src/hub`), `runner-web` (`src/runner-web`)
 - R002: every task is invoked via `npm run <task>`; npm scripts call nx where an nx task exists for that scope
-- R003: npm task names follow `type[:scope[:variant][:flavor]]` (e.g. `test:hub:unit-tests`, `test:hub`, `test:hub:unit-tests:agent`)
-- R004: task types are `autofix` (auto-fixable lint/guard), `guard` (tests, linters, type checks, link checker, etc.), and unprefixed "do" tasks (dev server, build)
+- R003: npm task names follow `type[:scope[:variant]]`, ordered like a directory path — most general segment first, then alphabetically by segment (e.g. `guard`, `guard:hub`, `guard:hub:lint`, `guard:hub:test`). Tests are a `guard` variant (per R004), not their own task type
+- R004: task types include `autofix` (auto-fixable lint/guard — no scope-level aggregate; run `autofix` for everything or an individual `autofix:<scope>:<variant>` command), `guard` (tests, linters, type checks, link checker, etc. — has a top-level `guard`, one `guard:<scope>` aggregate per scope as a real nx target, and individual `guard:<scope>:<variant>` commands), and "do" tasks (`dev`, `build`, `preview`, etc. — the verb itself is the type, e.g. `dev:hub`)
 - R005: single shared `package.json` at repo root; no npm workspaces
 - R006: dependencies installed for the already-copied `eslint.config.js`, `tsconfig.json`, `.stylelintrc.json` so they run without missing-package errors
 - R007: eslint gets a `guard` and an `autofix` task per scope
-- R008: typescript gets a type-check `guard` task per scope
+- R008: typescript gets a type-check `guard` task per scope (hub's is `svelte-check`, exposed as the `check` variant since it already covers TS type errors + Svelte a11y warnings, superseding a plain `tsc` check there)
 - R009: stylelint gets a `guard` and an `autofix` task, hub scope only
 - R010: `tools/guards/check-md-links.cjs` wired as a `guard` task (tools scope + npm task)
 - R011: `tools/guards/check-test-file-size.cjs` wired as a `guard` task (tools scope + npm task)
 - R012: `eslint.config.js`'s `files: ["scripts/**/*.cjs"]` override is stale (no `scripts/` dir exists) — repoint it at the actual guard/hook script locations under `tools/`
-- R013: husky pre-commit hook runs one npm command, `guards:all`, which nx fans out to all `guard` tasks across all 3 scopes
+- R013: husky pre-commit hook runs one npm command, `guard`, which nx fans out to all `guard` tasks across all 3 scopes
 - R014: husky pre-push hook runs `tools/hooks/check-review.cjs`
 - R015: `prepare` npm lifecycle script (auto-runs on `npm install`; README's "Run `npm prepare`" covers re-running it by hand) initializes husky and installs Playwright browsers
 - R016: hub (`src/hub`) is a SvelteKit app with a basic page
@@ -71,32 +71,32 @@ Hub is the only piece with user-observable behavior (a rendered page), so it get
 
 ### Step 3 — Nx setup + eslint/typescript/stylelint task conventions
 
-**Guard:** `guard:eslint:*`, `guard:tsc:*` (all 3 scopes) and `guard:stylelint:hub` pass against Step 2's hub source; matching `autofix:*` tasks run cleanly
+**Guard:** `guard:tools:lint`, `guard:hub:lint`, `guard:tools:tsc`, `guard:hub:check` and `guard:hub:stylelint` (plus the `guard:tools`/`guard:hub`/`guard` aggregates) pass against Step 2's hub source; matching `autofix:*`/`autofix` tasks run cleanly. Per the sequencing note above, `runner-web` has no project.json yet — its scope folds in during Step 5
 
 **References**
 - `eslint.config.js`, `tsconfig.json`, `.stylelintrc.json` — pre-copied starter configs, install their deps
 - CLAUDE.md "Commands" section — `npm run <task>` is the only execution surface
 
 **Work:**
-- Install nx and set up `project.json` in root, `src/hub/`, `src/runner-web/` per the 3-scope split (R001)
+- Install nx and set up `project.json` for the `tools` and `hub` scopes (R001); each scope gets a `guard`/`autofix` nx target that fans out to its own lint/type-check/stylelint sub-targets, independently cached
+- Fold `src/hub`'s independent `package.json`/`package-lock.json` (added as a Step 1 scaffolding artifact) into the single root `package.json` per R005
 - Install missing deps for eslint/tsconfig/stylelint starter configs
-- Add `guard`/`autofix` npm+nx tasks per R003/R004 for eslint (all 3 scopes), typescript (all 3 scopes, type-check only, no autofix), stylelint (hub only)
+- Add `guard`/`autofix` npm+nx tasks per R003/R004 for eslint (tools+hub scopes), typescript (tools+hub scopes; hub's is `svelte-check`, exposed as `check` rather than `tsc`), stylelint (hub only)
 
 ---
 
 ### Step 4 — Custom guards, hub e2e task, husky, dev tasks
 
-**Guard:** `npm run guards:all` passes across all 3 scopes (folding in Step 3's tasks plus md-links and test-file-size); husky pre-commit/pre-push fire on a sample commit/push; hub's Step 1 e2e spec now runs via a named `npm run` task
+**Guard:** `npm run guard` passes across all 3 scopes (folding in Step 3's tasks plus md-links and test-file-size); husky pre-commit/pre-push fire on a sample commit/push; hub's Step 1 e2e spec now runs via a named `npm run` task
 
 **References**
 - `tools/guards/check-md-links.cjs`, `tools/guards/check-test-file-size.cjs`, `tools/hooks/check-review.cjs` — existing scripts to wire in
 
 **Work:**
-- Wire `tools/guards/check-md-links.cjs` and `tools/guards/check-test-file-size.cjs` as `guard` npm+nx tasks, tools scope (R010/R011)
-- Fix `eslint.config.js`'s `scripts/**/*.cjs` override to match `tools/guards/**/*.cjs` and `tools/hooks/**/*.cjs` (R012)
-- Add a named `npm run` task for hub's Playwright e2e suite (R020), replacing Step 1's bare `npx playwright test` invocation
-- Add `guards:all` npm/nx task fanning out to every guard task, including the new e2e task
-- Add husky pre-commit (`guards:all`) and pre-push (`tools/hooks/check-review.cjs`) hooks
+- Wire `tools/guards/check-md-links.cjs` and `tools/guards/check-test-file-size.cjs` as `guard` npm+nx tasks, tools scope, folded into `tools`'s `guard` aggregate (R010/R011)
+- ~~Fix `eslint.config.js`'s `scripts/**/*.cjs` override~~ — already done in Step 3, once the stale glob turned out to block that step's own guards (R012)
+- Add a named `npm run` task for hub's Playwright e2e suite (R020), replacing Step 1's bare `npx playwright test` invocation; manual-only, not folded into `hub`'s `guard` aggregate
+- Add husky pre-commit (`guard`) and pre-push (`tools/hooks/check-review.cjs`) hooks
 - Add `prepare` npm script: husky install + `playwright install` (R015)
 - Add `dev:hub` and `dev:runner-web` "do" tasks
 
@@ -123,6 +123,7 @@ Hub is the only piece with user-observable behavior (a rendered page), so it get
 - Move the SvelteKit and Playwright-for-hub-e2e draft ADRs from the spec folder into `docs/adrs/hub/`, add their rows to `docs/adrs/hub/_index.md`
 - Update README.md's "Setup"/"Run the Apps" sections to match the single shared `package.json` (no per-project `npm install`) and the `dev:runner-web` task name
 - Complete CLAUDE.md's truncated "Build & Run" line and add the `dev:runner-web` task
+- Add the `guard:runner-web`/`guard:runner-web:lint`/`guard:runner-web:test`/`guard:runner-web:tsc` rows to CLAUDE.md's Guards & Sensors table (added in Step 5, not yet documented)
 
 ---
 

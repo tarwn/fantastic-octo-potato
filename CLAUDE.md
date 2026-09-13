@@ -19,9 +19,45 @@ Be intentional and frugal with commands:
 ### Build & Run
 
 - `npm install` installs for all projects
-- `npm run dev:hub` runs the backend and frontend for 
+- `npm run dev:hub` runs the backend and frontend for the hub SvelteKit app
+- `npm run dev:runner-web` runs the runner-web entry point
 
-## Code Quality Standards
+## AutoFix
+
+Run all autofix commands with `npm run autofix` or run individual commands below:
+
+| Command | Fixes | Runs |
+|---|---|---|
+| `npm run autofix:hub:lint` | ESLint fixable TypeScript/JS formatting issues (hub scope) | manual |
+| `npm run autofix:hub:stylelint` | Stylelint fixable SCSS formatting issues | manual |
+| `npm run autofix:tools:lint` | ESLint fixable TypeScript/JS formatting issues (tools scope) | manual |
+
+### Guards & Sensors
+
+Use `npm run guard` to quickly run every pre-commit guard across all scopes (nx run-many, so each scope's checks still run/cache independently). Use an individual command to run a specific guard and `--` to pass through arguments.
+
+Every guard below is nx-cached.
+
+| Command | Checks | Runs |
+|---|---|---|
+| `npm run guard` | every guard below | pre-commit |
+| `npm run guard:hub:check` | svelte-check: type errors + Svelte compiler a11y warnings | pre-commit |
+| `npm run guard:hub:lint` | ESLint checks (hub scope) | pre-commit |
+| `npm run guard:hub:stylelint` | Stylelint checks (hub scope) | pre-commit |
+| `npm run guard:hub:test` | vitest unit tests (hub scope) | pre-commit |
+| `npm run guard:runner-web:lint` | ESLint checks (runner-web scope) | pre-commit |
+| `npm run guard:runner-web:test` | vitest unit tests (runner-web scope) | pre-commit |
+| `npm run guard:runner-web:tsc` | TypeScript type-check (runner-web scope) | pre-commit |
+| `npm run guard:tools:lint` | ESLint checks (tools scope: tools/docs/test-e2e/top-level) | pre-commit |
+| `npm run guard:tools:md-links` | markdown link checker (tools scope) | pre-commit |
+| `npm run guard:tools:test-file-size` | test file line-count limit (tools scope) | pre-commit |
+| `npm run guard:tools:tsc` | TypeScript type-check (tools scope) | pre-commit |
+| `npm run guard:hub:e2e` | Playwright E2E | manual, before PR |
+| `npm run guard:tools:e2e` | multi-service e2e tests under `test-e2e/` (not yet wired up — lands in a later step) | manual, before PR |
+
+For adhoc manual checks against the running app (e.g. a design-comparison screenshot), use the `verify-ui` skill
+
+### Code Quality Standards
 
 - Always use common language conventions, informed by local eslint and stylelint rules
 - Always start with the smallest change that satisfies the goal. YAGNI. Listen to your inner Kent Beck.

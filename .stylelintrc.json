@@ -12,6 +12,10 @@
 			"rules": {
 				"color-no-hex": null
 			}
+		},
+		{
+			"files": ["**/*.svelte"],
+			"customSyntax": "postcss-html"
 		}
 	]
 }

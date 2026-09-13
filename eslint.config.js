@@ -25,7 +25,7 @@ export default tseslint.config(
 		// automatic tsconfigRootDir detection into seeing multiple candidate
 		// project roots — exclude the whole .claude/ tree, none of which is
 		// app source anyway.
-		ignores: ["build/", ".svelte-kit/", "dist/", "node_modules/", ".claude/"]
+		ignores: ["**/build/", "**/.svelte-kit/", "**/dist/", "**/node_modules/", ".claude/"]
 	},
 	js.configs.recommended,
 	...tseslint.configs.recommended,
@@ -46,8 +46,6 @@ export default tseslint.config(
 			}
 		},
 		rules: {
-			...tseslint.configs.recommended.rules,
-
 			"@stylistic/quotes": ["error", "double"],
 			"@stylistic/comma-dangle": ["error", "never"],
 			"@stylistic/semi": ["error", "always"],
@@ -111,10 +109,17 @@ export default tseslint.config(
 		}
 	},
 	{
-		// CommonJS CLI script invoked directly by git hooks (node scripts/*.cjs), not bundled
-		files: ["scripts/**/*.cjs"],
+		// CommonJS CLI script invoked directly by git hooks (node tools/**/*.cjs), not bundled
+		files: ["tools/guards/**/*.cjs", "tools/hooks/**/*.cjs"],
 		rules: {
 			"@typescript-eslint/no-require-imports": "off",
+			"no-console": "off"
+		}
+	},
+	{
+		// runner-web's sanctioned console sink — its whole job is console output
+		files: ["src/runner-web/logger.ts"],
+		rules: {
 			"no-console": "off"
 		}
 	}

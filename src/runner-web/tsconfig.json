@@ -10,15 +10,8 @@
 		"sourceMap": true,
 		"strict": true,
 		"moduleResolution": "bundler",
-		"types": [
-			"node"
-		]
+		"types": ["node"],
+		"noEmit": true
 	},
-	"exclude": [
-		"node_modules",
-		"src/hub",
-		"src/runner-web",
-		".claude",
-		"**/*.cjs"
-	]
+	"include": ["**/*.ts"]
 }

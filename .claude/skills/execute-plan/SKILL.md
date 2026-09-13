@@ -6,8 +6,9 @@ user-invocable: true
 
 # Process
 
-1. Verify the current git branch is not `main`. 
-  - If the branch is `main`, output to the user "Cannot continue, create a feature branch" and exit.
+1. Run `node .claude/skills/execute-plan/tools/check-branch.mjs` to verify the current git branch is not `main`.
+  - If it exits 1 (prints "Cannot continue, on main branch"), output that message to the user and exit.
+  - If it exits 0 (prints "Ready to continue"), proceed to the next step.
 2. Run `node .claude/skills/execute-plan/tools/scan-plans.mjs "docs/specs/*/plan.md"` (`<skill-dir>` is this skill's own directory) to get each plan's incomplete/total task count, e.g. `- 6/10 incomplete: C:/blah/blah/blah/plan.md`. Plans live in numbered folders (oldest to newest); the tool lists them in that same order.
 3. From the tool's output, select the oldest plan with incomplete tasks as <candidate-plan>.
   - If there are no plans with incomplete tasks, output to the user "Cannot continue, no plans with pending tasks" and exit.
