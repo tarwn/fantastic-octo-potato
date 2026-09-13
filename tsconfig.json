@@ -19,6 +19,7 @@
 		"src/hub",
 		"src/runner-web",
 		".claude",
-		"**/*.cjs"
+		"**/*.cjs",
+		"docs/design"
 	]
 }

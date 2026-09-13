@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #e8ecea; }
+  a { color: #17604a; text-decoration: none; }
+  a:hover { color: #0f4534; text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="min-height:100vh; padding:28px; font-family:'Public Sans', system-ui, sans-serif; display:flex; flex-direction:column; align-items:center; gap:16px;">
+
+  <!-- mock switcher (design scaffolding, not part of the product UI) -->
+  <div style="width:100%; max-width:1240px; display:flex; align-items:center; gap:10px;">
+    <span style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.09em; color:#6f7a75;">MOCK</span>
+    <button onClick="{{ showExecute }}" style="{{ execTab }}">Execute job · Intervention-Requested</button>
+    <button onClick="{{ showTraining }}" style="{{ trainTab }}">Training job · Completed-Success</button>
+  </div>
+
+  <div style="width:100%; max-width:1240px; background:#f1f3f2; border:1px solid #d7dedb; color:#141c19; position:relative;">
+
+    <!-- ================= global chrome ================= -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:0 22px; height:50px; background:#141c19; color:#e8ece9;">
+      <div style="display:flex; align-items:center; gap:26px;">
+        <span style="font-family:'JetBrains Mono', monospace; font-size:14px; font-weight:700; letter-spacing:0.1em;">HUB</span>
+        <div style="display:flex; gap:20px; font-size:13.5px; color:#9aa8a1;">
+          <span>Customers</span>
+          <span>Runners</span>
+          <span style="color:#f1f3f2; font-weight:600;">Jobs</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px; font-size:12px;">
+        <span style="font-family:'JetBrains Mono', monospace; font-weight:700; letter-spacing:0.08em; color:#e6b34a;">STAGING</span>
+        <span style="color:#9aa8a1;">r.okafor@acme.internal</span>
+      </div>
+    </div>
+
+    <!-- ================= EXECUTE JOB ================= -->
+    <sc-if value="{{ isExecute }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <!-- intervention bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:24px; padding:13px 22px; background:#fdefe8; border-bottom:1px solid #f0cdbb;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.08em; color:#8a3b12; border:1px solid #dfa787; padding:3px 7px;">INTERVENTION</span>
+            <span style="font-size:14px; color:#6d3616;">Runner halted at step 14 — no recoverable scenario matched. Waiting <span style="font-family:'JetBrains Mono', monospace;">03:40</span> for an operator.</span>
+          </div>
+          <button style="font-family:'Public Sans', sans-serif; font-size:13px; font-weight:600; color:#fff; background:#a8471a; border:none; padding:8px 15px; border-radius:2px; cursor:pointer;" style-hover="background:#8a3b12;">Take control</button>
+        </div>
+
+        <div style="padding:20px 22px 22px;">
+          <!-- title + page actions -->
+          <div style="display:flex; align-items:center; gap:9px; font-size:12.5px; color:#5c6a64; margin-bottom:8px;">
+            <span style="font-family:'JetBrains Mono', monospace; font-weight:700; letter-spacing:0.07em; color:#17604a;">EXECUTE</span>
+            <span style="color:#bcc5c0;">|</span>
+            <span style="font-family:'JetBrains Mono', monospace;">job_8f41c9</span>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:32px;">
+            <h1 style="margin:0; font-size:26px; font-weight:700; letter-spacing:-0.01em;">Statement Extract — March</h1>
+            <div style="display:flex; gap:8px;">
+              <button style="font-family:'Public Sans', sans-serif; font-size:13px; font-weight:600; color:#141c19; background:#f1f3f2; border:1px solid #c4ccc8; padding:8px 14px; border-radius:2px; cursor:pointer;" style-hover="background:#e9edeb;">Cancel job</button>
+              <button style="font-family:'Public Sans', sans-serif; font-size:13px; font-weight:600; color:#141c19; background:#f1f3f2; border:1px solid #c4ccc8; padding:8px 14px; border-radius:2px; cursor:pointer;" style-hover="background:#e9edeb;">Export JSON</button>
+            </div>
+          </div>
+
+          <!-- identity + status strip -->
+          <div style="margin-top:16px; display:grid; grid-template-columns:1.15fr 1fr 0.95fr 1fr 1.05fr; background:#fff; border:1px solid #d7dedb;">
+            <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Customer</div>
+              <div style="margin-top:4px; font-size:15px; font-weight:700;">Northwind Financial</div>
+            </div>
+            <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Application</div>
+              <div style="margin-top:4px; font-size:15px;">Legacy Teller Portal</div>
+            </div>
+            <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Recipe</div>
+              <div style="margin-top:4px; display:flex; align-items:center; gap:7px;">
+                <span style="font-family:'JetBrains Mono', monospace; font-size:14px;">v4.2</span>
+                <span style="font-size:12.5px; color:#8a938e;">released</span>
+                <button title="View recipe" style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; padding:0; background:transparent; border:none; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; color:#17604a;">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.8" cy="6.8" r="4.3"></circle><path d="M10.2 10.2 L14 14"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Runner</div>
+              <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:14px;">rnr-nw-02 <span style="color:#8a938e;">· 10.2.4.18</span></div>
+            </div>
+            <div style="padding:13px 16px; background:#fdefe8; box-shadow:inset 3px 0 0 #a8471a;">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#96674c; text-transform:uppercase;">Status</div>
+              <div style="margin-top:4px; display:flex; align-items:center; gap:7px;">
+                <span style="width:8px; height:8px; background:#a8471a;"></span>
+                <span style="font-size:15px; font-weight:700; color:#6d3616;">Intervention-Requested</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- steps + timing -->
+          <div style="margin-top:14px; background:#fff; border:1px solid #d7dedb; padding:15px 16px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px;">
+              <span style="font-size:13.5px; font-weight:600;">Step 14 of 19 <span style="font-weight:400; color:#5c6a64;">— halted</span></span>
+              <span style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#5c6a64;">started 12 Mar 2026 09:41:22 UTC · elapsed 00:06:18</span>
+            </div>
+            <div style="margin-top:10px; display:flex; gap:3px;">
+              <div style="flex:13; height:6px; background:#17604a;"></div>
+              <div style="flex:1; height:6px; background:#a8471a;"></div>
+              <div style="flex:5; height:6px; background:#dfe4e2;"></div>
+            </div>
+          </div>
+
+          <!-- transcript + results -->
+          <div style="margin-top:14px; display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:14px; align-items:start;">
+            <div style="background:#fff; border:1px solid #d7dedb;">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e6ebe9;">
+                <h2 style="margin:0; font-size:14px; font-weight:700;">Transcript</h2>
+                <span style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#8a938e;">128 entries · UTC</span>
+              </div>
+
+              <div style="padding:7px 16px 5px; background:#f7faf9; border-bottom:1px solid #e6ebe9; font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.08em; color:#6f7a75;">THU 12 MAR 2026</div>
+
+              <div style="font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.55;">
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px;">
+                  <span style="align-self:stretch; background:#c8d1cd; width:2px; margin-left:7px;"></span>
+                  <span style="color:#9aa39e;">09:41:18</span><span style="color:#4a5a53; font-weight:700;">STATUS</span><span>job created, queued for runner pool</span>
+                  <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:0.04em; color:#5c6a64; background:#f1f3f2; border:1px solid #d7dedb; padding:1px 6px;">→ PENDING</span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px; background:#f7faf9;">
+                  <span style="align-self:stretch; background:#17604a; width:2px; margin-left:7px;"></span>
+                  <span style="color:#9aa39e;">09:41:22</span><span style="color:#4a5a53; font-weight:700;">STATUS</span><span>picked up by runner rnr-nw-02</span>
+                  <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:0.04em; color:#17604a; background:#edf3f0; border:1px solid #bcd4ca; padding:1px 6px;">→ RUNNING</span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px;">
+                  <span></span><span style="color:#9aa39e;">09:41:24</span><span style="color:#17604a; font-weight:700;">STEP</span><span>open <span style="color:#4a5a53;">/reports/statements</span></span><span></span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px; background:#f7faf9;">
+                  <span></span><span style="color:#9aa39e;">09:41:31</span><span style="color:#17604a; font-weight:700;">STEP</span><span>click <span style="color:#4a5a53;">“Account Search” button</span></span><span></span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px;">
+                  <span></span><span style="color:#9aa39e;">09:41:33</span><span style="color:#17604a; font-weight:700;">STEP</span>
+                  <span>type <span style="color:#4a5a53;">acct_no</span> → <span style="background:#edf1ef; border:1px dashed #c8d1cd; padding:0 5px;">•••• 4417</span></span>
+                  <span style="font-family:'Public Sans', sans-serif; font-size:10px; font-weight:700; letter-spacing:0.06em; color:#5f7a70;">PII</span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px; background:#f7faf9;">
+                  <span></span><span style="color:#9aa39e;">09:41:36</span><span style="color:#8a6a2a; font-weight:700;">RECOVER</span><span style="color:#6b5520;">dismissed “What’s new” popup <span style="color:#9c8a63;">· scenario news_modal</span></span><span></span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px;">
+                  <span></span><span style="color:#9aa39e;">09:41:39</span><span style="color:#7a847f; font-weight:700;">INFO</span><span style="color:#7a847f;">waiting for results table (2.4s)</span><span></span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px; background:#f7faf9;">
+                  <span></span><span style="color:#9aa39e;">09:41:41</span><span style="color:#17604a; font-weight:700;">STEP</span><span>extract <span style="color:#4a5a53;">closing_balance</span> → <span style="font-weight:700;">48,120.55</span></span><span></span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:8px 16px; background:#fdefe8; border-top:1px solid #f0cdbb; border-bottom:1px solid #f0cdbb;">
+                  <span style="align-self:stretch; background:#a8471a; width:2px; margin-left:7px;"></span>
+                  <span style="color:#9a7663;">09:47:14</span><span style="color:#8a3b12; font-weight:700;">HALT</span>
+                  <span style="color:#6d3616;">step 14 <span style="color:#96674c;">click “Continue”</span> failed, no recoverable scenario matched</span>
+                  <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:0.04em; color:#8a3b12; background:#fff; border:1px solid #dfa787; padding:1px 6px;">→ INTERVENTION-REQUESTED</span>
+                </div>
+                <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px;">
+                  <span></span><span style="color:#9aa39e;">09:47:14</span><span style="color:#7a847f; font-weight:700;">INFO</span><span style="color:#7a847f;">awaiting operator</span><span></span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#fff; border:1px solid #d7dedb;">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e6ebe9;">
+                <h2 style="margin:0; font-size:14px; font-weight:700;">Results</h2>
+                <span style="font-size:12px; color:#8a938e;">3 / 5 collected</span>
+              </div>
+              <div style="font-size:13.5px;">
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px;">
+                  <span style="color:#5c6a64;">statement_period</span><span style="font-family:'JetBrains Mono', monospace;">2026-03</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px; background:#f7faf9;">
+                  <span style="color:#5c6a64;">account_no <span style="font-size:10px; font-weight:700; letter-spacing:0.06em; color:#5f7a70;">PII</span></span>
+                  <span style="font-family:'JetBrains Mono', monospace; background:#edf1ef; border:1px dashed #c8d1cd; padding:0 5px;">•••• 4417</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px;">
+                  <span style="color:#5c6a64;">closing_balance</span><span style="font-family:'JetBrains Mono', monospace; font-weight:700;">48,120.55</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px; color:#a4aca8;">
+                  <span>txn_count</span><span style="font-family:'JetBrains Mono', monospace;">pending</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px; color:#a4aca8;">
+                  <span>fees_total</span><span style="font-family:'JetBrains Mono', monospace;">pending</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ================= TRAINING JOB ================= -->
+    <sc-if value="{{ isTraining }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:20px 22px 22px;">
+        <div style="display:flex; align-items:center; gap:9px; font-size:12.5px; color:#5c6a64; margin-bottom:8px;">
+          <span style="font-family:'JetBrains Mono', monospace; font-weight:700; letter-spacing:0.07em; color:#8a6a2a;">TRAINING</span>
+          <span style="color:#bcc5c0;">|</span>
+          <span style="font-family:'JetBrains Mono', monospace;">job_7c0b31</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:32px;">
+          <h1 style="margin:0; font-size:26px; font-weight:700; letter-spacing:-0.01em;">Learn: Statement Extract</h1>
+          <div style="display:flex; gap:8px;">
+            <button style="font-family:'Public Sans', sans-serif; font-size:13px; font-weight:600; color:#141c19; background:#f1f3f2; border:1px solid #c4ccc8; padding:8px 14px; border-radius:2px; cursor:pointer;" style-hover="background:#e9edeb;">Export JSON</button>
+            <button style="font-family:'Public Sans', sans-serif; font-size:13px; font-weight:600; color:#fff; background:#17604a; border:none; padding:8px 14px; border-radius:2px; cursor:pointer;" style-hover="background:#0f4534;">Start Trial run</button>
+          </div>
+        </div>
+
+        <div style="margin-top:16px; display:grid; grid-template-columns:1.15fr 1fr 0.95fr 1fr 1.05fr; background:#fff; border:1px solid #d7dedb;">
+          <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Customer</div>
+            <div style="margin-top:4px; font-size:15px; font-weight:700;">Northwind Financial</div>
+          </div>
+          <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Application</div>
+            <div style="margin-top:4px; font-size:15px;">Legacy Teller Portal</div>
+          </div>
+          <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Recipe</div>
+            <div style="margin-top:4px; display:flex; align-items:center; gap:7px;">
+              <span style="font-family:'JetBrains Mono', monospace; font-size:14px;">v5.0</span>
+              <span style="font-size:12.5px; color:#8a6a2a;">draft</span>
+              <button title="View draft recipe" style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; padding:0; background:transparent; border:none; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; color:#17604a;">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.8" cy="6.8" r="4.3"></circle><path d="M10.2 10.2 L14 14"></path></svg>
+              </button>
+            </div>
+          </div>
+          <div style="padding:13px 16px; border-right:1px solid #e6ebe9;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#8a938e; text-transform:uppercase;">Runner</div>
+            <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:14px;">rnr-nw-02 <span style="color:#8a938e;">· 10.2.4.18</span></div>
+          </div>
+          <div style="padding:13px 16px; background:#edf3f0; box-shadow:inset 3px 0 0 #17604a;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; color:#5a7b6d; text-transform:uppercase;">Status</div>
+            <div style="margin-top:4px; display:flex; align-items:center; gap:7px;">
+              <span style="width:8px; height:8px; background:#17604a;"></span>
+              <span style="font-size:15px; font-weight:700; color:#0f4534;">Completed-Success</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; background:#fff; border:1px solid #d7dedb; padding:15px 16px;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px;">
+            <span style="font-size:13.5px; font-weight:600;">9 of 9 steps <span style="font-weight:400; color:#5c6a64;">— finished, draft recipe compiled</span></span>
+            <span style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#5c6a64;">started 11 Mar 2026 09:12:02 UTC · duration 00:00:33</span>
+          </div>
+          <div style="margin-top:10px; display:flex; gap:3px;">
+            <div style="flex:1; height:6px; background:#17604a;"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:14px; align-items:start;">
+          <div style="background:#fff; border:1px solid #d7dedb;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e6ebe9;">
+              <h2 style="margin:0; font-size:14px; font-weight:700;">Transcript</h2>
+              <span style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#8a938e;">41 entries · 6 screenshots · UTC</span>
+            </div>
+
+            <div style="padding:7px 16px 5px; background:#f7faf9; border-bottom:1px solid #e6ebe9; font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.08em; color:#6f7a75;">WED 11 MAR 2026</div>
+
+            <div style="font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.55;">
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px;">
+                <span style="align-self:stretch; background:#c8d1cd; width:2px; margin-left:7px;"></span>
+                <span style="color:#9aa39e;">09:12:02</span><span style="color:#4a5a53; font-weight:700;">STATUS</span><span>training job created, goals accepted</span>
+                <span style="display:inline-flex; align-items:center; font-size:11px; font-weight:700; color:#5c6a64; background:#f1f3f2; border:1px solid #d7dedb; padding:1px 6px; white-space:nowrap;">→ PENDING</span>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:7px 16px; background:#f7faf9;">
+                <span style="align-self:stretch; background:#17604a; width:2px; margin-left:7px;"></span>
+                <span style="color:#9aa39e;">09:12:09</span><span style="color:#4a5a53; font-weight:700;">STATUS</span><span>picked up by runner rnr-nw-02 · allowlist seeded</span>
+                <span style="display:inline-flex; align-items:center; font-size:11px; font-weight:700; color:#17604a; background:#edf3f0; border:1px solid #bcd4ca; padding:1px 6px; white-space:nowrap;">→ RUNNING</span>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:center; padding:7px 16px;">
+                <span></span><span style="color:#9aa39e;">09:12:11</span><span style="color:#17604a; font-weight:700;">STEP</span><span>open <span style="color:#4a5a53;">teller.northwind.test/login</span></span>
+                <button onClick="{{ openShot1 }}" title="View screenshot" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:1px solid #dfe4e2; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; border-color:#17604a; color:#17604a;">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect><circle cx="8" cy="8" r="2.2"></circle></svg>
+                </button>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:baseline; padding:7px 16px; background:#f7faf9;">
+                <span></span><span style="color:#9aa39e;">09:12:14</span><span style="color:#4b5d8f; font-weight:700;">PLAN</span><span style="color:#40507a;">locate the statements search form <span style="color:#8a93ad;">· llm, 2 candidates</span></span><span></span>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:center; padding:7px 16px;">
+                <span></span><span style="color:#9aa39e;">09:12:16</span><span style="color:#17604a; font-weight:700;">STEP</span><span>click <span style="color:#4a5a53;">“Reports” nav item</span> <span style="color:#9aa39e;">· selector refined from x,y</span></span>
+                <button onClick="{{ openShot2 }}" title="View screenshot" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:1px solid #dfe4e2; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; border-color:#17604a; color:#17604a;">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect><circle cx="8" cy="8" r="2.2"></circle></svg>
+                </button>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:center; padding:7px 16px; background:#f7faf9;">
+                <span></span><span style="color:#9aa39e;">09:12:19</span><span style="color:#17604a; font-weight:700;">STEP</span>
+                <span>type <span style="color:#4a5a53;">user_id</span> → <span style="background:#edf1ef; border:1px dashed #c8d1cd; padding:0 5px;">•••• 2210</span> <span style="font-family:'Public Sans', sans-serif; font-size:10px; font-weight:700; letter-spacing:0.06em; color:#5f7a70;">PII</span></span>
+                <button onClick="{{ openShot3 }}" title="View screenshot" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:1px solid #dfe4e2; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; border-color:#17604a; color:#17604a;">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect><circle cx="8" cy="8" r="2.2"></circle></svg>
+                </button>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:baseline; padding:7px 16px;">
+                <span></span><span style="color:#9aa39e;">09:12:24</span><span style="color:#4b5d8f; font-weight:700;">OBSERVE</span><span style="color:#40507a;">proposed output field <span style="color:#141c19;">closing_balance</span> from “Ending balance”</span><span></span>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:center; padding:7px 16px; background:#f7faf9;">
+                <span></span><span style="color:#9aa39e;">09:12:31</span><span style="color:#17604a; font-weight:700;">STEP</span><span>extract <span style="color:#4a5a53;">closing_balance</span> → <span style="font-weight:700;">48,120.55</span></span>
+                <button onClick="{{ openShot4 }}" title="View screenshot" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; padding:0; background:transparent; border:1px solid #dfe4e2; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; border-color:#17604a; color:#17604a;">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect><circle cx="8" cy="8" r="2.2"></circle></svg>
+                </button>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) 26px; gap:12px; align-items:baseline; padding:7px 16px;">
+                <span></span><span style="color:#9aa39e;">09:12:33</span><span style="color:#4b5d8f; font-weight:700;">PLAN</span><span style="color:#40507a;">Finished — all requested fields captured</span><span></span>
+              </div>
+              <div style="display:grid; grid-template-columns:16px 64px 72px minmax(0,1fr) auto; gap:12px; align-items:baseline; padding:8px 16px; background:#edf3f0; border-top:1px solid #bcd4ca; border-bottom:1px solid #bcd4ca;">
+                <span style="align-self:stretch; background:#17604a; width:2px; margin-left:7px;"></span>
+                <span style="color:#7c9a8c;">09:12:35</span><span style="color:#0f4534; font-weight:700;">STATUS</span><span style="color:#0f4534;">run finished, compiling draft recipe <span style="color:#5a7b6d;">v5.0</span></span>
+                <span style="display:inline-flex; align-items:center; font-size:11px; font-weight:700; color:#0f4534; background:#fff; border:1px solid #bcd4ca; padding:1px 6px; white-space:nowrap;">→ COMPLETED-SUCCESS</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <div style="background:#fff; border:1px solid #d7dedb;">
+              <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e6ebe9;">
+                <h2 style="margin:0; font-size:14px; font-weight:700;">Results</h2>
+                <span style="font-size:12px; color:#8a938e;">learned fields</span>
+              </div>
+              <div style="font-size:13.5px;">
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px;">
+                  <span style="color:#5c6a64;">statement_period</span><span style="font-family:'JetBrains Mono', monospace;">2026-03</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px; background:#f7faf9;">
+                  <span style="color:#5c6a64;">account_no <span style="font-size:10px; font-weight:700; letter-spacing:0.06em; color:#5f7a70;">PII</span></span>
+                  <span style="font-family:'JetBrains Mono', monospace; background:#edf1ef; border:1px dashed #c8d1cd; padding:0 5px;">•••• 4417</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px;">
+                  <span style="color:#5c6a64;">closing_balance</span><span style="font-family:'JetBrains Mono', monospace; font-weight:700;">48,120.55</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:14px; padding:9px 16px;">
+                  <span style="color:#5c6a64;">txn_count</span><span style="font-family:'JetBrains Mono', monospace;">142</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#fff; border:1px solid #d7dedb;">
+              <div style="padding:12px 16px; border-bottom:1px solid #e6ebe9;">
+                <h2 style="margin:0; font-size:14px; font-weight:700;">Goals</h2>
+              </div>
+              <div style="padding:12px 16px; font-size:13.5px; color:#3d4a45; line-height:1.5;">
+                Extract the monthly statement period, account number, closing balance and transaction count for a given account from the Teller Portal.
+              </div>
+              <div style="padding:0 16px 13px; font-size:12.5px; color:#8a938e; font-family:'JetBrains Mono', monospace;">allowlist: teller.northwind.test</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ================= screenshot overlay ================= -->
+    <sc-if value="{{ shotOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed; inset:0; z-index:50; background:rgba(20,28,25,0.72); display:flex; align-items:center; justify-content:center; padding:32px;">
+        <div style="width:100%; max-width:900px; max-height:100%; background:#f1f3f2; border:1px solid #b9c2be; box-shadow:0 12px 40px rgba(20,28,25,0.35); display:flex; flex-direction:column;">
+          <div style="flex:none; display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:14px 16px; border-bottom:1px solid #d7dedb; background:#fff;">
+            <div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#8a938e;">{{ shotMeta }}</div>
+              <div style="margin-top:3px; font-size:15px; font-weight:600; color:#141c19;">{{ shotTitle }}</div>
+            </div>
+            <button onClick="{{ closeShot }}" title="Close" style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; background:transparent; border:1px solid #d7dedb; border-radius:2px; color:#5c6a64; cursor:pointer;" style-hover="background:#edf1ef; color:#141c19;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3 L13 13 M13 3 L3 13"></path></svg>
+            </button>
+          </div>
+          <div style="padding:16px; display:flex; align-items:center; gap:14px; flex:1; min-height:0;">
+            <button onClick="{{ prevShot }}" title="Previous screenshot" style="flex:none; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #c4ccc8; border-radius:2px; color:#3d4a45; cursor:pointer;" style-hover="background:#edf1ef;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 2 L4 8 L10 14"></path></svg>
+            </button>
+            <div style="flex:1; aspect-ratio:16/10; max-height:100%; min-height:0; background:#e4e9e7; border:1px solid #cdd6d2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;">
+              <span style="font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; color:#7a847f;">RUNNER SCREENSHOT · MASKED</span>
+              <span style="font-size:13px; color:#8a938e;">1440 × 900 · captured after step</span>
+            </div>
+            <button onClick="{{ nextShot }}" title="Next screenshot" style="flex:none; width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; background:#fff; border:1px solid #c4ccc8; border-radius:2px; color:#3d4a45; cursor:pointer;" style-hover="background:#edf1ef;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2 L12 8 L6 14"></path></svg>
+            </button>
+          </div>
+          <div style="flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 16px 14px;">
+            <span style="font-size:12.5px; color:#5c6a64;">{{ shotPosition }}</span>
+            <span style="font-size:12.5px; color:#8a938e;">Sensitive fields masked before transmission</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;jobMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;execute&quot;,&quot;training&quot;],&quot;default&quot;:&quot;execute&quot;,&quot;tsType&quot;:&quot;'execute' | 'training'&quot;,&quot;section&quot;:&quot;Mock&quot;}}">
+const SHOTS = [
+  { time: "09:12:11", step: "Step 1 of 9", title: "open teller.northwind.test/login" },
+  { time: "09:12:16", step: "Step 3 of 9", title: "click “Reports” nav item" },
+  { time: "09:12:19", step: "Step 4 of 9", title: "type user_id → •••• 2210" },
+  { time: "09:12:31", step: "Step 7 of 9", title: "extract closing_balance → 48,120.55" },
+];
+
+class Component extends DCLogic {
+  state = { view: null, shot: -1 };
+
+  get view() { return this.state.view ?? (this.props.jobMode || "execute"); }
+
+  tab(active) {
+    return {
+      fontFamily: "'Public Sans', sans-serif", fontSize: "12.5px", fontWeight: 600,
+      padding: "6px 12px", borderRadius: "2px", cursor: "pointer",
+      color: active ? "#fff" : "#3d4a45",
+      background: active ? "#141c19" : "#f7faf9",
+      border: active ? "1px solid #141c19" : "1px solid #c4ccc8",
+    };
+  }
+
+  open(i) { this.setState({ shot: i }); }
+  move(d) {
+    this.setState(s => ({ shot: (s.shot + d + SHOTS.length) % SHOTS.length }));
+  }
+
+  componentDidMount() {
+    this._key = e => { if (this.state.shot < 0) return;
+      if (e.key === "Escape") this.setState({ shot: -1 });
+      if (e.key === "ArrowRight") this.move(1);
+      if (e.key === "ArrowLeft") this.move(-1); };
+    window.addEventListener("keydown", this._key);
+  }
+  componentWillUnmount() { window.removeEventListener("keydown", this._key); }
+
+  renderVals() {
+    const v = this.view, i = this.state.shot, s = SHOTS[i] || SHOTS[0];
+    return {
+      isExecute: v === "execute",
+      isTraining: v === "training",
+      showExecute: () => this.setState({ view: "execute", shot: -1 }),
+      showTraining: () => this.setState({ view: "training", shot: -1 }),
+      execTab: this.tab(v === "execute"),
+      trainTab: this.tab(v === "training"),
+      shotOpen: i >= 0,
+      openShot1: () => this.open(0),
+      openShot2: () => this.open(1),
+      openShot3: () => this.open(2),
+      openShot4: () => this.open(3),
+      closeShot: () => this.setState({ shot: -1 }),
+      prevShot: () => this.move(-1),
+      nextShot: () => this.move(1),
+      shotMeta: s.step + " · 11 Mar 2026 " + s.time + " UTC",
+      shotTitle: s.title,
+      shotPosition: "Screenshot " + (Math.max(i, 0) + 1) + " of " + SHOTS.length + " · ← → to navigate, Esc to close",
+    };
+  }
+}
+</script>
+</body>
+</html>

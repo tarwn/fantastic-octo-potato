@@ -15,6 +15,7 @@ const IGNORE_FILE_PATH = path.join(PROJECT_ROOT, ".md-linkcheck-ignore");
 
 // Files whose markdown links are intentionally illustrative (templates,
 // example output, prompt snippets) rather than real navigable references.
+// An entry ending in "/" ignores every file under that directory.
 function loadIgnoreFiles() {
   if (!fs.existsSync(IGNORE_FILE_PATH)) return [];
   return fs
@@ -22,6 +23,12 @@ function loadIgnoreFiles() {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "" && !line.startsWith("#"));
+}
+
+function isIgnored(file, ignoreEntries) {
+  return ignoreEntries.some((entry) =>
+    entry.endsWith("/") ? file.startsWith(entry) : file === entry
+  );
 }
 
 // Link-like syntax inside fenced/inline code isn't a real link — markdown
@@ -48,7 +55,7 @@ function listMarkdownFiles() {
   return output
     .split("\n")
     .filter(Boolean)
-    .filter((file) => !ignoreFiles.includes(file));
+    .filter((file) => !isIgnored(file, ignoreFiles));
 }
 
 function extractTarget(rawTarget) {

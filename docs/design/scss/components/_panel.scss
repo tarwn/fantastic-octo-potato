@@ -1,0 +1,116 @@
+@use "../variables" as *;
+
+// == panel
+// white surface, hairline grey border, square corners. the only container
+// primitive in the app: strip, transcript, results, goals are all panels.
+
+@mixin panel {
+  box-sizing: border-box;
+  background-color: $panel-background-color;
+  border: $border-hairline-width solid $panel-border-color;
+  border-radius: $panel-border-radius;
+}
+
+// header bar with title on the left and optional meta on the right
+@mixin panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-m;
+  padding: $panel-header-padding-y $panel-header-padding-x;
+  border-bottom: $border-hairline-width solid $panel-header-border-color;
+
+  > h2, > h3 {
+    margin: 0;
+    font-family: $font-family-ui;
+    font-size: $panel-header-font-size;
+    font-weight: $panel-header-font-weight;
+    color: $text-color-default;
+  }
+}
+
+@mixin panel-header-meta {
+  font-family: $font-family-mono;
+  font-size: $panel-header-meta-font-size;
+  color: $panel-header-meta-color;
+}
+
+@mixin panel-body {
+  padding: $panel-body-padding;
+  font-family: $font-family-ui;
+  font-size: $text-regular-size;
+  line-height: $text-regular-line-height;
+  color: $text-color-light;
+}
+
+// list of label/value rows. the stripe lives on the wrapper, not the row, so
+// the pattern is counted among rows only — a panel header (or any other
+// sibling) can never invert it.
+@mixin panel-rows {
+  > *:nth-child(even) { background-color: $surface-color-zebra; }
+}
+
+// label/value row (results, key-value readouts). wrap a run of these in an
+// element carrying panel-rows() to get the stripe.
+@mixin panel-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: $space-m;
+  padding: $panel-row-padding-y $panel-row-padding-x;
+  font-family: $font-family-ui;
+  font-size: $text-regular-size;
+}
+
+@mixin panel-row-label { color: $text-color-muted; }
+
+@mixin panel-row-value {
+  font-family: $font-family-mono;
+  color: $text-color-default;
+}
+
+@mixin panel-row-value-pending {
+  font-family: $font-family-mono;
+  color: $text-color-faint;
+}
+
+// a panel divided into equal fixed cells by hairlines — the identity strip.
+// the last cell is the status cell; tint it with status-cell().
+@mixin panel-strip($columns) {
+  @include panel;
+  display: grid;
+  grid-template-columns: $columns;
+
+  > * {
+    padding: 13px $space-m;
+    border-right: $border-hairline-width solid $border-color-inner;
+
+    &:last-child { border-right: 0; }
+  }
+}
+
+@mixin panel-strip-label {
+  font-family: $font-family-ui;
+  font-size: $text-micro-size;
+  font-weight: $text-micro-weight;
+  line-height: $text-micro-line-height;
+  letter-spacing: $text-micro-letter-spacing;
+  text-transform: uppercase;
+  color: $text-color-muted;
+}
+
+@mixin panel-strip-value {
+  margin-top: $space-xs;
+  font-family: $font-family-ui;
+  font-size: $text-body-size;
+  line-height: $text-body-line-height;
+  color: $text-color-default;
+}
+
+// the cell that answers "am I on the right thing, and what state is it in"
+@mixin panel-strip-status-cell($color, $surface) {
+  background-color: $surface;
+  box-shadow: inset 3px 0 0 $color;
+
+  > * { color: $color; }
+}

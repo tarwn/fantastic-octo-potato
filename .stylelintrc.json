@@ -1,7 +1,7 @@
 {
 	"extends": "stylelint-config-standard-scss",
 	"plugins": ["stylelint-scss"],
-	"ignoreFiles": ["**/node_modules/**"],
+	"ignoreFiles": ["**/node_modules/**", "docs/design/**"],
 	"rules": {
 		"color-no-hex": true,
 		"scss/dollar-variable-empty-line-before": null

@@ -25,7 +25,7 @@ export default tseslint.config(
 		// automatic tsconfigRootDir detection into seeing multiple candidate
 		// project roots — exclude the whole .claude/ tree, none of which is
 		// app source anyway.
-		ignores: ["**/build/", "**/.svelte-kit/", "**/dist/", "**/node_modules/", ".claude/"]
+		ignores: ["**/build/", "**/.svelte-kit/", "**/dist/", "**/node_modules/", ".claude/", "docs/design/"]
 	},
 	js.configs.recommended,
 	...tseslint.configs.recommended,

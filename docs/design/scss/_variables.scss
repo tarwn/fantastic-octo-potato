@@ -1,0 +1,328 @@
+// == basic tokens
+// == pattern: [type]-[variation name (size/color)]-[attr?]
+
+// palette
+// generated in oklch: fixed hue per family, lightness stepped, chroma held very
+// low + flat for the neutral family and raised for the signal families.
+// neutral is a cool grey with a faint green cast (hue 165) — no tan undertone.
+$color-stone-50: oklch(98% 0.003 165deg);
+$color-stone-100: oklch(95.5% 0.004 165deg);
+$color-stone-200: oklch(92.5% 0.005 165deg);
+$color-stone-300: oklch(89.5% 0.006 165deg);
+$color-stone-400: oklch(84% 0.007 165deg);
+$color-stone-500: oklch(72% 0.008 165deg);
+$color-stone-600: oklch(63% 0.009 165deg);
+$color-stone-700: oklch(52% 0.010 165deg);
+$color-stone-800: oklch(42% 0.010 165deg);
+$color-stone-900: oklch(32% 0.010 165deg);
+$color-stone-1200: oklch(19% 0.010 165deg);
+
+// stone-50  => 600+ for text
+// stone-100 => 700+ for text
+// stone-200 => 700+ (minimum shade for accessible body text on that background)
+
+$color-white: #fff;
+
+// moss is the brand / primary accent, and the "healthy" signal (running, success)
+$color-moss-100: oklch(95.5% 0.015 160deg);
+$color-moss-200: oklch(85% 0.035 160deg);
+$color-moss-600: oklch(48% 0.100 160deg);
+$color-moss-700: oklch(42% 0.090 160deg);
+$color-moss-800: oklch(34% 0.080 160deg);
+
+// rust is reserved for "a human is needed" — intervention, halt
+$color-rust-100: oklch(96% 0.018 45deg);
+$color-rust-200: oklch(87% 0.045 45deg);
+$color-rust-300: oklch(79% 0.070 45deg);
+$color-rust-600: oklch(52% 0.130 45deg);
+$color-rust-700: oklch(46% 0.125 45deg);
+$color-rust-800: oklch(38% 0.100 45deg);
+
+// ochre marks automated self-recovery and non-production environments
+$color-ochre-100: oklch(96% 0.030 80deg);
+$color-ochre-200: oklch(86% 0.065 80deg);
+$color-ochre-600: oklch(66% 0.110 80deg);
+$color-ochre-700: oklch(52% 0.085 80deg);
+$color-ochre-800: oklch(44% 0.070 80deg);
+
+// indigo marks machine reasoning (LLM plan/observe) and human-in-control
+$color-indigo-100: oklch(95.5% 0.020 275deg);
+$color-indigo-200: oklch(85% 0.045 275deg);
+$color-indigo-600: oklch(50% 0.090 275deg);
+$color-indigo-700: oklch(44% 0.085 275deg);
+$color-indigo-800: oklch(36% 0.075 275deg);
+
+// red is reserved for terminal failure / error and destructive actions
+$color-red-100: oklch(95.5% 0.030 27deg);
+$color-red-200: oklch(86% 0.060 27deg);
+$color-red-600: oklch(52% 0.165 27deg);
+$color-red-700: oklch(45% 0.155 27deg);
+$color-red-800: oklch(38% 0.135 27deg);
+
+$color-basic-regular: $color-stone-1200;
+$color-basic-lighter: $color-stone-900;
+$color-basic-deemphasized: $color-stone-700;
+
+// text
+$font-family-ui: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+$font-family-mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+
+// micro — uppercase eyebrows, strip labels, badges
+$text-micro-size: 11px;
+$text-micro-weight: 700;
+$text-micro-line-height: 14px;
+$text-micro-letter-spacing: 0.07em;
+
+$text-small-size: 12.5px;
+$text-small-weight: 400;
+$text-small-line-height: 18px;
+
+$text-regular-size: 13.5px;
+$text-regular-weight: 400;
+$text-regular-line-height: 20px;
+
+// body copy at reading size — goal statements, field labels in the strip
+$text-body-size: 15px;
+$text-body-weight: 400;
+$text-body-line-height: 22px;
+
+$text-h2-size: 14px;
+$text-h2-weight: 700;
+$text-h2-line-height: 20px;
+
+$text-h1-size: 26px;
+$text-h1-weight: 700;
+$text-h1-line-height: 32px;
+$text-h1-letter-spacing: -0.01em;
+
+// mono — transcript, identifiers, timestamps, numeric values
+$text-mono-micro-size: 11px;
+$text-mono-small-size: 12.5px;
+$text-mono-small-line-height: 19px;
+$text-mono-regular-size: 14px;
+
+// icon
+$icon-micro-size: 13px;
+$icon-small-size: 16px;
+$icon-regular-size: 18px;
+
+// spacing — fixed px scale
+$space-xxs: 2px;
+$space-xs: 4px;
+$space-s: 8px;
+$space-m: 16px;
+$space-l: 24px;
+$space-xl: 32px;
+$space-xxl: 48px;
+
+// borders — square-ish and tight, for an instrument-like feel
+$border-small-radius: 2px;
+$border-regular-radius: 3px;
+$border-hairline-width: 1px;
+
+// drop shadows — used sparingly; panels rely on borders, not elevation
+$box-shadow-flat: oklch(19% 0.01 165deg / 6%) 0px 1px 2px 0px;
+$box-shadow-overlay: oklch(19% 0.01 165deg / 35%) 0px 12px 40px 0px;
+
+// == derived basics
+// == pattern: [element]-[size variation?]-[property]-[property variation?]-[attr?]
+
+// general theme
+$text-color-default: $color-basic-regular;
+$text-color-light: $color-stone-800;
+$text-color-muted: $color-stone-600;
+$text-color-faint: $color-stone-500;
+$text-color-primary: $color-moss-700;
+$text-color-inverse: $color-stone-100;
+
+$surface-color-page: $color-stone-100;
+$surface-color-card: $color-white;
+$surface-color-zebra: $color-stone-50;
+$surface-color-chrome: $color-stone-1200;
+$surface-color-well: $color-stone-200;
+
+$border-color-panel: $color-stone-300;
+$border-color-inner: $color-stone-200;
+$border-color-control: $color-stone-400;
+
+$overlay-backdrop-color: oklch(19% 0.01 165deg / 72%);
+
+// anchor
+$anchor-default-color: $color-moss-700;
+$anchor-visited-color: $color-moss-700;
+$anchor-hover-color: $color-moss-800;
+
+// == status
+// the state machine's vocabulary. every state maps to one ink + one soft
+// surface + one border, and the same triplet is reused by the status strip,
+// the status-change badge in the transcript, and the status bar.
+$status-pending-color: $color-stone-700;
+$status-pending-surface: $color-stone-100;
+$status-pending-border: $color-stone-300;
+
+$status-running-color: $color-moss-700;
+$status-running-surface: $color-moss-100;
+$status-running-border: $color-moss-200;
+
+$status-intervention-color: $color-rust-700;
+$status-intervention-surface: $color-rust-100;
+$status-intervention-border: $color-rust-200;
+
+$status-interactive-color: $color-indigo-700;
+$status-interactive-surface: $color-indigo-100;
+$status-interactive-border: $color-indigo-200;
+
+$status-success-color: $color-moss-800;
+$status-success-surface: $color-moss-100;
+$status-success-border: $color-moss-200;
+
+$status-failed-color: $color-red-700;
+$status-failed-surface: $color-red-100;
+$status-failed-border: $color-red-200;
+
+$status-error-color: $color-red-800;
+$status-error-surface: $color-red-100;
+$status-error-border: $color-red-200;
+
+$status-stale-color: $color-ochre-800;
+$status-stale-surface: $color-ochre-100;
+$status-stale-border: $color-ochre-200;
+
+$status-cancelled-color: $color-stone-700;
+$status-cancelled-surface: $color-stone-100;
+$status-cancelled-border: $color-stone-300;
+
+// == button
+$button-all-border-width: $border-hairline-width;
+$button-all-border-radius: $border-small-radius;
+$button-all-height: 32px;
+$button-all-padding-x: 14px;
+$button-all-gap: $space-xs;
+$button-all-font-size: 13px;
+$button-all-font-weight: 600;
+
+$button-all-disabled-background-color: $color-stone-200;
+$button-all-disabled-border-color: $color-stone-300;
+$button-all-disabled-color: $color-stone-500;
+$button-all-focus-outline: 2px solid $color-moss-700;
+
+$button-primary-background-color: $color-moss-700;
+$button-primary-hover-background-color: $color-moss-800;
+$button-primary-color: $color-white;
+
+$button-secondary-background-color: $surface-color-page;
+$button-secondary-hover-background-color: $color-stone-200;
+$button-secondary-border-color: $color-stone-400;
+$button-secondary-color: $text-color-default;
+
+$button-caution-background-color: $color-rust-600;
+$button-caution-hover-background-color: $color-rust-700;
+$button-caution-color: $color-white;
+
+$button-danger-background-color: $color-red-700;
+$button-danger-hover-background-color: $color-red-800;
+$button-danger-color: $color-white;
+
+// icon button — square, label-less, quieter than a secondary button.
+// two weights: "bare" (no border until hover; the recipe magnifier in a
+// dense strip) and "outlined" (hairline border at rest; the screenshot
+// affordance in a transcript row, which must be findable while scanning).
+$button-icon-bare-size: 20px;
+$button-icon-outlined-size: 22px;
+$button-icon-glyph-size: $icon-micro-size;
+$button-icon-color: $text-color-muted;
+$button-icon-hover-color: $text-color-primary;
+$button-icon-hover-background-color: $color-stone-200;
+$button-icon-border-color: $color-stone-300;
+$button-icon-hover-border-color: $color-moss-700;
+
+// == panel
+$panel-background-color: $surface-color-card;
+$panel-border-color: $border-color-panel;
+$panel-border-radius: 0;
+$panel-header-border-color: $border-color-inner;
+$panel-header-padding-y: 12px;
+$panel-header-padding-x: $space-m;
+$panel-header-font-size: $text-h2-size;
+$panel-header-font-weight: $text-h2-weight;
+$panel-header-meta-color: $text-color-muted;
+$panel-header-meta-font-size: $text-small-size;
+$panel-body-padding: 12px $space-m;
+$panel-row-padding-y: 9px;
+$panel-row-padding-x: $space-m;
+
+// == transcript
+// a grid, not a table: [status rail] [time] [kind] [text] [affordance].
+// the last track is auto so it can hold either a status badge or an icon button.
+$transcript-grid-columns: 16px 64px 72px minmax(0, 1fr) auto;
+$transcript-grid-gap: 12px;
+$transcript-row-padding-y: 7px;
+$transcript-row-padding-x: $space-m;
+$transcript-row-emphasis-padding-y: $space-s;
+$transcript-font-family: $font-family-mono;
+$transcript-font-size: $text-mono-small-size;
+$transcript-line-height: 1.55;
+$transcript-time-color: $color-stone-500;
+$transcript-text-color: $text-color-default;
+$transcript-kind-font-weight: 700;
+$transcript-rail-width: 2px;
+$transcript-rail-offset: 7px;
+$transcript-rail-color-default: $color-stone-400;
+
+// date divider — the transcript carries time-of-day per row, and the date
+// only where it changes, so a long-running job reads as one continuous log.
+$transcript-date-background-color: $surface-color-zebra;
+$transcript-date-border-color: $border-color-inner;
+$transcript-date-color: $text-color-muted;
+$transcript-date-font-size: $text-micro-size;
+$transcript-date-letter-spacing: 0.08em;
+$transcript-date-padding: 7px $space-m 5px;
+
+// per-kind ink. STATUS/HALT additionally carry a rail + status badge.
+$transcript-kind-status-color: $color-stone-800;
+$transcript-kind-step-color: $color-moss-700;
+$transcript-kind-recover-color: $color-ochre-700;
+$transcript-kind-recover-text-color: $color-ochre-800;
+$transcript-kind-info-color: $text-color-muted;
+$transcript-kind-halt-color: $status-intervention-color;
+$transcript-kind-halt-text-color: $color-rust-800;
+$transcript-kind-halt-surface: $status-intervention-surface;
+$transcript-kind-halt-border-color: $status-intervention-border;
+$transcript-kind-plan-color: $color-indigo-700;
+$transcript-kind-plan-text-color: $color-indigo-800;
+$transcript-kind-observe-color: $color-indigo-700;
+$transcript-kind-terminal-surface: $status-success-surface;
+$transcript-kind-terminal-border-color: $status-success-border;
+
+// == redacted / sensitive value
+$redacted-background-color: $color-stone-200;
+$redacted-border: 1px dashed $color-stone-400;
+$redacted-color: $text-color-default;
+$redacted-padding-x: 5px;
+$redacted-font-family: $font-family-mono;
+$redacted-letter-spacing: 0.02em;
+$redacted-tag-color: $color-moss-700;
+$redacted-tag-font-size: 10px;
+$redacted-tag-font-weight: 700;
+$redacted-tag-letter-spacing: 0.06em;
+
+// == status change badge
+$status-change-font-size: $text-micro-size;
+$status-change-font-weight: 700;
+$status-change-letter-spacing: 0.04em;
+$status-change-padding-y: 1px;
+$status-change-padding-x: 6px;
+$status-change-border-width: 1px;
+$status-change-arrow-gap: 5px;
+$status-change-emphasis-background-color: $color-white;
+
+// == status bar
+// segmented progress: done / attention / remaining. one set of tokens, two
+// heights — the job page bar and the compact bar in the jobs list table.
+$status-bar-height: 6px;
+$status-bar-compact-height: 4px;
+$status-bar-gap: 3px;
+$status-bar-done-color: $color-moss-700;
+$status-bar-attention-color: $color-rust-600;
+$status-bar-failed-color: $color-red-700;
+$status-bar-remaining-color: $color-stone-300;

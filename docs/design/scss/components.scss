@@ -1,0 +1,114 @@
+// == components entry
+// the class layer: how the mixins are consumed. an application screen should
+// compose these mixins into its own semantic classes rather than reaching for
+// tokens directly; these classes are the reference implementation used by
+// Hub Components.dc.html.
+
+@use "variables" as *;
+@use "components" as *;
+
+.btn {
+  @include button-base;
+
+  &--primary { @include button-variant-primary; }
+  &--secondary { @include button-variant-secondary; }
+  &--caution { @include button-variant-caution; }
+  &--danger { @include button-variant-danger; }
+  &--tinted-interactive { @include button-variant-tinted($status-interactive-color, $color-indigo-800); }
+}
+
+.btn-icon {
+  @include button-icon-bare;
+
+  &--outlined { @include button-icon-outlined; }
+}
+
+.panel {
+  @include panel;
+
+  &__header { @include panel-header; }
+  &__meta { @include panel-header-meta; }
+  &__body { @include panel-body; }
+  &__rows { @include panel-rows; }
+  &__row { @include panel-row; }
+  &__label { @include panel-row-label; }
+  &__value { @include panel-row-value; }
+  &__value--pending { @include panel-row-value-pending; }
+}
+
+.strip {
+  @include panel-strip(1.15fr 1fr 0.95fr 1fr 1.05fr);
+
+  &__label { @include panel-strip-label; }
+  &__value { @include panel-strip-value; }
+  &__status--intervention { @include panel-strip-status-cell($status-intervention-color, $status-intervention-surface); }
+  &__status--running { @include panel-strip-status-cell($status-running-color, $status-running-surface); }
+  &__status--success { @include panel-strip-status-cell($status-success-color, $status-success-surface); }
+}
+
+.transcript {
+  @include transcript;
+
+  &__date { @include transcript-date-row; }
+  &__rows { @include transcript-rows; }
+  &__time { @include transcript-cell-time; }
+  &__detail { @include transcript-cell-detail; }
+  &__rail { @include transcript-rail; }
+  &__rail--running { @include transcript-rail($status-running-color); }
+  &__rail--intervention { @include transcript-rail($status-intervention-color); }
+  &__rail--success { @include transcript-rail($status-success-color); }
+
+  &__row {
+    @include transcript-row;
+
+    &--status { @include transcript-row-status; }
+    &--step { @include transcript-row-step; }
+    &--step-shot { @include transcript-row-interactive; @include transcript-row-step; }
+    &--recover { @include transcript-row-recover; }
+    &--info { @include transcript-row-info; }
+    &--halt { @include transcript-row-halt; }
+    &--plan { @include transcript-row-plan; }
+    &--observe { @include transcript-row-observe; }
+    &--terminal { @include transcript-row-terminal; }
+  }
+}
+
+.redacted {
+  @include redacted;
+
+  &-tag { @include redacted-tag; }
+}
+
+.status-change {
+  @include status-change;
+
+  &--pending { @include status-change-pending; }
+  &--running { @include status-change-running; }
+  &--intervention { @include status-change-intervention; }
+  &--interactive { @include status-change-interactive; }
+  &--success { @include status-change-success; }
+  &--failed { @include status-change-failed; }
+  &--error { @include status-change-error; }
+  &--stale { @include status-change-stale; }
+  &--cancelled { @include status-change-cancelled; }
+}
+
+.status-dot {
+  @include status-dot($status-running-color);
+
+  &--intervention { @include status-dot($status-intervention-color); }
+  &--success { @include status-dot($status-success-color); }
+}
+
+.status-bar {
+  @include status-bar;
+
+  &--compact { @include status-bar-compact; }
+
+  &__seg {
+    &--done { @include status-bar-segment-done; }
+    &--attention { @include status-bar-segment-attention; }
+    &--failed { @include status-bar-segment-failed; }
+    &--remaining { @include status-bar-segment-remaining; }
+  }
+}

@@ -6,3 +6,7 @@
 .claude/skills/write-spec/templates/spec.template.md
 .claude/skills/write-agent-context/_example.md
 .claude/skills/make-changes/SKILL.md
+
+# docs/design/ is imported verbatim from Claude Code (source of truth lives
+# there); links inside aren't meant to be validated against this repo.
+docs/design/

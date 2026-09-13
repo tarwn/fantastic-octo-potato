@@ -8,3 +8,4 @@ Reference: [tools/guards/check-md-links.cjs](../../../tools/guards/check-md-link
 * Only markdown-syntax links (`[text](path)`) are checked. Plain text that merely resembles a path, and external `http(s)`/`mailto:` links, are out of scope — the guard doesn't check external link liveness.
 * Link-like syntax inside inline code spans or fenced code blocks isn't checked — it renders as literal text, not a real link, so it's exempt by construction.
 * A file whose links are intentionally illustrative (a template, example output, or prompt snippet meant to be copy-pasted rather than followed) can be exempted wholesale by adding its project-relative path to `.md-linkcheck-ignore` (one path per line, `#`-prefixed comments allowed).
+* An entry ending in `/` exempts every file under that directory instead of a single file — use this for a directory of imported/vendored content (e.g. `docs/design/`) rather than listing each file.

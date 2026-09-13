@@ -1,0 +1,411 @@
+/* Generated from scss/components.scss — do not edit by hand.
+   Present so Hub Components.dc.html can render the real mixin output in a
+   browser without a Sass build step. Regenerate with:
+     sass scss/components.scss scss/components.css --no-source-map */
+
+.btn {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 14px;
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.btn:focus-visible {
+  outline: 2px solid oklch(42% 0.09 160deg);
+  outline-offset: 1px;
+}
+.btn:disabled {
+  cursor: not-allowed;
+  background-color: oklch(92.5% 0.005 165deg) !important;
+  border-color: oklch(89.5% 0.006 165deg) !important;
+  color: oklch(72% 0.008 165deg) !important;
+}
+.btn--primary {
+  background-color: oklch(42% 0.09 160deg);
+  border-color: oklch(42% 0.09 160deg);
+  color: #fff;
+}
+.btn--primary:hover, .btn--primary:active {
+  background-color: oklch(34% 0.08 160deg);
+  border-color: oklch(34% 0.08 160deg);
+}
+.btn--secondary {
+  background-color: oklch(95.5% 0.004 165deg);
+  border-color: oklch(84% 0.007 165deg);
+  color: oklch(19% 0.01 165deg);
+}
+.btn--secondary:hover, .btn--secondary:active {
+  background-color: oklch(92.5% 0.005 165deg);
+}
+.btn--caution {
+  background-color: oklch(52% 0.13 45deg);
+  border-color: oklch(52% 0.13 45deg);
+  color: #fff;
+}
+.btn--caution:hover {
+  background-color: oklch(46% 0.125 45deg);
+  border-color: oklch(46% 0.125 45deg);
+}
+.btn--danger {
+  background-color: oklch(45% 0.155 27deg);
+  border-color: oklch(45% 0.155 27deg);
+  color: #fff;
+}
+.btn--danger:hover {
+  background-color: oklch(38% 0.135 27deg);
+  border-color: oklch(38% 0.135 27deg);
+}
+.btn--tinted-interactive {
+  background-color: transparent;
+  border-color: oklch(44% 0.085 275deg);
+  color: oklch(44% 0.085 275deg);
+}
+.btn--tinted-interactive:hover {
+  background-color: color-mix(in oklab, oklch(44% 0.085 275deg) 8%, #fff);
+  border-color: oklch(36% 0.075 275deg);
+  color: oklch(36% 0.075 275deg);
+}
+
+.btn-icon {
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: oklch(63% 0.009 165deg);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  width: 20px;
+  height: 20px;
+}
+.btn-icon > svg { width: 13px; height: 13px; }
+.btn-icon:focus-visible {
+  outline: 2px solid oklch(42% 0.09 160deg);
+  outline-offset: 1px;
+}
+.btn-icon:hover {
+  background-color: oklch(92.5% 0.005 165deg);
+  color: oklch(42% 0.09 160deg);
+}
+.btn-icon--outlined {
+  width: 22px;
+  height: 22px;
+  border-color: oklch(89.5% 0.006 165deg);
+}
+.btn-icon--outlined:hover {
+  background-color: oklch(92.5% 0.005 165deg);
+  border-color: oklch(42% 0.09 160deg);
+  color: oklch(42% 0.09 160deg);
+}
+
+.panel {
+  box-sizing: border-box;
+  background-color: #fff;
+  border: 1px solid oklch(89.5% 0.006 165deg);
+  border-radius: 0;
+}
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid oklch(92.5% 0.005 165deg);
+}
+.panel__header > h2, .panel__header > h3 {
+  margin: 0;
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: oklch(19% 0.01 165deg);
+}
+.panel__meta {
+  font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  font-size: 12.5px;
+  color: oklch(63% 0.009 165deg);
+}
+.panel__body {
+  padding: 12px 16px;
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: oklch(42% 0.01 165deg);
+}
+.panel__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 16px;
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 13.5px;
+}
+.panel__rows > *:nth-child(even) { background-color: oklch(98% 0.003 165deg); }
+.panel__label { color: oklch(63% 0.009 165deg); }
+.panel__value {
+  font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  color: oklch(19% 0.01 165deg);
+}
+.panel__value--pending {
+  font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  color: oklch(72% 0.008 165deg);
+}
+
+.strip {
+  box-sizing: border-box;
+  background-color: #fff;
+  border: 1px solid oklch(89.5% 0.006 165deg);
+  border-radius: 0;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 0.95fr 1fr 1.05fr;
+}
+.strip > * {
+  padding: 13px 16px;
+  border-right: 1px solid oklch(92.5% 0.005 165deg);
+}
+.strip > *:last-child { border-right: 0; }
+.strip__label {
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: oklch(63% 0.009 165deg);
+}
+.strip__value {
+  margin-top: 4px;
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 15px;
+  line-height: 22px;
+  color: oklch(19% 0.01 165deg);
+}
+.strip__status--intervention {
+  background-color: oklch(96% 0.018 45deg);
+  box-shadow: inset 3px 0 0 oklch(46% 0.125 45deg);
+}
+.strip__status--intervention > * { color: oklch(46% 0.125 45deg); }
+.strip__status--running {
+  background-color: oklch(95.5% 0.015 160deg);
+  box-shadow: inset 3px 0 0 oklch(42% 0.09 160deg);
+}
+.strip__status--running > * { color: oklch(42% 0.09 160deg); }
+.strip__status--success {
+  background-color: oklch(95.5% 0.015 160deg);
+  box-shadow: inset 3px 0 0 oklch(34% 0.08 160deg);
+}
+.strip__status--success > * { color: oklch(34% 0.08 160deg); }
+
+.transcript {
+  font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: oklch(19% 0.01 165deg);
+}
+.transcript__date {
+  padding: 7px 16px 5px;
+  background-color: oklch(98% 0.003 165deg);
+  border-bottom: 1px solid oklch(92.5% 0.005 165deg);
+  font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(63% 0.009 165deg);
+}
+.transcript__time { color: oklch(72% 0.008 165deg); }
+.transcript__detail { color: oklch(63% 0.009 165deg); }
+.transcript__rail {
+  align-self: stretch;
+  width: 2px;
+  margin-left: 7px;
+  background-color: oklch(84% 0.007 165deg);
+}
+.transcript__rail--running {
+  align-self: stretch;
+  width: 2px;
+  margin-left: 7px;
+  background-color: oklch(42% 0.09 160deg);
+}
+.transcript__rail--intervention {
+  align-self: stretch;
+  width: 2px;
+  margin-left: 7px;
+  background-color: oklch(46% 0.125 45deg);
+}
+.transcript__rail--success {
+  align-self: stretch;
+  width: 2px;
+  margin-left: 7px;
+  background-color: oklch(34% 0.08 160deg);
+}
+.transcript__row {
+  display: grid;
+  grid-template-columns: 16px 64px 72px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 16px;
+}
+.transcript__rows > *:nth-child(even) { background-color: oklch(98% 0.003 165deg); }
+.transcript__row > .transcript__text { min-width: 0; }
+.transcript__row--status > .transcript__kind { font-weight: 700; color: oklch(42% 0.01 165deg); }
+.transcript__row--step > .transcript__kind,
+.transcript__row--step-shot > .transcript__kind { font-weight: 700; color: oklch(42% 0.09 160deg); }
+.transcript__row--step-shot { align-items: center; }
+.transcript__row--recover > .transcript__kind { font-weight: 700; color: oklch(52% 0.085 80deg); }
+.transcript__row--recover > .transcript__text { color: oklch(44% 0.07 80deg); }
+.transcript__row--info > .transcript__kind { font-weight: 700; color: oklch(63% 0.009 165deg); }
+.transcript__row--info > .transcript__text { color: oklch(63% 0.009 165deg); }
+.transcript__row--halt {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background-color: oklch(96% 0.018 45deg) !important;
+  border-top: 1px solid oklch(87% 0.045 45deg);
+  border-bottom: 1px solid oklch(87% 0.045 45deg);
+}
+.transcript__row--halt > .transcript__kind { font-weight: 700; color: oklch(46% 0.125 45deg); }
+.transcript__row--halt > .transcript__text { color: oklch(38% 0.1 45deg); }
+.transcript__row--halt > .transcript__time { color: oklch(60% 0.05 45deg); }
+.transcript__row--plan > .transcript__kind,
+.transcript__row--observe > .transcript__kind { font-weight: 700; color: oklch(44% 0.085 275deg); }
+.transcript__row--plan > .transcript__text,
+.transcript__row--observe > .transcript__text { color: oklch(36% 0.075 275deg); }
+.transcript__row--terminal {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background-color: oklch(95.5% 0.015 160deg) !important;
+  border-top: 1px solid oklch(85% 0.035 160deg);
+  border-bottom: 1px solid oklch(85% 0.035 160deg);
+}
+.transcript__row--terminal > .transcript__kind,
+.transcript__row--terminal > .transcript__text { font-weight: 700; color: oklch(34% 0.08 160deg); }
+.transcript__row--terminal > .transcript__text { font-weight: 400; }
+.transcript__row--terminal > .transcript__time { color: oklch(60% 0.03 160deg); }
+
+.redacted {
+  display: inline-block;
+  padding: 0 5px;
+  background-color: oklch(92.5% 0.005 165deg);
+  border: 1px dashed oklch(84% 0.007 165deg);
+  font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
+  letter-spacing: 0.02em;
+  color: oklch(19% 0.01 165deg);
+  white-space: nowrap;
+}
+.redacted-tag {
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: oklch(42% 0.09 160deg);
+  white-space: nowrap;
+}
+
+.status-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 6px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 0;
+  font-family: "Public Sans", -apple-system, blinkmacsystemfont, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status-change--pending {
+  color: oklch(52% 0.01 165deg);
+  border-color: oklch(89.5% 0.006 165deg);
+  background-color: oklch(95.5% 0.004 165deg);
+}
+.status-change--running {
+  color: oklch(42% 0.09 160deg);
+  border-color: oklch(85% 0.035 160deg);
+  background-color: oklch(95.5% 0.015 160deg);
+}
+.status-change--intervention {
+  color: oklch(46% 0.125 45deg);
+  border-color: oklch(87% 0.045 45deg);
+  background-color: #fff;
+}
+.status-change--interactive {
+  color: oklch(44% 0.085 275deg);
+  border-color: oklch(85% 0.045 275deg);
+  background-color: oklch(95.5% 0.02 275deg);
+}
+.status-change--success {
+  color: oklch(34% 0.08 160deg);
+  border-color: oklch(85% 0.035 160deg);
+  background-color: #fff;
+}
+.status-change--failed {
+  color: oklch(45% 0.155 27deg);
+  border-color: oklch(86% 0.06 27deg);
+  background-color: #fff;
+}
+.status-change--error {
+  color: oklch(38% 0.135 27deg);
+  border-color: oklch(86% 0.06 27deg);
+  background-color: #fff;
+}
+.status-change--stale {
+  color: oklch(44% 0.07 80deg);
+  border-color: oklch(86% 0.065 80deg);
+  background-color: oklch(96% 0.03 80deg);
+}
+.status-change--cancelled {
+  color: oklch(52% 0.01 165deg);
+  border-color: oklch(89.5% 0.006 165deg);
+  background-color: oklch(95.5% 0.004 165deg);
+}
+
+.status-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background-color: oklch(42% 0.09 160deg);
+}
+.status-dot--intervention { background-color: oklch(46% 0.125 45deg); }
+.status-dot--success { background-color: oklch(34% 0.08 160deg); }
+
+.status-bar {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  height: 6px;
+}
+.status-bar--compact {
+  height: 4px;
+  gap: 2px;
+}
+.status-bar__seg--done,
+.status-bar__seg--attention,
+.status-bar__seg--failed,
+.status-bar__seg--remaining {
+  flex: 1 1 0;
+  min-width: 2px;
+}
+.status-bar__seg--done { background-color: oklch(42% 0.09 160deg); }
+.status-bar__seg--attention { background-color: oklch(52% 0.13 45deg); }
+.status-bar__seg--failed { background-color: oklch(45% 0.155 27deg); }
+.status-bar__seg--remaining { background-color: oklch(89.5% 0.006 165deg); }

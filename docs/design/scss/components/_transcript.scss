@@ -1,0 +1,134 @@
+@use "../variables" as *;
+@use "status-change" as *;
+
+// == transcript
+// the log of one job: status changes, runner steps, recovered scenarios,
+// info, halts, and (training only) LLM plan/observe records.
+// laid out as a grid so time, kind and text align down the whole log:
+//   [status rail] [time] [kind] [text] [affordance]
+// rows carry time-of-day only; the date appears as a divider where it changes.
+
+@mixin transcript {
+  font-family: $transcript-font-family;
+  font-size: $transcript-font-size;
+  line-height: $transcript-line-height;
+  color: $transcript-text-color;
+}
+
+@mixin transcript-date-row {
+  padding: $transcript-date-padding;
+  background-color: $transcript-date-background-color;
+  border-bottom: $border-hairline-width solid $transcript-date-border-color;
+  font-family: $font-family-mono;
+  font-size: $transcript-date-font-size;
+  font-weight: 700;
+  letter-spacing: $transcript-date-letter-spacing;
+  text-transform: uppercase;
+  color: $transcript-date-color;
+}
+
+// a run of rows between two date dividers. the stripe lives here, not on the
+// row, so it is counted among rows only — date dividers can never shift it.
+@mixin transcript-rows {
+  > *:nth-child(even) { background-color: $surface-color-zebra; }
+}
+
+@mixin transcript-row {
+  display: grid;
+  grid-template-columns: $transcript-grid-columns;
+  gap: $transcript-grid-gap;
+  align-items: baseline;
+  padding: $transcript-row-padding-y $transcript-row-padding-x;
+}
+
+// rows whose affordance is an icon button need centred cells
+@mixin transcript-row-interactive {
+  @include transcript-row;
+  align-items: center;
+}
+
+@mixin transcript-cell-time { color: $transcript-time-color; }
+
+@mixin transcript-cell-kind($color) {
+  font-weight: $transcript-kind-font-weight;
+  color: $color;
+}
+
+@mixin transcript-cell-text($color: $transcript-text-color) {
+  min-width: 0;
+  color: $color;
+}
+
+// secondary detail inside a row's text — selector, scenario name, confidence
+@mixin transcript-cell-detail { color: $text-color-muted; }
+
+// the rail: a 2px vertical mark in the gutter, present only on rows that
+// changed the job's state, in that state's ink. same ink as the strip's
+// status cell and the status-change badge.
+@mixin transcript-rail($color: $transcript-rail-color-default) {
+  align-self: stretch;
+  width: $transcript-rail-width;
+  margin-left: $transcript-rail-offset;
+  background-color: $color;
+}
+
+// full-width emphasis on a row whose state change matters: halt and terminal
+@mixin transcript-row-emphasis($surface, $border) {
+  padding-top: $transcript-row-emphasis-padding-y;
+  padding-bottom: $transcript-row-emphasis-padding-y;
+  background-color: $surface !important;
+  border-top: $border-hairline-width solid $border;
+  border-bottom: $border-hairline-width solid $border;
+}
+
+// == row kinds
+// each kind sets its own kind-cell ink; text ink only shifts where the record
+// is not a neutral fact (recover, halt, plan).
+
+@mixin transcript-row-status {
+  @include transcript-row;
+  > .transcript__kind { @include transcript-cell-kind($transcript-kind-status-color); }
+}
+
+@mixin transcript-row-step {
+  @include transcript-row;
+  > .transcript__kind { @include transcript-cell-kind($transcript-kind-step-color); }
+}
+
+@mixin transcript-row-recover {
+  @include transcript-row;
+  > .transcript__kind { @include transcript-cell-kind($transcript-kind-recover-color); }
+  > .transcript__text { color: $transcript-kind-recover-text-color; }
+}
+
+@mixin transcript-row-info {
+  @include transcript-row;
+  > .transcript__kind { @include transcript-cell-kind($transcript-kind-info-color); }
+  > .transcript__text { color: $transcript-kind-info-color; }
+}
+
+@mixin transcript-row-halt {
+  @include transcript-row;
+  @include transcript-row-emphasis($transcript-kind-halt-surface, $transcript-kind-halt-border-color);
+  > .transcript__kind { @include transcript-cell-kind($transcript-kind-halt-color); }
+  > .transcript__text { color: $transcript-kind-halt-text-color; }
+}
+
+// LLM-originated records (training): plan = proposed next step,
+// observe = proposed output field. indigo separates machine reasoning from
+// runner action at a glance.
+@mixin transcript-row-plan {
+  @include transcript-row;
+  > .transcript__kind { @include transcript-cell-kind($transcript-kind-plan-color); }
+  > .transcript__text { color: $transcript-kind-plan-text-color; }
+}
+
+@mixin transcript-row-observe { @include transcript-row-plan; }
+
+// terminal success row — same emphasis treatment as halt, success ink
+@mixin transcript-row-terminal {
+  @include transcript-row;
+  @include transcript-row-emphasis($transcript-kind-terminal-surface, $transcript-kind-terminal-border-color);
+  > .transcript__kind { @include transcript-cell-kind($status-success-color); }
+  > .transcript__text { color: $status-success-color; }
+}

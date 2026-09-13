@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="scss/components.css">
+<style>
+  body { margin: 0; background: oklch(95.5% 0.004 165deg); }
+  a { color: oklch(42% 0.09 160deg); text-decoration: none; }
+  a:hover { color: oklch(34% 0.08 160deg); text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="max-width:1180px; margin:0 auto; padding:36px 28px 72px; font-family:'Public Sans', system-ui, sans-serif; color:oklch(19% 0.01 165deg);">
+
+  <header style="padding-bottom:20px; border-bottom:1px solid oklch(89.5% 0.006 165deg);">
+    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.09em; color:oklch(63% 0.009 165deg);">HUB · DESIGN SYSTEM</div>
+    <h1 style="margin:8px 0 0; font-size:26px; font-weight:700; letter-spacing:-0.01em;">Components</h1>
+    <p style="margin:10px 0 0; max-width:62ch; font-size:13.5px; line-height:20px; color:oklch(42% 0.01 165deg); text-wrap:pretty;">Every specimen below is rendered by the compiled output of <code style="font-family:'JetBrains Mono', monospace;">scss/components.scss</code>, which composes the mixins in <code style="font-family:'JetBrains Mono', monospace;">scss/components/</code> over the tokens in <code style="font-family:'JetBrains Mono', monospace;">scss/_variables.scss</code>. Class names here are the reference consumption, not the API — application screens compose the mixins into their own semantic classes.</p>
+  </header>
+
+  <!-- ============ tokens ============ -->
+  <section style="padding-top:32px;">
+    <h2 style="margin:0; font-size:18px; font-weight:700;">Tokens</h2>
+    <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">scss/_variables.scss</div>
+
+    <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+      <div>
+        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.07em; color:oklch(63% 0.009 165deg);">STONE — NEUTRAL</div>
+        <div style="margin-top:8px; display:flex; height:40px; border:1px solid oklch(89.5% 0.006 165deg);">
+          <div style="flex:1; background:oklch(98% 0.003 165deg);"></div>
+          <div style="flex:1; background:oklch(95.5% 0.004 165deg);"></div>
+          <div style="flex:1; background:oklch(92.5% 0.005 165deg);"></div>
+          <div style="flex:1; background:oklch(89.5% 0.006 165deg);"></div>
+          <div style="flex:1; background:oklch(84% 0.007 165deg);"></div>
+          <div style="flex:1; background:oklch(72% 0.008 165deg);"></div>
+          <div style="flex:1; background:oklch(63% 0.009 165deg);"></div>
+          <div style="flex:1; background:oklch(52% 0.01 165deg);"></div>
+          <div style="flex:1; background:oklch(42% 0.01 165deg);"></div>
+          <div style="flex:1; background:oklch(32% 0.01 165deg);"></div>
+          <div style="flex:1; background:oklch(19% 0.01 165deg);"></div>
+        </div>
+        <div style="margin-top:5px; font-size:12.5px; color:oklch(63% 0.009 165deg);">50 → 1200 · page, panels, chrome, body ink</div>
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.07em; color:oklch(63% 0.009 165deg);">MOSS — PRIMARY / HEALTHY</div>
+        <div style="margin-top:8px; display:flex; height:40px; border:1px solid oklch(89.5% 0.006 165deg);">
+          <div style="flex:1; background:oklch(95.5% 0.015 160deg);"></div>
+          <div style="flex:1; background:oklch(85% 0.035 160deg);"></div>
+          <div style="flex:1; background:oklch(48% 0.1 160deg);"></div>
+          <div style="flex:1; background:oklch(42% 0.09 160deg);"></div>
+          <div style="flex:1; background:oklch(34% 0.08 160deg);"></div>
+        </div>
+        <div style="margin-top:5px; font-size:12.5px; color:oklch(63% 0.009 165deg);">primary actions, running, success</div>
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.07em; color:oklch(63% 0.009 165deg);">RUST — NEEDS A HUMAN</div>
+        <div style="margin-top:8px; display:flex; height:40px; border:1px solid oklch(89.5% 0.006 165deg);">
+          <div style="flex:1; background:oklch(96% 0.018 45deg);"></div>
+          <div style="flex:1; background:oklch(87% 0.045 45deg);"></div>
+          <div style="flex:1; background:oklch(79% 0.07 45deg);"></div>
+          <div style="flex:1; background:oklch(52% 0.13 45deg);"></div>
+          <div style="flex:1; background:oklch(46% 0.125 45deg);"></div>
+          <div style="flex:1; background:oklch(38% 0.1 45deg);"></div>
+        </div>
+        <div style="margin-top:5px; font-size:12.5px; color:oklch(63% 0.009 165deg);">intervention, halt — nothing else</div>
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700; letter-spacing:0.07em; color:oklch(63% 0.009 165deg);">OCHRE · INDIGO · RED</div>
+        <div style="margin-top:8px; display:flex; height:40px; border:1px solid oklch(89.5% 0.006 165deg);">
+          <div style="flex:1; background:oklch(96% 0.03 80deg);"></div>
+          <div style="flex:1; background:oklch(66% 0.11 80deg);"></div>
+          <div style="flex:1; background:oklch(44% 0.07 80deg);"></div>
+          <div style="flex:1; background:oklch(95.5% 0.02 275deg);"></div>
+          <div style="flex:1; background:oklch(50% 0.09 275deg);"></div>
+          <div style="flex:1; background:oklch(36% 0.075 275deg);"></div>
+          <div style="flex:1; background:oklch(95.5% 0.03 27deg);"></div>
+          <div style="flex:1; background:oklch(45% 0.155 27deg);"></div>
+          <div style="flex:1; background:oklch(38% 0.135 27deg);"></div>
+        </div>
+        <div style="margin-top:5px; font-size:12.5px; color:oklch(63% 0.009 165deg);">self-recovery · machine reasoning · terminal failure</div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px;">
+      <div class="panel">
+        <div class="panel__header"><h2>Type scale</h2><span class="panel__meta">Public Sans · JetBrains Mono</span></div>
+        <div style="padding:14px 16px; display:flex; flex-direction:column; gap:12px;">
+          <div>
+            <div style="font-size:26px; font-weight:700; letter-spacing:-0.01em; line-height:32px;">Statement Extract — March</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:oklch(63% 0.009 165deg);">$text-h1 · 26/32/700</div>
+          </div>
+          <div>
+            <div style="font-size:14px; font-weight:700; line-height:20px;">Transcript</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:oklch(63% 0.009 165deg);">$text-h2 · 14/20/700 — panel headers</div>
+          </div>
+          <div>
+            <div style="font-size:15px; line-height:22px;">Northwind Financial</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:oklch(63% 0.009 165deg);">$text-body · 15/22 — strip values, identity</div>
+          </div>
+          <div>
+            <div style="font-size:13.5px; line-height:20px;">Extract the monthly statement period and closing balance.</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:oklch(63% 0.009 165deg);">$text-regular · 13.5/20 — body, rows</div>
+          </div>
+          <div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:19px;">09:47:14 · rnr-nw-02 · 48,120.55</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:oklch(63% 0.009 165deg);">$text-mono-small · 12.5/19 — log, ids, values</div>
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:oklch(63% 0.009 165deg);">Customer</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:oklch(63% 0.009 165deg);">$text-micro · 11/14/700 · +0.07em — labels</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__header"><h2>Status vocabulary</h2><span class="panel__meta">one ink + surface + border per state</span></div>
+        <div style="padding:14px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <span class="status-change status-change--pending">→ Pending</span>
+          <span class="status-change status-change--running">→ Running</span>
+          <span class="status-change status-change--intervention">→ Intervention-Requested</span>
+          <span class="status-change status-change--interactive">→ Interactive-User</span>
+          <span class="status-change status-change--success">→ Completed-Success</span>
+          <span class="status-change status-change--failed">→ Completed-Failed</span>
+          <span class="status-change status-change--error">→ Completed-Error</span>
+          <span class="status-change status-change--stale">→ Completed-Stale</span>
+          <span class="status-change status-change--cancelled">→ Completed-Cancelled</span>
+        </div>
+        <div style="padding:0 16px 14px; font-size:13.5px; line-height:20px; color:oklch(42% 0.01 165deg); text-wrap:pretty;">Moss is healthy, rust means a human is needed, indigo means a human or the model is driving, red is terminal failure, grey is inert. The same triplet drives the strip's status cell, the transcript rail, and this badge.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ buttons ============ -->
+  <section style="padding-top:36px;">
+    <h2 style="margin:0; font-size:18px; font-weight:700;">Buttons</h2>
+    <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">button-base + button-variant-{primary, secondary, caution, danger, tinted($color)}</div>
+
+    <div class="panel" style="margin-top:14px;">
+      <div style="padding:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+        <button class="btn btn--primary">Start Trial run</button>
+        <button class="btn btn--secondary">Export JSON</button>
+        <button class="btn btn--caution">Take control</button>
+        <button class="btn btn--danger">Cancel job</button>
+        <button class="btn btn--tinted-interactive">Hand control back</button>
+        <button class="btn btn--primary" disabled="disabled">Disabled</button>
+      </div>
+      <div style="padding:0 16px 16px; font-size:13.5px; line-height:20px; color:oklch(42% 0.01 165deg); text-wrap:pretty; max-width:78ch;">One size (32px). <strong>Caution</strong> is separate from <strong>danger</strong>: rust asks a human to act on a stuck job, red destroys or ends something. <code style="font-family:'JetBrains Mono', monospace;">button-variant-tinted($color)</code> takes any status ink for actions that belong to a state.</div>
+    </div>
+
+    <h3 style="margin:24px 0 0; font-size:15px; font-weight:700;">Icon buttons</h3>
+    <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">button-icon-bare · button-icon-outlined — a separate mixin, not a button variant</div>
+
+    <div class="panel" style="margin-top:14px;">
+      <div style="padding:16px; display:flex; flex-wrap:wrap; gap:28px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn-icon" title="View recipe">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.8" cy="6.8" r="4.3"></circle><path d="M10.2 10.2 L14 14"></path></svg>
+          </button>
+          <span style="font-size:13.5px; color:oklch(42% 0.01 165deg);">bare · inline in a dense strip</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn-icon btn-icon--outlined" title="View screenshot">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect><circle cx="8" cy="8" r="2.2"></circle></svg>
+          </button>
+          <span style="font-size:13.5px; color:oklch(42% 0.01 165deg);">outlined · scannable in a log row</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn-icon btn-icon--outlined" title="Close">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3 L13 13 M13 3 L3 13"></path></svg>
+          </button>
+          <span style="font-size:13.5px; color:oklch(42% 0.01 165deg);">outlined · overlay dismiss</span>
+        </div>
+      </div>
+      <div style="padding:0 16px 16px; font-size:13.5px; line-height:20px; color:oklch(42% 0.01 165deg); text-wrap:pretty; max-width:78ch;">Kept out of the button mixin deliberately: it is square, label-less, 20–22px rather than 32px, and carries no horizontal padding or min-width. Composing it from <code style="font-family:'JetBrains Mono', monospace;">button-base</code> would mean overriding height, padding, min-width, gap and font-size at every call site.</div>
+    </div>
+  </section>
+
+  <!-- ============ panel ============ -->
+  <section style="padding-top:36px;">
+    <h2 style="margin:0; font-size:18px; font-weight:700;">Panel</h2>
+    <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">panel · panel-header · panel-body · panel-row · panel-strip($columns)</div>
+
+    <div style="margin-top:14px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start;">
+      <div class="panel">
+        <div class="panel__header"><h2>Results</h2><span class="panel__meta">3 / 5 collected</span></div>
+        <div class="panel__rows">
+          <div class="panel__row"><span class="panel__label">statement_period</span><span class="panel__value">2026-03</span></div>
+          <div class="panel__row"><span class="panel__label">account_no <span class="redacted-tag">PII</span></span><span class="redacted">•••• 4417</span></div>
+          <div class="panel__row"><span class="panel__label">closing_balance</span><span class="panel__value" style="font-weight:700;">48,120.55</span></div>
+          <div class="panel__row"><span class="panel__label">txn_count</span><span class="panel__value--pending">pending</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel__header"><h2>Goals</h2></div>
+        <div class="panel__body">Extract the monthly statement period, account number, closing balance and transaction count for a given account from the Teller Portal.</div>
+      </div>
+    </div>
+
+    <div class="strip" style="margin-top:16px;">
+      <div>
+        <div class="strip__label">Customer</div>
+        <div class="strip__value" style="font-weight:700;">Northwind Financial</div>
+      </div>
+      <div>
+        <div class="strip__label">Application</div>
+        <div class="strip__value">Legacy Teller Portal</div>
+      </div>
+      <div>
+        <div class="strip__label">Recipe</div>
+        <div class="strip__value" style="display:flex; align-items:center; gap:7px; font-family:'JetBrains Mono', monospace; font-size:14px;">v4.2
+          <span style="font-family:'Public Sans', sans-serif; font-size:12.5px; color:oklch(63% 0.009 165deg);">released</span>
+          <button class="btn-icon" title="View recipe">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.8" cy="6.8" r="4.3"></circle><path d="M10.2 10.2 L14 14"></path></svg>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="strip__label">Runner</div>
+        <div class="strip__value" style="font-family:'JetBrains Mono', monospace; font-size:14px;">rnr-nw-02</div>
+      </div>
+      <div class="strip__status--intervention">
+        <div class="strip__label">Status</div>
+        <div class="strip__value" style="display:flex; align-items:center; gap:7px; font-weight:700;"><span class="status-dot status-dot--intervention"></span>Intervention-Requested</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ transcript ============ -->
+  <section style="padding-top:36px;">
+    <h2 style="margin:0; font-size:18px; font-weight:700;">Transcript</h2>
+    <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">transcript · transcript-date-row · transcript-row-{status, step, recover, info, halt, plan, observe, terminal} · transcript-rail($status)</div>
+
+    <div class="panel" style="margin-top:14px;">
+      <div class="panel__header"><h2>Every row kind</h2><span class="panel__meta">time-of-day per row · date only where it changes</span></div>
+      <div class="transcript">
+        <div class="transcript__date">Wed 11 Mar 2026</div>
+        <div class="transcript__rows">
+        <div class="transcript__row transcript__row--status">
+          <span class="transcript__rail"></span>
+          <span class="transcript__time">09:12:02</span>
+          <span class="transcript__kind">STATUS</span>
+          <span class="transcript__text">job created, queued for runner pool</span>
+          <span class="status-change status-change--pending">→ Pending</span>
+        </div>
+        <div class="transcript__row transcript__row--status">
+          <span class="transcript__rail transcript__rail--running"></span>
+          <span class="transcript__time">09:12:09</span>
+          <span class="transcript__kind">STATUS</span>
+          <span class="transcript__text">picked up by runner rnr-nw-02</span>
+          <span class="status-change status-change--running">→ Running</span>
+        </div>
+        <div class="transcript__row transcript__row--step">
+          <span></span>
+          <span class="transcript__time">09:12:24</span>
+          <span class="transcript__kind">STEP</span>
+          <span class="transcript__text">click <span class="transcript__detail">“Account Search” button</span></span>
+          <span></span>
+        </div>
+        <div class="transcript__row transcript__row--step-shot">
+          <span></span>
+          <span class="transcript__time">09:12:31</span>
+          <span class="transcript__kind">STEP</span>
+          <span class="transcript__text">type <span class="transcript__detail">acct_no</span> → <span class="redacted">•••• 4417</span> <span class="redacted-tag">PII</span></span>
+          <button class="btn-icon btn-icon--outlined" title="View screenshot">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect><circle cx="8" cy="8" r="2.2"></circle></svg>
+          </button>
+        </div>
+        <div class="transcript__row transcript__row--recover">
+          <span></span>
+          <span class="transcript__time">09:12:36</span>
+          <span class="transcript__kind">RECOVER</span>
+          <span class="transcript__text">dismissed “What’s new” popup <span class="transcript__detail">· scenario news_modal</span></span>
+          <span></span>
+        </div>
+        <div class="transcript__row transcript__row--info">
+          <span></span>
+          <span class="transcript__time">09:12:39</span>
+          <span class="transcript__kind">INFO</span>
+          <span class="transcript__text">waiting for results table (2.4s)</span>
+          <span></span>
+        </div>
+        <div class="transcript__row transcript__row--plan">
+          <span></span>
+          <span class="transcript__time">09:12:42</span>
+          <span class="transcript__kind">PLAN</span>
+          <span class="transcript__text">locate the statements search form <span class="transcript__detail">· llm, 2 candidates</span></span>
+          <span></span>
+        </div>
+        <div class="transcript__row transcript__row--observe">
+          <span></span>
+          <span class="transcript__time">09:12:47</span>
+          <span class="transcript__kind">OBSERVE</span>
+          <span class="transcript__text">proposed output field closing_balance from “Ending balance”</span>
+          <span></span>
+        </div>
+        <div class="transcript__row transcript__row--halt">
+          <span class="transcript__rail transcript__rail--intervention"></span>
+          <span class="transcript__time">09:12:52</span>
+          <span class="transcript__kind">HALT</span>
+          <span class="transcript__text">step 14 failed, no recoverable scenario matched</span>
+          <span class="status-change status-change--intervention">→ Intervention-Requested</span>
+        </div>
+        <div class="transcript__row transcript__row--terminal">
+          <span class="transcript__rail transcript__rail--success"></span>
+          <span class="transcript__time">09:12:35</span>
+          <span class="transcript__kind">STATUS</span>
+          <span class="transcript__text">run finished, compiling draft recipe v5.0</span>
+          <span class="status-change status-change--success">→ Completed-Success</span>
+        </div>
+        </div>
+      </div>
+      <div style="padding:14px 16px; border-top:1px solid oklch(92.5% 0.005 165deg); font-size:13.5px; line-height:20px; color:oklch(42% 0.01 165deg); text-wrap:pretty; max-width:86ch;">A grid, not a table, so time / kind / text align down a log of mixed record types. The last track is <code style="font-family:'JetBrains Mono', monospace;">auto</code>: it holds either a status badge or an icon button. A state change never becomes a second row — the record that caused it carries the badge and a rail in the gutter.</div>
+    </div>
+  </section>
+
+  <!-- ============ redacted + status bar ============ -->
+  <section style="padding-top:36px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start;">
+    <div>
+      <h2 style="margin:0; font-size:18px; font-weight:700;">Redacted</h2>
+      <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">redacted · redacted-tag</div>
+      <div class="panel" style="margin-top:14px;">
+        <div style="padding:16px; display:flex; flex-direction:column; gap:10px; font-family:'JetBrains Mono', monospace; font-size:12.5px;">
+          <div><span class="redacted">•••• 4417</span> <span class="redacted-tag">PII</span></div>
+          <div><span class="redacted">•••• 2210</span> <span class="redacted-tag">PII</span></div>
+          <div><span class="redacted">[masked at capture]</span> <span class="redacted-tag">sensitive</span></div>
+        </div>
+        <div style="padding:0 16px 16px; font-size:13.5px; line-height:20px; color:oklch(42% 0.01 165deg); text-wrap:pretty;">Dashed border says “stand-in, not the data”; always mono, so masked and real values align in a column. The tag names why it is masked.</div>
+      </div>
+    </div>
+
+    <div>
+      <h2 style="margin:0; font-size:18px; font-weight:700;">Status bar</h2>
+      <div style="margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; color:oklch(63% 0.009 165deg);">status-bar · status-bar-compact · status-bar-segment-{done, attention, failed, remaining}</div>
+      <div class="panel" style="margin-top:14px;">
+        <div style="padding:16px; display:flex; flex-direction:column; gap:16px;">
+          <div>
+            <div style="display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:8px;"><span style="font-weight:600;">Step 14 of 19 — halted</span><span style="font-family:'JetBrains Mono', monospace; color:oklch(63% 0.009 165deg);">00:06:18</span></div>
+            <div class="status-bar">
+              <div class="status-bar__seg--done" style="flex:13;"></div>
+              <div class="status-bar__seg--attention" style="flex:1;"></div>
+              <div class="status-bar__seg--remaining" style="flex:5;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:13.5px; font-weight:600; margin-bottom:8px;">9 of 9 — finished</div>
+            <div class="status-bar"><div class="status-bar__seg--done" style="flex:1;"></div></div>
+          </div>
+          <div>
+            <div style="font-size:13.5px; font-weight:600; margin-bottom:8px;">Failed at step 6 of 19</div>
+            <div class="status-bar">
+              <div class="status-bar__seg--done" style="flex:5;"></div>
+              <div class="status-bar__seg--failed" style="flex:1;"></div>
+              <div class="status-bar__seg--remaining" style="flex:13;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12.5px; color:oklch(63% 0.009 165deg); margin-bottom:8px;">compact — jobs list table cell</div>
+            <div style="display:flex; flex-direction:column; gap:9px; max-width:220px;">
+              <div class="status-bar status-bar--compact">
+                <div class="status-bar__seg--done" style="flex:13;"></div>
+                <div class="status-bar__seg--attention" style="flex:1;"></div>
+                <div class="status-bar__seg--remaining" style="flex:5;"></div>
+              </div>
+              <div class="status-bar status-bar--compact"><div class="status-bar__seg--done" style="flex:1;"></div></div>
+              <div class="status-bar status-bar--compact">
+                <div class="status-bar__seg--done" style="flex:2;"></div>
+                <div class="status-bar__seg--remaining" style="flex:17;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+</body>
+</html>
