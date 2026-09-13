@@ -1,4 +1,4 @@
-# ADR N: SvelteKit for the hub
+# ADR 0000: SvelteKit for the hub
 
 **Author:** Agent (Eli Weinstock-Herman)
 
@@ -19,7 +19,7 @@ The author is already familiar with SvelteKit. Svelte tends to produce less code
 
 ## Status
 
-Proposed
+Accepted
 
 ## Consequences
 

@@ -1,4 +1,4 @@
-# ADR N: Vitest for unit/component tests
+# ADR 0001: Vitest for unit/component tests
 
 **Author:** Agent (Eli Weinstock-Herman)
 
@@ -10,7 +10,7 @@ We will use vitest as the unit/component test runner for both hub (`src/hub`) an
 
 ## Rationale
 
-The author is actively using vitest across several other projects and has previously evaluated it against Jest and other alternatives, where it came out faster and integrates well with an already Vite-based setup (relevant here since hub is SvelteKit, which is Vite-based). Already vetted recently enough elsewhere that re-running that comparison for this repo wasn't warranted. Recorded because it establishes the repo's unit-test tooling and its nx/npm task wiring (`test:hub:unit-tests`, `test:runner-web:unit-tests`, etc.) for both scopes going forward.
+The author is actively using vitest across several other projects and has previously evaluated it against Jest and other alternatives, where it came out faster and integrates well with an already Vite-based setup (relevant here since hub is SvelteKit, which is Vite-based). Already vetted recently enough elsewhere that re-running that comparison for this repo wasn't warranted. Recorded because it establishes the repo's unit-test tooling and its nx/npm task wiring (`guard:hub:test`, `guard:runner-web:test`, etc.) for both scopes going forward.
 
 ### Considered Options
 
@@ -19,7 +19,7 @@ The author is actively using vitest across several other projects and has previo
 
 ## Status
 
-Proposed
+Accepted
 
 ## Consequences
 

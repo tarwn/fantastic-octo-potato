@@ -19,7 +19,8 @@ Be intentional and frugal with commands:
 ### Build & Run
 
 - `npm install` installs for all projects
-- `npm run dev:hub` runs the backend and frontend for 
+- `npm run dev:hub` runs the backend and frontend for the hub SvelteKit app
+- `npm run dev:runner-web` runs the runner-web entry point
 
 ## AutoFix
 
@@ -44,6 +45,9 @@ Every guard below is nx-cached.
 | `npm run guard:hub:lint` | ESLint checks (hub scope) | pre-commit |
 | `npm run guard:hub:stylelint` | Stylelint checks (hub scope) | pre-commit |
 | `npm run guard:hub:test` | vitest unit tests (hub scope) | pre-commit |
+| `npm run guard:runner-web:lint` | ESLint checks (runner-web scope) | pre-commit |
+| `npm run guard:runner-web:test` | vitest unit tests (runner-web scope) | pre-commit |
+| `npm run guard:runner-web:tsc` | TypeScript type-check (runner-web scope) | pre-commit |
 | `npm run guard:tools:lint` | ESLint checks (tools scope: tools/docs/test-e2e/top-level) | pre-commit |
 | `npm run guard:tools:md-links` | markdown link checker (tools scope) | pre-commit |
 | `npm run guard:tools:test-file-size` | test file line-count limit (tools scope) | pre-commit |

@@ -1,4 +1,4 @@
-# ADR N: Playwright for hub e2e tests
+# ADR 0001: Playwright for hub e2e tests
 
 **Author:** Agent (Eli Weinstock-Herman)
 
@@ -19,7 +19,7 @@ Playwright is the author's current default choice for browser automation and e2e
 
 ## Status
 
-Proposed
+Accepted
 
 ## Consequences
 
