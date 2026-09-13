@@ -1,0 +1,1869 @@
+{
+  "note": "Synthetic POC design examples, not browser execution evidence. Standalone scenarios are separate snippets. Sensitive extraction values illustrate the authorized store; transcript/LLM views mask them.",
+  "recipe": {
+    "id": "recipe-account-summary",
+    "version": 1,
+    "customerId": "customer-example",
+    "applicationId": "application-legacy",
+    "name": "Read an account summary",
+    "goal": "Find an account and copy number, balance, and raw statement date",
+    "state": "draft",
+    "createdAt": "2026-09-13T19:00:00Z",
+    "sourceTrainingRunId": "training-account-summary",
+    "definition": {
+      "schemaVersion": 1,
+      "inputs": {
+        "startUrl": {
+          "type": "string",
+          "description": "Application starting URL",
+          "required": true,
+          "nullable": false,
+          "sensitive": false
+        },
+        "accountQuery": {
+          "type": "string",
+          "description": "Account to search for",
+          "required": true,
+          "nullable": false,
+          "sensitive": true
+        }
+      },
+      "outputs": {
+        "status": {
+          "type": "string",
+          "description": "Search outcome",
+          "required": true,
+          "nullable": false,
+          "sensitive": false,
+          "enum": [
+            "found",
+            "not_found"
+          ]
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": true
+        },
+        "balance": {
+          "type": "number",
+          "description": "Balance, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": true
+        },
+        "statementDate": {
+          "type": "string",
+          "description": "Raw statement date text, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": false
+        }
+      },
+      "steps": [
+        {
+          "id": "start",
+          "action": "open",
+          "args": [
+            {
+              "ref": "input",
+              "name": "startUrl"
+            }
+          ],
+          "intent": "Open accounts"
+        },
+        {
+          "id": "search",
+          "action": "group",
+          "args": [
+            [
+              {
+                "id": "enter_query",
+                "action": "fill",
+                "args": [
+                  {
+                    "by": "placeholder",
+                    "value": "Search accounts"
+                  },
+                  {
+                    "ref": "input",
+                    "name": "accountQuery"
+                  }
+                ]
+              },
+              {
+                "id": "push_search",
+                "action": "click",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "button[name=search]"
+                  }
+                ]
+              },
+              {
+                "id": "wait_search",
+                "action": "verify",
+                "args": [
+                  {
+                    "test": "any",
+                    "args": [
+                      {
+                        "test": "visible",
+                        "args": [
+                          {
+                            "by": "text",
+                            "value": "No results"
+                          }
+                        ]
+                      },
+                      {
+                        "test": "visible",
+                        "args": [
+                          {
+                            "by": "css",
+                            "value": "button[name=open-account]"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          ],
+          "intent": "Search for the account"
+        },
+        {
+          "id": "choose_result",
+          "action": "if",
+          "args": [
+            [
+              {
+                "when": {
+                  "test": "visible",
+                  "args": [
+                    {
+                      "by": "text",
+                      "value": "No results"
+                    }
+                  ]
+                },
+                "steps": [
+                  {
+                    "id": "mark_missing",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "status"
+                      },
+                      "not_found"
+                    ]
+                  },
+                  {
+                    "id": "missing_accountNumber",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "accountNumber"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "id": "missing_balance",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "balance"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "id": "missing_statementDate",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "statementDate"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "id": "missing_done",
+                    "action": "goto",
+                    "args": [
+                      "complete"
+                    ]
+                  }
+                ]
+              },
+              {
+                "when": {
+                  "test": "visible",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "button[name=open-account]"
+                    }
+                  ]
+                },
+                "steps": [
+                  {
+                    "id": "open_account",
+                    "action": "click",
+                    "args": [
+                      {
+                        "by": "css",
+                        "value": "button[name=open-account]"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            [
+              {
+                "id": "unknown_result",
+                "action": "fail",
+                "args": [
+                  "UNKNOWN_RESULT",
+                  "No recognized search outcome"
+                ]
+              }
+            ]
+          ],
+          "intent": "Handle missing account or open the result"
+        },
+        {
+          "id": "wait_details",
+          "action": "verify",
+          "args": [
+            {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "#account-details"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "copy_summary",
+          "action": "group",
+          "args": [
+            [
+              {
+                "id": "copy_number",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "label",
+                    "value": "Account number"
+                  },
+                  "value",
+                  {
+                    "ref": "output",
+                    "name": "accountNumber"
+                  }
+                ]
+              },
+              {
+                "id": "copy_balance",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "#balance"
+                  },
+                  "number",
+                  {
+                    "ref": "output",
+                    "name": "balance"
+                  }
+                ]
+              },
+              {
+                "id": "copy_date",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "label",
+                    "value": "Statement date"
+                  },
+                  "value",
+                  {
+                    "ref": "output",
+                    "name": "statementDate"
+                  }
+                ]
+              },
+              {
+                "id": "mark_found",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "status"
+                  },
+                  "found"
+                ]
+              }
+            ]
+          ],
+          "intent": "Copy the account summary"
+        },
+        {
+          "id": "complete",
+          "action": "finish",
+          "args": [
+            {
+              "test": "all",
+              "args": [
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "status"
+                    }
+                  ]
+                },
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "accountNumber"
+                    }
+                  ]
+                },
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "balance"
+                    }
+                  ]
+                },
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "statementDate"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "intent": "Confirm all outputs were collected"
+        }
+      ],
+      "recoveries": [
+        {
+          "id": "dismiss_feature",
+          "description": "Dismiss a new-feature popup",
+          "when": {
+            "test": "visible",
+            "args": [
+              {
+                "by": "css",
+                "value": "#new-feature-dialog"
+              }
+            ]
+          },
+          "steps": [
+            {
+              "id": "dismiss_popup",
+              "action": "click",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "#new-feature-dialog button[name=dismiss]"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "runnerPayload": {
+    "jobId": "job-trial-1",
+    "mode": "Trial",
+    "recipeId": "recipe-account-summary",
+    "recipeVersion": 1,
+    "recipe": {
+      "schemaVersion": 1,
+      "inputs": {
+        "startUrl": {
+          "type": "string",
+          "description": "Application starting URL",
+          "required": true,
+          "nullable": false,
+          "sensitive": false
+        },
+        "accountQuery": {
+          "type": "string",
+          "description": "Account to search for",
+          "required": true,
+          "nullable": false,
+          "sensitive": true
+        }
+      },
+      "outputs": {
+        "status": {
+          "type": "string",
+          "description": "Search outcome",
+          "required": true,
+          "nullable": false,
+          "sensitive": false,
+          "enum": [
+            "found",
+            "not_found"
+          ]
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": true
+        },
+        "balance": {
+          "type": "number",
+          "description": "Balance, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": true
+        },
+        "statementDate": {
+          "type": "string",
+          "description": "Raw statement date text, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": false
+        }
+      },
+      "steps": [
+        {
+          "id": "start",
+          "action": "open",
+          "args": [
+            {
+              "ref": "input",
+              "name": "startUrl"
+            }
+          ],
+          "intent": "Open accounts"
+        },
+        {
+          "id": "search",
+          "action": "group",
+          "args": [
+            [
+              {
+                "id": "enter_query",
+                "action": "fill",
+                "args": [
+                  {
+                    "by": "placeholder",
+                    "value": "Search accounts"
+                  },
+                  {
+                    "ref": "input",
+                    "name": "accountQuery"
+                  }
+                ]
+              },
+              {
+                "id": "push_search",
+                "action": "click",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "button[name=search]"
+                  }
+                ]
+              },
+              {
+                "id": "wait_search",
+                "action": "verify",
+                "args": [
+                  {
+                    "test": "any",
+                    "args": [
+                      {
+                        "test": "visible",
+                        "args": [
+                          {
+                            "by": "text",
+                            "value": "No results"
+                          }
+                        ]
+                      },
+                      {
+                        "test": "visible",
+                        "args": [
+                          {
+                            "by": "css",
+                            "value": "button[name=open-account]"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          ],
+          "intent": "Search for the account"
+        },
+        {
+          "id": "choose_result",
+          "action": "if",
+          "args": [
+            [
+              {
+                "when": {
+                  "test": "visible",
+                  "args": [
+                    {
+                      "by": "text",
+                      "value": "No results"
+                    }
+                  ]
+                },
+                "steps": [
+                  {
+                    "id": "mark_missing",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "status"
+                      },
+                      "not_found"
+                    ]
+                  },
+                  {
+                    "id": "missing_accountNumber",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "accountNumber"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "id": "missing_balance",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "balance"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "id": "missing_statementDate",
+                    "action": "assign",
+                    "args": [
+                      {
+                        "ref": "output",
+                        "name": "statementDate"
+                      },
+                      null
+                    ]
+                  },
+                  {
+                    "id": "missing_done",
+                    "action": "goto",
+                    "args": [
+                      "complete"
+                    ]
+                  }
+                ]
+              },
+              {
+                "when": {
+                  "test": "visible",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "button[name=open-account]"
+                    }
+                  ]
+                },
+                "steps": [
+                  {
+                    "id": "open_account",
+                    "action": "click",
+                    "args": [
+                      {
+                        "by": "css",
+                        "value": "button[name=open-account]"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            [
+              {
+                "id": "unknown_result",
+                "action": "fail",
+                "args": [
+                  "UNKNOWN_RESULT",
+                  "No recognized search outcome"
+                ]
+              }
+            ]
+          ],
+          "intent": "Handle missing account or open the result"
+        },
+        {
+          "id": "wait_details",
+          "action": "verify",
+          "args": [
+            {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "#account-details"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "copy_summary",
+          "action": "group",
+          "args": [
+            [
+              {
+                "id": "copy_number",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "label",
+                    "value": "Account number"
+                  },
+                  "value",
+                  {
+                    "ref": "output",
+                    "name": "accountNumber"
+                  }
+                ]
+              },
+              {
+                "id": "copy_balance",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "#balance"
+                  },
+                  "number",
+                  {
+                    "ref": "output",
+                    "name": "balance"
+                  }
+                ]
+              },
+              {
+                "id": "copy_date",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "label",
+                    "value": "Statement date"
+                  },
+                  "value",
+                  {
+                    "ref": "output",
+                    "name": "statementDate"
+                  }
+                ]
+              },
+              {
+                "id": "mark_found",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "status"
+                  },
+                  "found"
+                ]
+              }
+            ]
+          ],
+          "intent": "Copy the account summary"
+        },
+        {
+          "id": "complete",
+          "action": "finish",
+          "args": [
+            {
+              "test": "all",
+              "args": [
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "status"
+                    }
+                  ]
+                },
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "accountNumber"
+                    }
+                  ]
+                },
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "balance"
+                    }
+                  ]
+                },
+                {
+                  "test": "assigned",
+                  "args": [
+                    {
+                      "ref": "output",
+                      "name": "statementDate"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "intent": "Confirm all outputs were collected"
+        }
+      ],
+      "recoveries": [
+        {
+          "id": "dismiss_feature",
+          "description": "Dismiss a new-feature popup",
+          "when": {
+            "test": "visible",
+            "args": [
+              {
+                "by": "css",
+                "value": "#new-feature-dialog"
+              }
+            ]
+          },
+          "steps": [
+            {
+              "id": "dismiss_popup",
+              "action": "click",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "#new-feature-dialog button[name=dismiss]"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "ingredients": {
+      "startUrl": "https://legacy.example.test/accounts",
+      "accountQuery": "ACCT-1042"
+    },
+    "controls": {
+      "allowedOrigins": [
+        "https://legacy.example.test"
+      ]
+    },
+    "stepTimeoutMs": 15000,
+    "comms": {
+      "statusUrl": "https://hub.example.test/jobs/job-trial-1/status",
+      "artifactsUrl": "https://hub.example.test/jobs/job-trial-1/artifacts"
+    }
+  },
+  "ingredients": {
+    "startUrl": "https://legacy.example.test/accounts",
+    "accountQuery": "ACCT-1042"
+  },
+  "controls": {
+    "allowedOrigins": [
+      "https://legacy.example.test"
+    ]
+  },
+  "sampleOutputs": {
+    "found": {
+      "status": "found",
+      "accountNumber": "ACCT-1042",
+      "balance": 1234.5,
+      "statementDate": "09/01/2026"
+    },
+    "notFound": {
+      "status": "not_found",
+      "accountNumber": null,
+      "balance": null,
+      "statementDate": null
+    }
+  },
+  "sampleResult": {
+    "outputs": {
+      "status": "found",
+      "accountNumber": "ACCT-1042",
+      "balance": 1234.5,
+      "statementDate": "09/01/2026"
+    },
+    "runnerTimezone": "America/New_York"
+  },
+  "trainingRun": {
+    "schemaVersion": 1,
+    "id": "training-account-summary",
+    "jobId": "job-training-1",
+    "customerId": "customer-example",
+    "applicationId": "application-legacy",
+    "createdAt": "2026-09-13T18:30:00Z",
+    "goal": "Find an account and copy number, balance, and raw statement date",
+    "alternateGoals": [
+      "Find recoverable popups"
+    ],
+    "startUrl": "https://legacy.example.test/accounts",
+    "controls": {
+      "allowedOrigins": [
+        "https://legacy.example.test"
+      ]
+    },
+    "maxSteps": 12,
+    "stepTimeoutMs": 15000,
+    "masking": "synthetic",
+    "syntheticDataConfirmed": true,
+    "inputSamples": {
+      "startUrl": "https://legacy.example.test/accounts",
+      "accountQuery": "ACCT-1042"
+    },
+    "outputSamples": {
+      "status": "found",
+      "accountNumber": "ACCT-1042",
+      "balance": 1234.5,
+      "statementDate": "09/01/2026"
+    },
+    "hypotheses": [
+      {
+        "id": "output_status",
+        "kind": "output",
+        "statement": "Observed status extraction or assignment",
+        "status": "confirmed",
+        "evidenceEventIds": [
+          "event_9"
+        ],
+        "fieldName": "status",
+        "field": {
+          "type": "string",
+          "description": "Search outcome",
+          "required": true,
+          "nullable": false,
+          "sensitive": false,
+          "enum": [
+            "found",
+            "not_found"
+          ]
+        }
+      },
+      {
+        "id": "output_accountNumber",
+        "kind": "output",
+        "statement": "Observed accountNumber extraction or assignment",
+        "status": "confirmed",
+        "evidenceEventIds": [
+          "event_6"
+        ],
+        "fieldName": "accountNumber",
+        "field": {
+          "type": "string",
+          "description": "Account number, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": true
+        }
+      },
+      {
+        "id": "output_balance",
+        "kind": "output",
+        "statement": "Observed balance extraction or assignment",
+        "status": "confirmed",
+        "evidenceEventIds": [
+          "event_7"
+        ],
+        "fieldName": "balance",
+        "field": {
+          "type": "number",
+          "description": "Balance, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": true
+        }
+      },
+      {
+        "id": "output_statementDate",
+        "kind": "output",
+        "statement": "Observed statementDate extraction or assignment",
+        "status": "confirmed",
+        "evidenceEventIds": [
+          "event_8"
+        ],
+        "fieldName": "statementDate",
+        "field": {
+          "type": "string",
+          "description": "Raw statement date text, null if absent",
+          "required": true,
+          "nullable": true,
+          "sensitive": false
+        }
+      }
+    ],
+    "steps": [
+      {
+        "sequence": 1,
+        "source": "system",
+        "step": {
+          "id": "train_start",
+          "action": "open",
+          "args": [
+            "https://legacy.example.test/accounts"
+          ]
+        }
+      },
+      {
+        "sequence": 2,
+        "source": "llm",
+        "step": {
+          "id": "train_query",
+          "action": "fill",
+          "args": [
+            {
+              "by": "placeholder",
+              "value": "Search accounts"
+            },
+            {
+              "ref": "input",
+              "name": "accountQuery"
+            }
+          ]
+        }
+      },
+      {
+        "sequence": 3,
+        "source": "llm",
+        "step": {
+          "id": "train_search",
+          "action": "click",
+          "args": [
+            {
+              "by": "css",
+              "value": "button[name=search]"
+            }
+          ]
+        }
+      },
+      {
+        "sequence": 4,
+        "source": "llm",
+        "step": {
+          "id": "train_open",
+          "action": "click",
+          "args": [
+            {
+              "by": "css",
+              "value": "button[name=open-account]"
+            }
+          ]
+        }
+      },
+      {
+        "sequence": 5,
+        "source": "llm",
+        "step": {
+          "id": "train_copy",
+          "action": "group",
+          "args": [
+            [
+              {
+                "id": "train_copy_number",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "label",
+                    "value": "Account number"
+                  },
+                  "value",
+                  {
+                    "ref": "output",
+                    "name": "accountNumber"
+                  }
+                ]
+              },
+              {
+                "id": "train_copy_balance",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "#balance"
+                  },
+                  "number",
+                  {
+                    "ref": "output",
+                    "name": "balance"
+                  }
+                ]
+              },
+              {
+                "id": "train_copy_date",
+                "action": "read",
+                "args": [
+                  {
+                    "by": "label",
+                    "value": "Statement date"
+                  },
+                  "value",
+                  {
+                    "ref": "output",
+                    "name": "statementDate"
+                  }
+                ]
+              },
+              {
+                "id": "train_mark_found",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "status"
+                  },
+                  "found"
+                ]
+              }
+            ]
+          ],
+          "intent": "Copy the account summary"
+        }
+      },
+      {
+        "sequence": 6,
+        "source": "llm",
+        "step": {
+          "id": "train_finish",
+          "action": "finish",
+          "args": [
+            null
+          ]
+        }
+      }
+    ],
+    "transcript": [
+      {
+        "id": "event_1",
+        "sequence": 1,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_start",
+        "source": "system",
+        "outcome": "succeeded",
+        "artifactIds": [
+          "screen_1"
+        ]
+      },
+      {
+        "id": "event_2",
+        "sequence": 2,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_query",
+        "source": "llm",
+        "outcome": "succeeded"
+      },
+      {
+        "id": "event_3",
+        "sequence": 3,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_search",
+        "source": "llm",
+        "outcome": "succeeded"
+      },
+      {
+        "id": "event_4",
+        "sequence": 4,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_open",
+        "source": "llm",
+        "outcome": "succeeded"
+      },
+      {
+        "id": "event_5",
+        "sequence": 5,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_copy",
+        "source": "llm",
+        "outcome": "succeeded"
+      },
+      {
+        "id": "event_6",
+        "sequence": 6,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_copy_number",
+        "parentStepId": "train_copy",
+        "source": "llm",
+        "outcome": "succeeded",
+        "extractions": [
+          {
+            "destination": {
+              "ref": "output",
+              "name": "accountNumber"
+            },
+            "value": "ACCT-1042",
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "event_7",
+        "sequence": 7,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_copy_balance",
+        "parentStepId": "train_copy",
+        "source": "llm",
+        "outcome": "succeeded",
+        "extractions": [
+          {
+            "destination": {
+              "ref": "output",
+              "name": "balance"
+            },
+            "value": 1234.5,
+            "sensitive": true
+          }
+        ]
+      },
+      {
+        "id": "event_8",
+        "sequence": 8,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_copy_date",
+        "parentStepId": "train_copy",
+        "source": "llm",
+        "outcome": "succeeded",
+        "extractions": [
+          {
+            "destination": {
+              "ref": "output",
+              "name": "statementDate"
+            },
+            "value": "09/01/2026",
+            "sensitive": false
+          }
+        ]
+      },
+      {
+        "id": "event_9",
+        "sequence": 9,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_mark_found",
+        "parentStepId": "train_copy",
+        "source": "llm",
+        "outcome": "succeeded",
+        "extractions": [
+          {
+            "destination": {
+              "ref": "output",
+              "name": "status"
+            },
+            "value": "found",
+            "sensitive": false
+          }
+        ]
+      },
+      {
+        "id": "event_10",
+        "sequence": 10,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "train_finish",
+        "source": "llm",
+        "outcome": "succeeded"
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "screen_1",
+        "kind": "screenshot",
+        "storageKey": "training/job-training-1/screen_1.png",
+        "masked": true,
+        "width": 1280,
+        "height": 2400
+      }
+    ],
+    "compiledRecipe": {
+      "id": "recipe-account-summary",
+      "version": 1
+    }
+  },
+  "standaloneScenarios": [
+    {
+      "id": "find_text",
+      "action": "check",
+      "args": [
+        {
+          "test": "exists",
+          "args": [
+            {
+              "by": "text",
+              "value": "Account saved"
+            }
+          ]
+        }
+      ],
+      "intent": "Is Account saved present?"
+    },
+    {
+      "id": "find_button_label",
+      "action": "check",
+      "args": [
+        {
+          "test": "visible",
+          "args": [
+            {
+              "by": "text",
+              "value": "Search"
+            }
+          ]
+        }
+      ],
+      "intent": "Is Search visible?"
+    },
+    {
+      "id": "find_button_identity",
+      "action": "check",
+      "args": [
+        {
+          "test": "exists",
+          "args": [
+            {
+              "by": "css",
+              "value": "button[name=search]"
+            }
+          ]
+        }
+      ],
+      "intent": "Is the Search button present?"
+    },
+    {
+      "id": "click_button",
+      "action": "click",
+      "args": [
+        {
+          "by": "css",
+          "value": "button[name=search]"
+        }
+      ],
+      "intent": "Push Search"
+    },
+    {
+      "id": "click_link",
+      "action": "click",
+      "args": [
+        {
+          "by": "css",
+          "value": "a[href='/account/details']"
+        }
+      ],
+      "intent": "Follow Account details"
+    },
+    {
+      "id": "click_point",
+      "action": "click",
+      "args": [
+        {
+          "by": "point",
+          "x": 240,
+          "y": 1180
+        }
+      ],
+      "intent": "Click a point below the initial viewport"
+    },
+    {
+      "id": "read_point",
+      "action": "read",
+      "args": [
+        {
+          "by": "point",
+          "x": 240,
+          "y": 1240
+        },
+        "text",
+        {
+          "ref": "output",
+          "name": "accountNumber"
+        }
+      ],
+      "intent": "Copy text at a full-page image position"
+    },
+    {
+      "id": "read_text",
+      "action": "read",
+      "args": [
+        {
+          "by": "css",
+          "value": "#summary"
+        },
+        "text",
+        {
+          "ref": "output",
+          "name": "accountNumber"
+        }
+      ]
+    },
+    {
+      "id": "read_text_input",
+      "action": "read",
+      "args": [
+        {
+          "by": "label",
+          "value": "Account number"
+        },
+        "value",
+        {
+          "ref": "output",
+          "name": "accountNumber"
+        }
+      ]
+    },
+    {
+      "id": "read_number_input",
+      "action": "read",
+      "args": [
+        {
+          "by": "label",
+          "value": "Balance"
+        },
+        "number",
+        {
+          "ref": "output",
+          "name": "balance"
+        }
+      ]
+    },
+    {
+      "id": "read_number_text",
+      "action": "read",
+      "args": [
+        {
+          "by": "css",
+          "value": "#balance"
+        },
+        "number",
+        {
+          "ref": "output",
+          "name": "balance"
+        }
+      ],
+      "intent": "Parse 1234.50 from a text element"
+    },
+    {
+      "id": "read_native_date_input",
+      "action": "read",
+      "args": [
+        {
+          "by": "label",
+          "value": "Statement date"
+        },
+        "value",
+        {
+          "ref": "output",
+          "name": "statementDate"
+        }
+      ],
+      "intent": "Copy date input string unchanged"
+    },
+    {
+      "id": "read_legacy_date",
+      "action": "read",
+      "args": [
+        {
+          "by": "css",
+          "value": "#statement-date"
+        },
+        "text",
+        {
+          "ref": "output",
+          "name": "statementDate"
+        }
+      ],
+      "intent": "Copy legacy date display unchanged"
+    },
+    {
+      "id": "fill_input",
+      "action": "fill",
+      "args": [
+        {
+          "by": "label",
+          "value": "Search accounts"
+        },
+        {
+          "ref": "input",
+          "name": "accountQuery"
+        }
+      ]
+    },
+    {
+      "id": "fill_editable",
+      "action": "fill",
+      "args": [
+        {
+          "by": "css",
+          "value": "[contenteditable=\"true\"]"
+        },
+        "Customer requested a statement"
+      ],
+      "intent": "Type into editable HTML"
+    },
+    {
+      "id": "focus_input",
+      "action": "focus",
+      "args": [
+        {
+          "by": "label",
+          "value": "Search accounts"
+        }
+      ]
+    },
+    {
+      "id": "confirm_visible",
+      "action": "verify",
+      "args": [
+        {
+          "test": "visible",
+          "args": [
+            {
+              "by": "css",
+              "value": "#summary"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "confirm_enabled",
+      "action": "verify",
+      "args": [
+        {
+          "test": "enabled",
+          "args": [
+            {
+              "by": "css",
+              "value": "button[name=save]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "confirm_disabled",
+      "action": "verify",
+      "args": [
+        {
+          "test": "disabled",
+          "args": [
+            {
+              "by": "css",
+              "value": "button[name=save]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attempt_interaction",
+      "action": "click",
+      "args": [
+        {
+          "by": "css",
+          "value": "button[name=save]"
+        }
+      ],
+      "intent": "Confirm interactability by attempting Save"
+    },
+    {
+      "id": "choose_option",
+      "action": "select",
+      "args": [
+        {
+          "by": "label",
+          "value": "Account type"
+        },
+        [
+          {
+            "by": "label",
+            "value": "Checking"
+          }
+        ]
+      ]
+    },
+    {
+      "id": "bring_into_view",
+      "action": "scrollIntoView",
+      "args": [
+        {
+          "by": "css",
+          "value": "button[name=save]"
+        }
+      ]
+    },
+    {
+      "id": "scroll_down",
+      "action": "scroll",
+      "args": [
+        0,
+        600
+      ]
+    },
+    {
+      "id": "assign_null",
+      "action": "assign",
+      "args": [
+        {
+          "ref": "output",
+          "name": "balance"
+        },
+        null
+      ]
+    },
+    {
+      "id": "confirm_assigned",
+      "action": "check",
+      "args": [
+        {
+          "test": "assigned",
+          "args": [
+            {
+              "ref": "output",
+              "name": "balance"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "confirm_all",
+      "action": "verify",
+      "args": [
+        {
+          "test": "all",
+          "args": [
+            {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "#summary"
+                }
+              ]
+            },
+            {
+              "test": "enabled",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "button[name=save]"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credential_fill",
+      "action": "fill",
+      "args": [
+        {
+          "by": "label",
+          "value": "Password"
+        },
+        {
+          "ref": "credential",
+          "name": "password"
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "action": "group",
+      "args": [
+        [
+          {
+            "id": "enter_query",
+            "action": "fill",
+            "args": [
+              {
+                "by": "placeholder",
+                "value": "Search accounts"
+              },
+              {
+                "ref": "input",
+                "name": "accountQuery"
+              }
+            ]
+          },
+          {
+            "id": "push_search",
+            "action": "click",
+            "args": [
+              {
+                "by": "css",
+                "value": "button[name=search]"
+              }
+            ]
+          },
+          {
+            "id": "wait_search",
+            "action": "verify",
+            "args": [
+              {
+                "test": "any",
+                "args": [
+                  {
+                    "test": "visible",
+                    "args": [
+                      {
+                        "by": "text",
+                        "value": "No results"
+                      }
+                    ]
+                  },
+                  {
+                    "test": "visible",
+                    "args": [
+                      {
+                        "by": "css",
+                        "value": "button[name=open-account]"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ],
+      "intent": "Search for the account"
+    },
+    {
+      "id": "choose_result",
+      "action": "if",
+      "args": [
+        [
+          {
+            "when": {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "text",
+                  "value": "No results"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "id": "mark_missing",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "status"
+                  },
+                  "not_found"
+                ]
+              },
+              {
+                "id": "missing_accountNumber",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "accountNumber"
+                  },
+                  null
+                ]
+              },
+              {
+                "id": "missing_balance",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "balance"
+                  },
+                  null
+                ]
+              },
+              {
+                "id": "missing_statementDate",
+                "action": "assign",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "statementDate"
+                  },
+                  null
+                ]
+              },
+              {
+                "id": "missing_done",
+                "action": "goto",
+                "args": [
+                  "complete"
+                ]
+              }
+            ]
+          },
+          {
+            "when": {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "button[name=open-account]"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "id": "open_account",
+                "action": "click",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "button[name=open-account]"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "id": "unknown_result",
+            "action": "fail",
+            "args": [
+              "UNKNOWN_RESULT",
+              "No recognized search outcome"
+            ]
+          }
+        ]
+      ],
+      "intent": "Handle missing account or open the result"
+    },
+    {
+      "id": "confirm_any",
+      "action": "verify",
+      "args": [
+        {
+          "test": "any",
+          "args": [
+            {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "text",
+                  "value": "No results"
+                }
+              ]
+            },
+            {
+              "test": "visible",
+              "args": [
+                {
+                  "by": "css",
+                  "value": "button[name=open-account]"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "intent": "Wait for an account result or the expected not-found page"
+    }
+  ],
+  "interventionExample": {
+    "recipeId": "recipe-account-summary",
+    "failedStepId": "copy_balance",
+    "transcript": [
+      {
+        "id": "trial_1",
+        "sequence": 1,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "copy_number",
+        "parentStepId": "copy_summary",
+        "source": "system",
+        "outcome": "succeeded"
+      },
+      {
+        "id": "trial_2",
+        "sequence": 2,
+        "kind": "STEP",
+        "at": "2026-09-13T18:30:00Z",
+        "stepId": "copy_balance",
+        "parentStepId": "copy_summary",
+        "source": "system",
+        "outcome": "failed",
+        "error": {
+          "code": "ELEMENT_NOT_FOUND",
+          "message": "Balance element unavailable"
+        }
+      }
+    ],
+    "handback": {
+      "resumeStepId": "copy_balance"
+    },
+    "continuation": [
+      "copy_balance",
+      "copy_date",
+      "mark_found",
+      "complete"
+    ],
+    "note": "Resume the failed child; do not repeat copy_number or re-evaluate choose_result."
+  }
+}

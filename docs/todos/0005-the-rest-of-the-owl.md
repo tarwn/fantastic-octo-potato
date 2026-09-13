@@ -1,6 +1,8 @@
 # Step 3: Profit
 
-Use the [Architecture doc](../../ARCHITECTURE.md) to fill in more of the detail as you plan.
+Use the [Architecture doc](../../ARCHITECTURE.md) to fill in more of the detail as you plan. Also:
+- [recipe.md](./supporting-docs/recipe.md)
+- [examples.json](./supporting-docs/examples.json)
 
 Include `write-adr` and `write-agent-context` where relevant to each of these tasks goals, using context from the architecture doc.
 

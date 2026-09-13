@@ -26,12 +26,12 @@ Use `write-defer` when completing a task here that has an explicit, relevant def
       6. recipe_status: id, name
          1. seed this with system data and make it a TypeScript enum with matching values in the app: 1=Draft, 2=Released
       7. recipe: id, customer_application_xref_id, recipe_status_id
-         1. recipe will be expanded later once I add the DSL to the architecture doc
+         1. see [recipe.md](./supporting-docs/recipe.md) to infer remaining schema, `definition` can probably be a json or text field in the DB and not deconstructed further, defer any fields that can't be FK'd until a later stage in the todos/specs
    3. Add a script to seed data in the database that will run as part of the server startup (if not exists...)
       1. customer, application, customer_application_xref, runner
    4. Implement other pages (w/ APIs to server) for Customer, Registered Application, and Jobs list with routes and navigation
       1. Jobs list will be empty for now, leave the hard-coded job details pages from the prior step for now
-   6. Implemented Start Training modal with planned fields and display of input validation messages.
+   5. Implemented Start Training modal with planned fields and display of input validation messages.
 3. Runner polling
    1. Add logic to the runner to load a hub URL and id (copy it from the seed script above) from a .env file
       1. .env will be gitignored, make a .env.example with these values also to commit, they are not secrets
@@ -45,6 +45,7 @@ Use `write-defer` when completing a task here that has an explicit, relevant def
 4. Implement a local testable target application, my thought was a Dockerfile with MySQL and an app I found: https://www.bambooinvoice.net/
    1. It would need to be able to be self-enclosed but reachable by something running on the host system and may need some data seeded into it, I'm open to alternatives that meet the criteria as long as I don't have to install databases or similar myself (maybe a copy of the old music store from the microsoft examples or something WebForms-based?)
 5. Runner main loop and hub job queue
+   - also reference [training-run.md](./supporting-docs/training-run.md) for more details about the data arriving at start and sent at end of loops
    - Runner's initial call to Hub verifies configured/active identity and receives polling configuration and intervention timeout.
    - Running main loop: poll, claim, validate/acknowledge, receive Hub instructions and return simulated action results during development, report progress/heartbeats, complete/halt, and return to polling.
      - Instructions at this stage are not really implemented, they are pre-filled transcript rows basically so the Runner can run through each "step" and performatively report back what it did and the transcript will look realish

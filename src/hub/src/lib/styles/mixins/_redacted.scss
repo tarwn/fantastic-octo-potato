@@ -1,0 +1,28 @@
+@use "../variables" as *;
+
+// == redacted
+// a value the runner masked before transmission. the dashed border says
+// "this is a stand-in, not the data" without shouting; the PII tag names why.
+// always mono, so masked and unmasked values align in a column.
+
+@mixin redacted {
+  display: inline-block;
+  padding: 0 $redacted-padding-x;
+  background-color: $redacted-background-color;
+  border: $redacted-border;
+  font-family: $redacted-font-family;
+  letter-spacing: $redacted-letter-spacing;
+  color: $redacted-color;
+  white-space: nowrap;
+}
+
+// sensitivity tag placed next to a field label or a masked value
+@mixin redacted-tag {
+  font-family: $font-family-ui;
+  font-size: $redacted-tag-font-size;
+  font-weight: $redacted-tag-font-weight;
+  letter-spacing: $redacted-tag-letter-spacing;
+  text-transform: uppercase;
+  color: $redacted-tag-color;
+  white-space: nowrap;
+}
