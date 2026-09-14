@@ -23,5 +23,8 @@ export function resolveDatabasePath(databaseUrl: string): string {
 export function openDb(databaseUrl: string): Database.Database {
 	const path = resolveDatabasePath(databaseUrl);
 	mkdirSync(dirname(path), { recursive: true });
-	return new Database(path);
+	const db = new Database(path);
+	// SQLite ignores REFERENCES constraints unless this is set per-connection.
+	db.pragma("foreign_keys = ON");
+	return db;
 }

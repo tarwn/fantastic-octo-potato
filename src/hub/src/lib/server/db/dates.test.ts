@@ -18,4 +18,9 @@ describe("toDbDate / fromDbDate", () => {
 	it("parses ISO-8601 text read back from the database", () => {
 		expect(fromDbDate("2026-09-14T00:06:12.000Z")).toEqual(new Date("2026-09-14T00:06:12.000Z"));
 	});
+
+	it("passes null through in both directions, for nullable date columns", () => {
+		expect(toDbDate(null)).toBeNull();
+		expect(fromDbDate(null)).toBeNull();
+	});
 });

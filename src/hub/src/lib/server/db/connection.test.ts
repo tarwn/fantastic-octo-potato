@@ -30,6 +30,21 @@ describe("openDb", () => {
 
 		expect(existsSync(dbPath)).toBe(true);
 	});
+
+	it("enforces foreign key constraints, since SQLite ignores them by default", () => {
+		const dbPath = join(scratchDir, "fk.db");
+		const db = openDb(`sqlite:${dbPath}`);
+		db.exec(`
+			CREATE TABLE parent (id INTEGER PRIMARY KEY);
+			CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER NOT NULL REFERENCES parent (id));
+		`);
+
+		expect(() => db.prepare("INSERT INTO child (id, parent_id) VALUES (1, 999)").run()).toThrow(
+			/FOREIGN KEY constraint failed/
+		);
+
+		db.close();
+	});
 });
 
 describe("requireDatabaseUrl", () => {
