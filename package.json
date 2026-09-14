@@ -27,6 +27,7 @@
     "guard:hub:lint": "nx run hub:lint",
     "guard:hub:stylelint": "nx run hub:style-lint",
     "guard:hub:test": "nx run hub:test",
+    "guard:hub:test-integration": "nx run hub:test-integration",
     "guard:runner-web": "nx run runner-web:guard",
     "guard:runner-web:lint": "nx run runner-web:lint",
     "guard:runner-web:test": "nx run runner-web:test",

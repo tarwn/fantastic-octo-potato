@@ -39,7 +39,7 @@
 		},
 		"guard": {
 			"executor": "nx:noop",
-			"dependsOn": ["lint", "check", "style-lint", "test"]
+			"dependsOn": ["lint", "check", "style-lint", "test", "test-integration"]
 		},
 		"autofix": {
 			"executor": "nx:noop",
@@ -49,6 +49,13 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "vitest run",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"test-integration": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config vite.integration.config.ts",
 				"cwd": "{workspaceRoot}/src/hub"
 			}
 		},

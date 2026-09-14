@@ -37,7 +37,7 @@ Lowercase-with-underscores names; each table's own key is `id`; foreign keys are
 
 - C001: No `job` table or Job API in this spec — Jobs list is empty and the Job Screen keeps its hardcoded mock data (0002-hub-visuals scope untouched).
 - C002: Registered Application and Customer pages have no design mockup — build them with existing design-system tokens/mixins and panel/button components from `styles/mixins/`, no new visual language.
-- C003: Create/Update/Retire for Customer, Application, and Runner are FUTURE per architecture — this spec only reads/seeds them.
+- C003: Create/Update/Retire for Customer, Application, and Runner are FUTURE per architecture — this spec only reads/seeds them. Note for whichever future step adds Customer creation: `seed()`'s idempotency check (`countCustomers(db) > 0`) assumes the seeded baseline is the only way a Customer row appears; revisit that check once real Customer creation exists.
 - C004: SCSS tokens only, local-first `_components`, per [conventions.md](../../context/hub/conventions.md).
 - C005: New API routes follow [API request/response conventions](../../context/hub/backend/api-request-response-conventions.md) — GET envelopes, no server-generated fields accepted from clients.
 - C006: `db/migrations` and the SQLite driver are a new architectural dependency — draft an ADR (via `write-adr`).

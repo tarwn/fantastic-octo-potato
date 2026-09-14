@@ -16,6 +16,9 @@
     "test": {
       "cache": true
     },
+    "test-integration": {
+      "cache": true
+    },
     "md-links": {
       "cache": true
     },

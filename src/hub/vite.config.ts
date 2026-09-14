@@ -1,8 +1,7 @@
-/// <reference types="vitest/config" />
 import adapter from "@sveltejs/adapter-auto";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import { defineConfig } from "vite";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
 	plugins: [
@@ -25,6 +24,9 @@ export default defineConfig({
 	test: {
 		environment: "jsdom",
 		include: ["src/**/*.test.ts"],
+		// Real-database integration tests (npm run guard:hub:test-integration) live in
+		// vite.integration.config.ts instead, so this run stays fast and resource-free.
+		exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
 		setupFiles: ["./vitest-setup.ts"]
 	},
 	resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined

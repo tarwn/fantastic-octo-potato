@@ -1,3 +1,4 @@
 import { getDb } from "$lib/server/db/db";
+import { seed } from "$lib/server/db/seed";
 
-getDb();
+seed(getDb());
