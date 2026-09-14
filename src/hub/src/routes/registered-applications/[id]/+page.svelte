@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 
 	import RunnersPanel from "./_components/RunnersPanel.svelte";
+	import StartTrainingModal from "./_components/StartTrainingModal.svelte";
 
 	import { page } from "$app/state";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
@@ -9,6 +10,7 @@
 
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
 	let loadError = $state<string | null>(null);
+	let trainingModalOpen = $state(false);
 
 	onMount(async () => {
 		try {
@@ -20,7 +22,11 @@
 	});
 
 	function beginTrainingRun() {
-	// TODO: wire up the Start Training modal once it exists; no-op until then.
+		trainingModalOpen = true;
+	}
+
+	function closeTrainingModal() {
+		trainingModalOpen = false;
 	}
 </script>
 
@@ -39,6 +45,7 @@
 			<button type="button" class="btn btn-primary" onclick={beginTrainingRun}>Begin a Training Run</button>
 		</div>
 		<RunnersPanel runners={registeredApplication.runners} />
+		<StartTrainingModal open={trainingModalOpen} onClose={closeTrainingModal} />
 	{/if}
 </div>
 
