@@ -8,6 +8,16 @@ export interface Runner {
 	lastHeartbeatOn: Date | null;
 }
 
+interface RunnerRow {
+	id: number;
+	customerApplicationXrefId: number;
+	lastHeartbeatOn: string | null;
+}
+
+function mapRow(row: RunnerRow): Runner {
+	return { ...row, lastHeartbeatOn: fromDbDate(row.lastHeartbeatOn) };
+}
+
 export function listRunnersByCustomerApplicationXrefId(
 	db: Database.Database,
 	customerApplicationXrefId: number
@@ -16,12 +26,8 @@ export function listRunnersByCustomerApplicationXrefId(
 		.prepare(
 			"SELECT id, customer_application_xref_id AS customerApplicationXrefId, last_heartbeat_on AS lastHeartbeatOn FROM runner WHERE customer_application_xref_id = ? ORDER BY id"
 		)
-		.all(customerApplicationXrefId) as {
-		id: number;
-		customerApplicationXrefId: number;
-		lastHeartbeatOn: string | null;
-	}[];
-	return rows.map((row) => ({ ...row, lastHeartbeatOn: fromDbDate(row.lastHeartbeatOn) }));
+		.all(customerApplicationXrefId) as RunnerRow[];
+	return rows.map(mapRow);
 }
 
 export function insertRunner(
@@ -33,4 +39,17 @@ export function insertRunner(
 		.prepare("INSERT INTO runner (customer_application_xref_id, last_heartbeat_on) VALUES (?, ?)")
 		.run(customerApplicationXrefId, toDbDate(lastHeartbeatOn));
 	return { id: Number(lastInsertRowid), customerApplicationXrefId, lastHeartbeatOn };
+}
+
+export function getRunnerById(db: Database.Database, id: number): Runner | undefined {
+	const row = db
+		.prepare(
+			"SELECT id, customer_application_xref_id AS customerApplicationXrefId, last_heartbeat_on AS lastHeartbeatOn FROM runner WHERE id = ?"
+		)
+		.get(id) as RunnerRow | undefined;
+	return row ? mapRow(row) : undefined;
+}
+
+export function updateRunnerHeartbeat(db: Database.Database, id: number, when: Date): void {
+	db.prepare("UPDATE runner SET last_heartbeat_on = ? WHERE id = ?").run(toDbDate(when), id);
 }
