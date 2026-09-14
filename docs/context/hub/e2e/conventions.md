@@ -21,3 +21,9 @@ Durable rules for Playwright specs in `e2e/`.
 - If a flow spans multiple pages (e.g. a multi-step wizard), prefer a
   `<flow>.spec.ts` named for the flow rather than forcing it into a
   single page's file
+- **Exposed HTTP endpoints (app pages or API routes) are tested through
+  the real server request surface, via Playwright** — not by importing
+  route handlers into a unit/integration test. API-only specs (no `page`
+  fixture, just `request`) are named `api-<resource>.spec.ts` (e.g.
+  `api-customers.spec.ts`), one file per resource/noun, mirroring
+  `<page>.spec.ts` for pages.

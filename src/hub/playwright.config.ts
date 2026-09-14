@@ -7,5 +7,6 @@ export default defineConfig({
 		port: 4173,
 		env: { HUB_DATABASE_URL: "sqlite:.data/hub.e2e.db" }
 	},
+	use: { baseURL: "http://localhost:4173" },
 	testDir: "e2e"
 });
