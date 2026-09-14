@@ -45,6 +45,7 @@ Every guard below is nx-cached.
 | `npm run guard:hub:lint` | ESLint checks (hub scope) | pre-commit |
 | `npm run guard:hub:stylelint` | Stylelint checks (hub scope) | pre-commit |
 | `npm run guard:hub:test` | vitest unit tests (hub scope) | pre-commit |
+| `npm run guard:hub:test-integration` | vitest integration tests (hub scope): real sqlite file, real dbmate migrations, real db:reset between tests | pre-commit |
 | `npm run guard:runner-web:lint` | ESLint checks (runner-web scope) | pre-commit |
 | `npm run guard:runner-web:test` | vitest unit tests (runner-web scope) | pre-commit |
 | `npm run guard:runner-web:tsc` | TypeScript type-check (runner-web scope) | pre-commit |
@@ -71,6 +72,7 @@ For adhoc manual checks against the running app (e.g. a design-comparison screen
     2. it describes _why_, not _what_
     3. a function or variable name cannot be sufficiently descriptive instead
 - No one reads multiline comments
+- Let it crash. Do not hide missing configs, expected API values, and other "it should be set but ops it wasn't" values with a fallback to a default value. Crash. Loudly. We want to fix our code, not hide bugs for users to find later after our data has been corrupted.
 
 ## Project Structure
 

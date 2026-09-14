@@ -3,10 +3,13 @@
 
 	import { page } from "$app/state";
 	import AppChrome from "$lib/components/AppChrome.svelte";
+	import { navItems } from "$lib/components/navItems";
 
 	let { children } = $props();
 
-	const active = $derived(page.url.pathname.startsWith("/jobs") ? "Jobs" : undefined);
+	const active = $derived(
+		navItems.find((item) => page.url.pathname.startsWith(item.path))?.label
+	);
 </script>
 
 <svelte:head>

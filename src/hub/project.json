@@ -39,7 +39,7 @@
 		},
 		"guard": {
 			"executor": "nx:noop",
-			"dependsOn": ["lint", "check", "style-lint", "test"]
+			"dependsOn": ["lint", "check", "style-lint", "test", "test-integration"]
 		},
 		"autofix": {
 			"executor": "nx:noop",
@@ -49,6 +49,13 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "vitest run",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"test-integration": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "vitest run --config vite.integration.config.ts",
 				"cwd": "{workspaceRoot}/src/hub"
 			}
 		},
@@ -77,6 +84,34 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "playwright test",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"db-migrate-up": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "dbmate --env HUB_DATABASE_URL up",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"db-migrate-down": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "dbmate --env HUB_DATABASE_URL down",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"db-migrate-new": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "dbmate --env HUB_DATABASE_URL new",
+				"cwd": "{workspaceRoot}/src/hub"
+			}
+		},
+		"db-reset": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "node --env-file-if-exists=.env src/lib/server/db/resetCli.ts",
 				"cwd": "{workspaceRoot}/src/hub"
 			}
 		}

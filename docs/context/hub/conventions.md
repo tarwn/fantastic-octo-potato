@@ -37,8 +37,9 @@ Durable rules for Svelte pages and components.
   stylesheet. Site-wide base styles go in the root `+layout.svelte`,
   scoped out with `:global(...)`.
 - **Test file placement and size** — default is a test file living next
-  to the file under test as `*.spec.ts`. If it exceeds 400 lines,
-  extract one `describe` block into a neighboring `*.{topic}.spec.ts`
-  file instead of letting the original file keep growing. Enforced by
+  to the file under test as `*.test.ts` (matching vitest's `include`
+  glob in `vite.config.ts`). If it exceeds 400 lines, extract one
+  `describe` block into a neighboring `*.{topic}.test.ts` file instead
+  of letting the original file keep growing. Enforced by
   `npm run guard:tools:test-file-size`.
 
