@@ -5,6 +5,7 @@
 
 Backend:
 * [API Request/Response Conventions](./backend/api-request-response-conventions.md)
+* [Database Handling](./backend/database-handling.md)
 
 Frontend:
 * [API Calling Pattern](./frontend/api-calling-pattern.md)
