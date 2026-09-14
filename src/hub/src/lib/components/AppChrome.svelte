@@ -1,10 +1,9 @@
 <script lang="ts">
+	import { navItems } from "./navItems";
 	import type { SharedComponentProps } from "./sharedComponentProps";
 
-	const navItems = ["Customers", "Runners", "Jobs"];
+	import { resolve } from "$app/paths";
 
-	// no route exists yet for any of these sections; plain labels until
-	// Customers/Runners/Jobs-list routes land.
 	let { active, class: className }: SharedComponentProps & { active?: string } = $props();
 </script>
 
@@ -12,8 +11,11 @@
 	<div class="chrome-left">
 		<span class="chrome-wordmark">HUB</span>
 		<nav class="chrome-nav">
-			{#each navItems as item (item)}
-				<span class={["chrome-nav-item", item === active && "chrome-nav-item-active"]}>{item}</span>
+			{#each navItems as item (item.path)}
+				<a
+					href={resolve(item.path)}
+					class={["chrome-nav-item", item.label === active && "chrome-nav-item-active"]}>{item.label}</a
+				>
 			{/each}
 		</nav>
 	</div>
@@ -61,6 +63,11 @@
 		gap: $space-m;
 		font-size: $text-regular-size;
 		color: $chrome-nav-color;
+	}
+
+	.chrome-nav-item {
+		color: inherit;
+		text-decoration: none;
 	}
 
 	.chrome-nav-item-active {

@@ -4,7 +4,7 @@ test("start training modal shows goal, URL, and max-steps fields with validation
 	page
 }) => {
 	await page.goto("/registered-applications");
-	await page.getByRole("link", { name: "Legacy Teller Portal" }).click();
+	await page.getByRole("link", { name: /Widgets/ }).click();
 	await page.getByRole("button", { name: "Begin a Training Run" }).click();
 
 	const dialog = page.getByRole("dialog");
