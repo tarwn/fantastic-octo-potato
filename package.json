@@ -19,7 +19,7 @@
     "db:migrate:new": "nx run hub:db-migrate-new",
     "db:reset": "nx run hub:db-reset",
     "dev:hub": "nx run hub:dev",
-    "dev:runner-web": "node --watch src/runner-web/index.ts",
+    "dev:runner-web": "node --env-file=src/runner-web/.env --watch src/runner-web/index.ts",
     "guard": "nx run-many --target=guard",
     "guard:hub": "nx run hub:guard",
     "guard:hub:check": "nx run hub:check",
