@@ -33,6 +33,7 @@
     "guard:runner-web:test": "nx run runner-web:test",
     "guard:runner-web:tsc": "nx run runner-web:type-check",
     "guard:tools": "nx run tools:guard",
+    "guard:tools:e2e": "nx run tools:e2e",
     "guard:tools:lint": "nx run tools:lint",
     "guard:tools:md-links": "nx run tools:md-links",
     "guard:tools:test-file-size": "nx run tools:test-file-size",

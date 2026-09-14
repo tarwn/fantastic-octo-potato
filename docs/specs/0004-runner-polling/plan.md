@@ -1,6 +1,6 @@
 This is the plan for [0004-runner-polling/spec.md](./spec.md).
 
-- [ ] 1. Multi-service e2e guard: runner startup and poll loop
+- [x] 1. Multi-service e2e guard: runner startup and poll loop
 - [ ] 2. Hub: runner init and poll endpoints, heartbeat repository update
 - [ ] 3. Hub UI: alive/idle status
 - [ ] 4. Runner-web: config loading and init call

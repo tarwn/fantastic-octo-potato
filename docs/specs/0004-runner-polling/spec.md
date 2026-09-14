@@ -34,6 +34,8 @@ Step 1's multi-service e2e guard stays red until Step 5 (runner poll loop) lands
 
 **Guard:** new `test-e2e/runner-startup.spec.ts`; red until Step 5.
 
+**Note (as implemented):** the config has one `webServer` entry (hub) rather than two — Playwright's `webServer` readiness check needs a port/URL to poll, and runner-web has none. The spec spawns runner-web itself (`node:child_process`) so it can capture and assert on its stdout/stderr directly. Later steps touching runner-web startup should build on this spawn-in-spec pattern rather than assuming a second `webServer` entry.
+
 **References**
 - [Hub e2e conventions](../../context/hub/e2e/conventions.md) (apply the same user-observable-assertion spirit; this is process console output, not a page)
 - `src/hub/playwright.config.ts` for the pattern of a Playwright config with a `webServer`
