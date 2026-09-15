@@ -5,10 +5,20 @@ import { JobStatus } from "../db/jobStatus.ts";
 
 const TERMINAL_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
 
+// Grows to include "trial"/"execute" once those modes exist; until then, only "training" is valid.
+export const JOB_MODES = ["training"] as const;
+export type JobMode = (typeof JOB_MODES)[number];
+
+function assertValidJobMode(mode: string): asserts mode is JobMode {
+	if (!(JOB_MODES as readonly string[]).includes(mode)) {
+		throw new Error(`Invalid job mode: ${mode}`);
+	}
+}
+
 export interface Job {
 	id: number;
 	customerApplicationXrefId: number;
-	mode: string;
+	mode: JobMode;
 	jobStatusId: JobStatus;
 	goal: string;
 	startingUrl: string;
@@ -79,8 +89,10 @@ const JOB_SELECT = `
 `;
 
 function mapJobRow(row: JobRow): Job {
+	assertValidJobMode(row.mode);
 	return {
 		...row,
+		mode: row.mode,
 		createdAt: fromDbDate(row.createdAt),
 		startedAt: fromDbDate(row.startedAt),
 		heartbeatOn: fromDbDate(row.heartbeatOn),
@@ -98,7 +110,7 @@ function mapJobResultRow(row: JobResultRow): JobResult {
 
 export interface InsertJobParams {
 	customerApplicationXrefId: number;
-	mode: string;
+	mode: JobMode;
 	goal: string;
 	startingUrl: string;
 	allowlist: string;
@@ -107,6 +119,8 @@ export interface InsertJobParams {
 }
 
 export function insertJob(db: Database.Database, params: InsertJobParams): Job {
+	assertValidJobMode(params.mode);
+
 	const { lastInsertRowid } = db
 		.prepare(
 			`INSERT INTO job (customer_application_xref_id, mode, job_status_id, goal, starting_url, allowlist, max_steps, created_at)

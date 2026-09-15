@@ -9,6 +9,7 @@ import {
 	claimNextJobForRunner,
 	getJobById,
 	insertJob,
+	type JobMode,
 	listJobResults,
 	listJobs,
 	listTranscriptEntries,
@@ -77,6 +78,33 @@ describe("jobRepository", () => {
 			completedAt: null
 		});
 		expect(getJobById(getDb(), job.id)).toEqual(job);
+	});
+
+	it("throws on an unrecognized mode instead of silently persisting it", () => {
+		seedXref(getDb());
+
+		expect(() =>
+			insertJob(getDb(), {
+				customerApplicationXrefId: 1,
+				mode: "bogus-mode" as JobMode,
+				goal: "Extract invoice total",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 10,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			})
+		).toThrow("Invalid job mode: bogus-mode");
+	});
+
+	it("throws on read when a row already in the table has an unrecognized mode", () => {
+		const db = getDb();
+		seedXref(db);
+		db.prepare(
+			`INSERT INTO job (customer_application_xref_id, mode, job_status_id, goal, starting_url, allowlist, max_steps, created_at)
+			 VALUES (1, 'bogus-mode', ?, 'Goal', 'https://example.com/start', 'https://example.com', 10, ?)`
+		).run(JobStatus.Pending, "2026-09-15T00:00:00.000Z");
+
+		expect(() => getJobById(db, 1)).toThrow("Invalid job mode: bogus-mode");
 	});
 
 	it("lists jobs newest first", () => {
