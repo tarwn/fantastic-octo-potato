@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { useIntegrationTestDb } from "../db/_test/integrationTestDb";
 
-import { insertRunner, listRunnersByCustomerApplicationXrefId } from "./runnerRepository";
+import { getRunnerById, insertRunner, listRunnersByCustomerApplicationXrefId, updateRunnerHeartbeat } from "./runnerRepository";
 
 function seedXref(db: Database.Database): void {
 	db.exec(`
@@ -44,5 +44,26 @@ describe("runnerRepository", () => {
 		expect(listRunnersByCustomerApplicationXrefId(db, 1)).toEqual([
 			{ id: 1, customerApplicationXrefId: 1, lastHeartbeatOn: heartbeat }
 		]);
+	});
+
+	it("gets a runner by id", () => {
+		seedXref(getDb());
+		const runner = insertRunner(getDb(), 1);
+
+		expect(getRunnerById(getDb(), runner.id)).toEqual(runner);
+	});
+
+	it("returns undefined for an unknown runner id", () => {
+		expect(getRunnerById(getDb(), 999)).toBeUndefined();
+	});
+
+	it("updates a runner's heartbeat", () => {
+		seedXref(getDb());
+		const runner = insertRunner(getDb(), 1);
+		const heartbeat = new Date("2026-09-14T00:06:12.000Z");
+
+		updateRunnerHeartbeat(getDb(), runner.id, heartbeat);
+
+		expect(getRunnerById(getDb(), runner.id)).toEqual({ ...runner, lastHeartbeatOn: heartbeat });
 	});
 });

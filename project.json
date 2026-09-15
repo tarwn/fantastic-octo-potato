@@ -41,6 +41,13 @@
 			"executor": "nx:noop",
 			"dependsOn": ["lint", "type-check", "md-links", "test-file-size"]
 		},
+		"e2e": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "playwright test",
+				"cwd": "{workspaceRoot}/test-e2e"
+			}
+		},
 		"autofix": {
 			"executor": "nx:noop",
 			"dependsOn": ["lint-fix"]

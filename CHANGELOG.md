@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 - 2026-09-14
+
+Runner Polling (spec 0004): runner-web reads its Hub URL, runner id, and shared bearer secret from `.env`, connects to Hub's `/api/runner/*` init endpoint on startup, then loops on a poll endpoint at the interval Hub returns while Hub tracks each runner's heartbeat and shows it as "alive"/"idle" on the Registered Application page — proven end-to-end by a new multi-service Playwright guard.
+
 ## 0.4.0 - 2026-09-14
 
 Hub Data Foundation (spec 0003): hub persists Customer, Application, Runner, and Recipe data in SQLite via dbmate migrations and a startup seed, exposes read APIs, and adds Customers/Registered Applications/Jobs list-and-detail pages plus a Start Training modal with client-side validation — the Job Screen itself is unchanged.

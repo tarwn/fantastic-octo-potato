@@ -6,6 +6,7 @@
 Backend:
 * [API Request/Response Conventions](./backend/api-request-response-conventions.md)
 * [Database Handling](./backend/database-handling.md)
+* [Runner API: init & poll](./backend/runner-api.md)
 
 Frontend:
 * [API Calling Pattern](./frontend/api-calling-pattern.md)
