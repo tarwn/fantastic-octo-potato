@@ -16,8 +16,8 @@ A developer can start a self-contained, no-API legacy web application locally wi
 
 - C001: No local install of a database engine or the target application's language runtime on the developer machine — container-only.
 - C002: The user's starting idea was BambooInvoice + MySQL in Docker; alternatives are acceptable if they meet R001-R005.
-- C003: The application/tech selection is a third-party choice — recorded as a draft ADR next to this spec: [0000-use-bambooinvoice-in-docker-for-target-app.md](./0000-use-bambooinvoice-in-docker-for-target-app.md).
-- C004: The container tooling must work on both Docker and Podman (the user runs Podman on one development machine, Docker on another) — the compose file itself must avoid engine-specific features (e.g. `depends_on: condition: service_healthy`, which older `podman-compose` doesn't honor; the app container should wait-and-retry its DB connection instead), and the `target-app:tools:up`/`down` scripts must auto-detect which compose command (`docker compose`, `podman compose`, or `podman-compose`) is available rather than hardcoding `docker compose`.
+- C003: The application/tech selection is a third-party choice — recorded as a draft ADR next to this spec: [0000-use-bambooinvoice-in-docker-for-target-app.md](./0000-use-bambooinvoice-in-docker-for-target-app.md). The ADR originally cited a `Magentron/BambooInvoice` fork for PHP8/MySQL8 compatibility fixes; that fork turned out to be an unmodified copy of the original `derekallard/BambooInvoice` repo at the same single (2009) commit, with no such fixes. The ADR now points at the original repo directly, running on PHP 5.6 + MySQL 5.7 (matching the app's actual vintage) instead.
+- C004: The container tooling must work on both Docker and Podman (the user runs Podman on one development machine, Docker on another) — the compose file itself must avoid engine-specific features (e.g. `depends_on: condition: service_healthy`, which older `podman-compose` doesn't honor; the app container should wait-and-retry its DB connection instead), and the `up:tools:target-app`/`down:tools:target-app` scripts must auto-detect which compose command (`docker compose`, `podman compose`, or `podman-compose`) is available rather than hardcoding `docker compose`.
 
 ## Sequencing
 
@@ -35,11 +35,11 @@ Step 1 delivers and proves the containerized app. Step 2 moves the draft ADR to 
 - [0000-use-bambooinvoice-in-docker-for-target-app.md](./0000-use-bambooinvoice-in-docker-for-target-app.md) for the source repo/version pinned and the config/env approach
 
 **Work:**
-- Add a `Dockerfile` that fetches the `Magentron/BambooInvoice` source at build time (`git clone` pinned to a specific commit SHA) rather than vendoring the source into this repo, keeping the app's third-party history out of our git history and this step's diff small.
+- Add a `Dockerfile` that fetches the `derekallard/BambooInvoice` source at build time (`git clone` pinned to a specific commit SHA) rather than vendoring the source into this repo, keeping the app's third-party history out of our git history and this step's diff small.
 - Add a `docker-compose.yml` with the app service and a MySQL service, a healthcheck on each service, MySQL data on a named volume, and the app service published on a fixed host port. Per C004, don't rely on `depends_on: condition: service_healthy`; have the app container's entrypoint wait-and-retry its DB connection until MySQL is ready.
 - Add a MySQL seed script (`docker-entrypoint-initdb.d`) with a handful of sample customers/invoices so R004 is met on first boot with no manual step.
 - Config/credentials (DB host/user/password, app base URL) are dev-only fixture values, not secrets — commit them directly or via a committed `.env.example`, matching the pattern used for `RUNNER_SHARED_SECRET` in `test-e2e/playwright.config.ts`.
-- Add `target-app:tools:up` / `target-app:tools:down` npm scripts, per the `type:scope` naming convention (scope `tools`, since this lives under `test-e2e`/top-level), wrapping a small helper that auto-detects the available compose command in order (`docker compose`, `podman compose`, `podman-compose`) per C004, so the same script works on the user's Docker and Podman machines.
+- Add `up:tools:target-app` / `down:tools:target-app` npm scripts, per the `type:scope:variant` naming convention (verb-led type, scope `tools` since this lives under `test-e2e`/top-level), wrapping a small helper that auto-detects the available compose command in order (`docker compose`, `podman compose`, `podman-compose`) per C004, so the same script works on the user's Docker and Podman machines.
 - Add the guard test above under `test-e2e/`.
 
 ---
@@ -54,8 +54,8 @@ Step 1 delivers and proves the containerized app. Step 2 moves the draft ADR to 
 
 **Work:**
 - Move `0000-use-bambooinvoice-in-docker-for-target-app.md` from this spec folder into `docs/adrs/tools/`, renumbered per that folder's convention, and set its Status to Accepted; link it from `docs/adrs/tools/_index.md`.
-- Add a short `docs/context/tools` reference doc covering: how to start/stop the target app (`target-app:tools:up`/`down`), the port it's reachable on, and the default seeded data/credentials; link it from `docs/context/tools/_index.md`.
-- Add `target-app:tools:up` / `target-app:tools:down` to CLAUDE.md's "Build & Run" commands table.
+- Add a short `docs/context/tools` reference doc covering: how to start/stop the target app (`up:tools:target-app`/`down:tools:target-app`), the port it's reachable on, and the default seeded data/credentials; link it from `docs/context/tools/_index.md`.
+- Add `up:tools:target-app` / `down:tools:target-app` to CLAUDE.md's "Build & Run" commands table.
 
 ---
 
