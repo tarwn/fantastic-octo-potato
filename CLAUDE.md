@@ -21,6 +21,7 @@ Be intentional and frugal with commands:
 - `npm install` installs for all projects
 - `npm run dev:hub` runs the backend and frontend for the hub SvelteKit app
 - `npm run dev:runner-web` runs the runner-web entry point
+- `npm run dev:target-app:up` starts the local target application (BambooInvoice) in containers; `npm run dev:target-app:down` stops it — see [docs/context/tools/target-app.md](./docs/context/tools/target-app.md)
 
 ## AutoFix
 
@@ -86,6 +87,7 @@ docs/
 src/
     hub/                # SvelteKit website that combines front-end with back-end, including separate API for runner integration
     runner-web/         # node executable that drives browsers
+target-app/             # local no-API target application (BambooInvoice) used for dev and e2e testing
 test-e2e/               # multi-system tests
 tools/                  # scripts for automation, agents, and more
 ```

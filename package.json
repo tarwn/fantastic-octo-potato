@@ -20,7 +20,8 @@
     "db:reset": "nx run hub:db-reset",
     "dev:hub": "nx run hub:dev",
     "dev:runner-web": "node --env-file=src/runner-web/.env --watch src/runner-web/index.ts",
-    "down:tools:target-app": "node test-e2e/target-app/run-compose.mjs down",
+    "dev:target-app:down": "node target-app/run-compose.mjs down",
+    "dev:target-app:up": "node target-app/run-compose.mjs up",
     "guard": "nx run-many --target=guard",
     "guard:hub": "nx run hub:guard",
     "guard:hub:check": "nx run hub:check",
@@ -40,8 +41,7 @@
     "guard:tools:test-file-size": "nx run tools:test-file-size",
     "guard:tools:tsc": "nx run tools:type-check",
     "prepare": "husky && playwright install",
-    "preview:hub": "nx run hub:preview",
-    "up:tools:target-app": "node test-e2e/target-app/run-compose.mjs up"
+    "preview:hub": "nx run hub:preview"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

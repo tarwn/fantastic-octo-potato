@@ -2,7 +2,7 @@
 
 **Author:** Agent (Eli Weinstock-Herman)
 
-[Spec 0005](./spec.md) needs a local, no-API "Target Application" (per [ARCHITECTURE.md](../../../ARCHITECTURE.md#overview)) for Runner development and e2e work, running self-contained in containers with no host-installed database (R001-R004). The originating idea was BambooInvoice (PHP/MySQL) via Docker, with an alternative WebForms-based app also floated, and the door left open to any option that meets the criteria.
+[Spec 0005](../../specs/0005-target-application/spec.md) needs a local, no-API "Target Application" (per [ARCHITECTURE.md](../../../ARCHITECTURE.md#overview)) for Runner development and e2e work, running self-contained in containers with no host-installed database (R001-R004). The originating idea was BambooInvoice (PHP/MySQL) via Docker, with an alternative WebForms-based app also floated, and the door left open to any option that meets the criteria.
 
 ## Decision
 
@@ -23,7 +23,7 @@ BambooInvoice is open source (MIT), has no public API (UI-only, matching the "no
 
 ## Status
 
-Proposed
+Accepted
 
 ## Consequences
 
@@ -32,6 +32,6 @@ Proposed
 * The target app's source is a pinned third-party commit, not a repo we maintain features in; any BambooInvoice bugs encountered are worked around at the Runner/recipe level, not patched upstream, unless a fix is trivial and clearly load-bearing for our testing.
 * Because the app is unmodified rather than patched for PHP8/MySQL8, this target app's stack (PHP 5.6, MySQL 5.7) is intentionally older than what a production PHP app would run today — acceptable since its only job is to be a stable, realistic screen to instrument, not to demonstrate a current stack.
 * The `php:5.6-apache` base image is built on EOL Debian 9 (stretch), whose apt mirrors have moved to `archive.debian.org` and whose package signing keys have expired; the Dockerfile points apt there over plain HTTP and disables signature verification to install packages at all. This is an accepted reduction in supply-chain integrity guarantees for this one dev/test-only image — acceptable because it's never deployed anywhere beyond a developer's or CI's local containers, but worth calling out explicitly rather than leaving it implicit in a Dockerfile comment.
-* Seed data and DB credentials for this container are fixture-only (never real data), committed alongside the Dockerfile/compose per [Spec 0005](./spec.md).
+* Seed data and DB credentials for this container are fixture-only (never real data), committed alongside the Dockerfile/compose per [Spec 0005](../../specs/0005-target-application/spec.md).
 * Developers need Docker available locally to run the target application; this was already an accepted tradeoff per the originating idea.
-* Developers run either Docker or Podman across their machines, so the compose file avoids engine-specific features (notably `depends_on: condition: service_healthy`) and the wrapper scripts auto-detect the available compose command, per [Spec 0005](./spec.md) C004.
+* Developers run either Docker or Podman across their machines, so the compose file avoids engine-specific features (notably `depends_on: condition: service_healthy`) and the wrapper scripts auto-detect the available compose command, per [Spec 0005](../../specs/0005-target-application/spec.md) C004.

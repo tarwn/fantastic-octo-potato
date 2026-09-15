@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 
-const TARGET_APP_DIR = path.resolve(import.meta.dirname, "target-app");
+const TARGET_APP_DIR = path.resolve(import.meta.dirname, "..", "target-app");
 const TARGET_APP_URL = "http://localhost:8089";
 const SEEDED_LOGIN = { username: "admin@targetapp.local", password: "targetapp-seed-pw" };
 const SEEDED_CLIENT_NAME = "Contoso Consulting";
