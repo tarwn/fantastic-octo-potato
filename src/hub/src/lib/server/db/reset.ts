@@ -1,7 +1,16 @@
 import type Database from "better-sqlite3";
 
 // Order matters: children before parents, to satisfy foreign key constraints.
-const USER_DEFINED_TABLES = ["recipe", "runner", "customer_application_xref", "application", "customer"];
+const USER_DEFINED_TABLES = [
+	"job_result",
+	"job_transcript_entry",
+	"job",
+	"recipe",
+	"runner",
+	"customer_application_xref",
+	"application",
+	"customer"
+];
 
 export function resetUserData(db: Database.Database): void {
 	const existingTables = new Set(

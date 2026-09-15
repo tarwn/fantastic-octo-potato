@@ -1,0 +1,198 @@
+import type Database from "better-sqlite3";
+import { describe, expect, it } from "vitest";
+
+import { useIntegrationTestDb } from "../db/_test/integrationTestDb";
+import { JobStatus } from "../db/jobStatus";
+
+import {
+	appendTranscriptEntry,
+	claimNextJobForRunner,
+	getJobById,
+	insertJob,
+	listJobResults,
+	listJobs,
+	listTranscriptEntries,
+	updateJobHeartbeat,
+	updateJobStatus,
+	upsertJobResult
+} from "./jobRepository";
+
+function seedXref(db: Database.Database, id = 1): void {
+	db.exec(`
+		INSERT INTO customer (id, name) VALUES (${id}, 'Acme');
+		INSERT INTO application (id, name) VALUES (${id}, 'Widgets');
+		INSERT INTO customer_application_xref (id, customer_id, application_id) VALUES (${id}, ${id}, ${id});
+	`);
+}
+
+function seedRunner(db: Database.Database, xrefId: number): number {
+	const { lastInsertRowid } = db
+		.prepare("INSERT INTO runner (customer_application_xref_id) VALUES (?)")
+		.run(xrefId);
+	return Number(lastInsertRowid);
+}
+
+function insertPendingJob(db: Database.Database, xrefId: number): number {
+	const job = insertJob(db, {
+		customerApplicationXrefId: xrefId,
+		mode: "training",
+		goal: "Extract invoice total",
+		startingUrl: "https://example.com/start",
+		allowlist: "https://example.com",
+		maxSteps: 10,
+		createdAt: new Date("2026-09-15T00:00:00.000Z")
+	});
+	return job.id;
+}
+
+describe("jobRepository", () => {
+	const getDb = useIntegrationTestDb();
+
+	it("inserts a Pending job and reads it back", () => {
+		seedXref(getDb());
+
+		const job = insertJob(getDb(), {
+			customerApplicationXrefId: 1,
+			mode: "training",
+			goal: "Extract invoice total",
+			startingUrl: "https://example.com/start",
+			allowlist: "https://example.com",
+			maxSteps: 10,
+			createdAt: new Date("2026-09-15T00:00:00.000Z")
+		});
+
+		expect(job).toEqual({
+			id: job.id,
+			customerApplicationXrefId: 1,
+			mode: "training",
+			jobStatusId: JobStatus.Pending,
+			goal: "Extract invoice total",
+			startingUrl: "https://example.com/start",
+			allowlist: "https://example.com",
+			maxSteps: 10,
+			runnerId: null,
+			createdAt: new Date("2026-09-15T00:00:00.000Z"),
+			startedAt: null,
+			heartbeatOn: null,
+			completedAt: null
+		});
+		expect(getJobById(getDb(), job.id)).toEqual(job);
+	});
+
+	it("lists jobs newest first", () => {
+		seedXref(getDb());
+		const firstId = insertPendingJob(getDb(), 1);
+		const secondId = insertPendingJob(getDb(), 1);
+
+		expect(listJobs(getDb()).map((job) => job.id)).toEqual([secondId, firstId]);
+	});
+
+	it("claims the oldest Pending job for a matching-xref Runner, exactly once", () => {
+		const db = getDb();
+		seedXref(db);
+		const runnerId = seedRunner(db, 1);
+		const jobId = insertPendingJob(db, 1);
+		const now = new Date("2026-09-15T00:05:00.000Z");
+
+		const firstClaim = claimNextJobForRunner(db, 1, runnerId, now);
+		const secondClaim = claimNextJobForRunner(db, 1, runnerId, now);
+
+		expect(firstClaim).toEqual({
+			id: jobId,
+			customerApplicationXrefId: 1,
+			mode: "training",
+			jobStatusId: JobStatus.Running,
+			goal: "Extract invoice total",
+			startingUrl: "https://example.com/start",
+			allowlist: "https://example.com",
+			maxSteps: 10,
+			runnerId,
+			createdAt: new Date("2026-09-15T00:00:00.000Z"),
+			startedAt: now,
+			heartbeatOn: now,
+			completedAt: null
+		});
+		expect(secondClaim).toBeUndefined();
+	});
+
+	it("never claims a job for a Runner on a different xref", () => {
+		const db = getDb();
+		seedXref(db, 1);
+		seedXref(db, 2);
+		const otherXrefRunnerId = seedRunner(db, 2);
+		insertPendingJob(db, 1);
+
+		expect(claimNextJobForRunner(db, 2, otherXrefRunnerId, new Date("2026-09-15T00:05:00.000Z"))).toBeUndefined();
+	});
+
+	it("updates heartbeat_on", () => {
+		const db = getDb();
+		seedXref(db);
+		const jobId = insertPendingJob(db, 1);
+		const heartbeat = new Date("2026-09-15T00:10:00.000Z");
+
+		updateJobHeartbeat(db, jobId, heartbeat);
+
+		expect(getJobById(db, jobId)?.heartbeatOn).toEqual(heartbeat);
+	});
+
+	it("updates status and completed_at", () => {
+		const db = getDb();
+		seedXref(db);
+		const jobId = insertPendingJob(db, 1);
+		const completedAt = new Date("2026-09-15T00:15:00.000Z");
+
+		updateJobStatus(db, jobId, JobStatus.CompletedSuccess, completedAt);
+
+		const job = getJobById(db, jobId);
+		expect(job?.jobStatusId).toBe(JobStatus.CompletedSuccess);
+		expect(job?.completedAt).toEqual(completedAt);
+	});
+
+	it("no-ops a status update once the job is already terminal", () => {
+		const db = getDb();
+		seedXref(db);
+		const jobId = insertPendingJob(db, 1);
+		const firstCompletedAt = new Date("2026-09-15T00:15:00.000Z");
+		updateJobStatus(db, jobId, JobStatus.CompletedFailed, firstCompletedAt);
+
+		updateJobStatus(db, jobId, JobStatus.CompletedCancelled, new Date("2026-09-15T00:20:00.000Z"));
+
+		const job = getJobById(db, jobId);
+		expect(job?.jobStatusId).toBe(JobStatus.CompletedFailed);
+		expect(job?.completedAt).toEqual(firstCompletedAt);
+	});
+
+	it("ignores a duplicate transcript sequence instead of inserting a second row", () => {
+		const db = getDb();
+		seedXref(db);
+		const jobId = insertPendingJob(db, 1);
+		const firstCreatedAt = new Date("2026-09-15T00:01:00.000Z");
+
+		appendTranscriptEntry(db, jobId, 1, "step", "First report", firstCreatedAt);
+		appendTranscriptEntry(db, jobId, 1, "step", "Late duplicate report", new Date("2026-09-15T00:02:00.000Z"));
+
+		expect(listTranscriptEntries(db, jobId)).toEqual([
+			{ id: expect.any(Number), jobId, sequence: 1, kind: "step", text: "First report", createdAt: firstCreatedAt }
+		]);
+	});
+
+	it("upserts a job result so the latest write wins", () => {
+		const db = getDb();
+		seedXref(db);
+		const jobId = insertPendingJob(db, 1);
+
+		upsertJobResult(db, jobId, "total", "10.00", new Date("2026-09-15T00:01:00.000Z"));
+		upsertJobResult(db, jobId, "total", "12.50", new Date("2026-09-15T00:02:00.000Z"));
+
+		expect(listJobResults(db, jobId)).toEqual([
+			{
+				id: expect.any(Number),
+				jobId,
+				fieldName: "total",
+				value: "12.50",
+				createdAt: new Date("2026-09-15T00:02:00.000Z")
+			}
+		]);
+	});
+});
