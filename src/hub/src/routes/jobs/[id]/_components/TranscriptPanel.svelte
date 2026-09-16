@@ -2,7 +2,9 @@
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
-	import type { JobTranscriptEntry } from "$lib/types/job";
+	import { TranscriptKind } from "$lib/jobTranscriptKind";
+	import { SensitivityType } from "$lib/sensitivityType";
+	import type { JobTranscriptEntry, TranscriptFieldRef } from "$lib/types/job";
 
 	let { entries }: { entries: JobTranscriptEntry[] } = $props();
 
@@ -27,7 +29,22 @@
 	}
 
 	const days = $derived(groupByDay(entries));
+
+	function kindName(kind: TranscriptKind): string {
+		return TranscriptKind[kind];
+	}
 </script>
+
+{#snippet transcriptStepField(label: string, field: TranscriptFieldRef)}
+	<div class="transcript-step-field">
+		<span class="transcript-step-field-label">{label}: {field.fieldName}</span>
+		{#if field.sensitivityType !== SensitivityType.None}
+			<RedactedValue value={field.safeValue} />
+		{:else}
+			<span class="transcript-step-field-value">{field.safeValue}</span>
+		{/if}
+	</div>
+{/snippet}
 
 <div class="panel">
 	<div class="panel-header">
@@ -48,14 +65,18 @@
 						<span class="transcript-rail"></span>
 					{/if}
 					<span class="transcript-time">{entry.createdAt.toLocaleTimeString()}</span>
-					<span class="transcript-kind">{entry.kind.toUpperCase()}</span>
+					<span class={`transcript-kind-${kindName(entry.kind).toLowerCase()}`}>{kindName(entry.kind).toUpperCase()}</span>
 					<span class="transcript-text">
-						{entry.text}
-						{#if entry.redacted}
-							<RedactedValue value={entry.redacted} />
-						{/if}
-						{#if entry.pii}
-							<span class="redacted-tag">PII</span>
+						{#if entry.kind === TranscriptKind.Step}
+							<span class="transcript-step-message">{entry.text.message}</span>
+							{#each entry.text.inputs as field (field.fieldName)}
+								{@render transcriptStepField("input", field)}
+							{/each}
+							{#each entry.text.outputs as field (field.fieldName)}
+								{@render transcriptStepField("output", field)}
+							{/each}
+						{:else}
+							{entry.text}
 						{/if}
 					</span>
 					{#if entry.jobStatusId !== null}
@@ -135,15 +156,49 @@
 		@include transcript-row;
 	}
 
-	.transcript-kind {
+	.transcript-kind-status {
+		@include transcript-cell-kind($transcript-kind-status-color);
+	}
+
+	.transcript-kind-step {
 		@include transcript-cell-kind($transcript-kind-step-color);
+	}
+
+	.transcript-kind-recover {
+		@include transcript-cell-kind($transcript-kind-recover-color);
+	}
+
+	.transcript-kind-halt {
+		@include transcript-cell-kind($transcript-kind-halt-color);
+	}
+
+	.transcript-kind-observe {
+		@include transcript-cell-kind($transcript-kind-observe-color);
+	}
+
+	.transcript-kind-plan {
+		@include transcript-cell-kind($transcript-kind-plan-color);
+	}
+
+	.transcript-kind-info {
+		@include transcript-cell-kind($transcript-kind-info-color);
 	}
 
 	.transcript-text {
 		@include transcript-cell-text;
 	}
 
-	.redacted-tag {
-		@include redacted-tag;
+	.transcript-step-message {
+		display: block;
+	}
+
+	.transcript-step-field {
+		display: flex;
+		align-items: center;
+		gap: $space-xs;
+	}
+
+	.transcript-step-field-label {
+		color: $text-color-muted;
 	}
 </style>

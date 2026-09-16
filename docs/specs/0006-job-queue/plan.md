@@ -9,6 +9,6 @@ This is the plan for [0006-job-queue/spec.md](./spec.md).
     - [x] Repository layer: base+extension Job reads, safe/raw ingredient and result reads, structured transcript serialization
         - Restores and rewrites the three integration test files disabled by Step 1 (renamed `.disabled`, not deleted): `src/hub/src/lib/server/repositories/jobRepository.integration.test.ts`, `src/hub/src/lib/server/jobActions.integration.test.ts`, `src/hub/src/lib/server/runnerActions.integration.test.ts`.
     - [x] Hub action/API layer: kind-dispatched `steps` endpoint, ingredient/result sensitivity resolution
-    - [ ] Hub UI: consume real sensitivity signals, render structured `Step` transcript rows
+    - [x] Hub UI: consume real sensitivity signals, render structured `Step` transcript rows
 - [ ] 6. Runner-web: job-aware main loop
 - [ ] 7. Docs

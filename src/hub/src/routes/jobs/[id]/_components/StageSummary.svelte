@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { JobStatus } from "$lib/jobStatus";
+	import { JobType } from "$lib/jobType";
 	import type { Job } from "$lib/types/job";
 
-	let { job, stepsTaken }: { job: Job; stepsTaken: number } = $props();
+	type TrainingJobDetail = Extract<Job, { jobType: JobType.Training }>;
+
+	let { job, stepsTaken }: { job: TrainingJobDetail; stepsTaken: number } = $props();
 
 	type StageSegmentVariant = "done" | "failed" | "remaining";
 	interface StageSegment {
@@ -54,10 +57,10 @@
 		return segments.length > 0 ? segments : [{ variant: "remaining", weight: 1 }];
 	}
 
-	const label = $derived(`Step ${stepsTaken} of ${job.maxSteps}`);
+	const label = $derived(`Step ${stepsTaken} of ${job.details.maxSteps}`);
 	const note = $derived(statusNote(job.jobStatusId));
 	const timing = $derived(formatTiming(job));
-	const segments = $derived(computeSegments(job.jobStatusId, stepsTaken, job.maxSteps));
+	const segments = $derived(computeSegments(job.jobStatusId, stepsTaken, job.details.maxSteps));
 </script>
 
 <div class="stage">

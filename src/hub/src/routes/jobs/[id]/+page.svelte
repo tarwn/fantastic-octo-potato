@@ -13,6 +13,8 @@
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
 	import { isTerminalJobStatus } from "$lib/jobStatus";
+	import { TranscriptKind } from "$lib/jobTranscriptKind";
+	import { JOB_TYPE_LABELS, JobType } from "$lib/jobType";
 	import type { JobDetail } from "$lib/types/job";
 	import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
 
@@ -77,15 +79,15 @@
 <div class="job-page">
 	{#if loadError}
 		<p class="job-page-message">{loadError}</p>
-	{:else if job && registeredApplication}
+	{:else if job && registeredApplication && job.jobType === JobType.Training}
 		<div class="job-page-content">
 			<div class="job-page-eyebrow">
-				<span class="job-page-mode">{job.mode.toUpperCase()}</span>
+				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>
 				<span class="job-page-divider">|</span>
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
 			<div class="job-page-header">
-				<h1>{job.goal}</h1>
+				<h1>{job.details.goal}</h1>
 				<div class="job-page-actions">
 					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
 					{#if !isTerminalJobStatus(job.jobStatusId)}
@@ -104,16 +106,18 @@
 				runnerId={job.runnerId}
 				jobStatusId={job.jobStatusId}
 			/>
-			<StageSummary {job} stepsTaken={job.transcript.filter((entry) => entry.kind === "step").length} />
+			<StageSummary {job} stepsTaken={job.transcript.filter((entry) => entry.kind === TranscriptKind.Step).length} />
 
 			<div class="job-page-panels">
 				<TranscriptPanel entries={job.transcript} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
-					<GoalsPanel goal={job.goal} allowlist={job.allowlist} />
+					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
 				</div>
 			</div>
 		</div>
+	{:else if job}
+		<p class="job-page-message">Recipe Jobs are not yet supported by this view.</p>
 	{/if}
 </div>
 

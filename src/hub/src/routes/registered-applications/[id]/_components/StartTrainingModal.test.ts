@@ -5,6 +5,7 @@ import StartTrainingModal from "./StartTrainingModal.svelte";
 
 import { goto } from "$app/navigation";
 import { startTrainingRun } from "$lib/api/jobsApi";
+import { JobType } from "$lib/jobType";
 
 vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
 vi.mock("$lib/api/jobsApi", () => ({ startTrainingRun: vi.fn() }));
@@ -32,12 +33,14 @@ describe("StartTrainingModal", () => {
 		vi.mocked(startTrainingRun).mockResolvedValue({
 			id: 42,
 			customerApplicationXrefId: 1,
-			mode: "training",
+			jobType: JobType.Training,
 			jobStatusId: 1,
-			goal: "Extract invoices",
-			startingUrl: "https://example.com",
-			allowlist: "https://example.com",
-			maxSteps: 10,
+			details: {
+				goal: "Extract invoices",
+				startingUrl: "https://example.com",
+				allowlist: "https://example.com",
+				maxSteps: 10
+			},
 			runnerId: null,
 			createdAt: new Date(),
 			startedAt: null,

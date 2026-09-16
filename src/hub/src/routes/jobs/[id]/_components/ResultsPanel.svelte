@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
+	import { SensitivityType } from "$lib/sensitivityType";
 	import type { JobResult } from "$lib/types/job";
 
 	let { results }: { results: JobResult[] } = $props();
@@ -17,12 +18,10 @@
 			{#each results as result (result.fieldName)}
 				<div class="panel-row">
 					<span class="panel-label">{result.fieldName}</span>
-					{#if result.pending}
-						<span class="panel-value panel-value-pending">pending</span>
-					{:else if result.redacted}
-						<RedactedValue value={result.value} />
+					{#if result.sensitivityType !== SensitivityType.None}
+						<RedactedValue value={result.safeValue} />
 					{:else}
-						<span class="panel-value">{result.value}</span>
+						<span class="panel-value">{result.safeValue}</span>
 					{/if}
 				</div>
 			{/each}
@@ -65,9 +64,5 @@
 
 	.panel-value {
 		@include panel-row-value;
-
-		&-pending {
-			@include panel-row-value-pending;
-		}
 	}
 </style>

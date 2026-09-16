@@ -7,6 +7,7 @@
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
+	import { JOB_TYPE_LABELS } from "$lib/jobType";
 	import type { Job } from "$lib/types/job";
 	import type { RegisteredApplication } from "$lib/types/registeredApplication";
 
@@ -51,7 +52,7 @@
 								{registeredApplication ? `${registeredApplication.customerName} — ${registeredApplication.applicationName}` : ""}
 							</span>
 						</a>
-						<span class="job-mode">{job.mode}</span>
+						<span class="job-mode">{JOB_TYPE_LABELS[job.jobType]}</span>
 						<StatusBadge text={JOB_STATUS_LABELS[job.jobStatusId]} variant={JOB_STATUS_VARIANTS[job.jobStatusId]} />
 						<span class="job-time">{(job.startedAt ?? job.createdAt).toLocaleString()}</span>
 					</li>

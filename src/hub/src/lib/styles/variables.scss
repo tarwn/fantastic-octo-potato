@@ -131,7 +131,6 @@ $box-shadow-overlay: oklch(19% 0.01 165deg / 35%) 0px 12px 40px 0px;
 $text-color-default: $color-basic-regular;
 $text-color-light: $color-stone-800;
 $text-color-muted: $color-stone-600;
-$text-color-faint: $color-stone-500;
 $text-color-primary: $color-moss-700;
 $text-color-inverse: $color-stone-100;
 
@@ -301,10 +300,6 @@ $redacted-color: $text-color-default;
 $redacted-padding-x: 5px;
 $redacted-font-family: $font-family-mono;
 $redacted-letter-spacing: 0.02em;
-$redacted-tag-color: $color-moss-700;
-$redacted-tag-font-size: 10px;
-$redacted-tag-font-weight: 700;
-$redacted-tag-letter-spacing: 0.06em;
 
 // == status change badge
 $status-change-font-size: $text-micro-size;
