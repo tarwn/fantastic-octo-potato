@@ -19,10 +19,23 @@ export function terminalTranscriptSequence(maxSteps: number): number {
 	return maxSteps + 1;
 }
 
+// A Runner-submitted non-Step kind (status/info/recover/observe/plan) carries no sequence of
+// its own — Hub assigns the next one after whatever positive (in-scripted-flow) sequence
+// already exists, leaving the negative/terminal sentinel sequences (JOB_CREATED_SEQUENCE et al.) alone.
+function nextTranscriptSequence(db: Database.Database, jobId: number): number {
+	const row = db
+		.prepare("SELECT COALESCE(MAX(sequence), 0) + 1 AS next FROM job_transcript_entry WHERE job_id = ? AND sequence > 0")
+		.get(jobId) as { next: number };
+	return row.next;
+}
+
 // Fixed masking token, not real PII/secret detection — a placeholder until real Runner/Hub masking lands.
 const MASK_TOKEN = "••••••";
 
-function maskValue(rawValue: string, sensitivityType: SensitivityType): string {
+// Exported so a caller that must build a masked TranscriptFieldRef in the same turn as a write
+// (e.g. a Step submission's outputs) can derive it without a second read — masking still only
+// ever happens through this one function.
+export function maskValue(rawValue: string, sensitivityType: SensitivityType): string {
 	return sensitivityType === SensitivityType.None ? rawValue : MASK_TOKEN;
 }
 
@@ -369,6 +382,27 @@ export function appendTranscriptEntry(
 	db.prepare(
 		"INSERT OR IGNORE INTO job_transcript_entry (job_id, sequence, job_transcript_kind_id, text, created_at, job_status_id) VALUES (?, ?, ?, ?, ?, ?)"
 	).run(jobId, sequence, kind, text, toDbDate(createdAt), jobStatusId);
+}
+
+// Wraps the auto-assigned-sequence lookup, the transcript insert, and (when a status change
+// accompanies the entry) the job_status update in one transaction — mirrors claimNextJobForRunner's
+// find-then-claim pattern so two concurrent non-Step submissions can't silently lose a transcript
+// row to the UNIQUE(job_id, sequence) constraint's INSERT OR IGNORE.
+export function appendAutoSequencedTranscriptEntry(
+	db: Database.Database,
+	jobId: number,
+	kind: Exclude<TranscriptKind, TranscriptKind.Step>,
+	message: string,
+	createdAt: Date,
+	statusChange: JobStatus | null = null
+): void {
+	db.transaction(() => {
+		const sequence = nextTranscriptSequence(db, jobId);
+		appendTranscriptEntry(db, jobId, sequence, kind, message, createdAt, statusChange);
+		if (statusChange !== null) {
+			updateJobStatus(db, jobId, statusChange, createdAt);
+		}
+	})();
 }
 
 export function listTranscriptEntries(db: Database.Database, jobId: number): JobTranscriptEntry[] {

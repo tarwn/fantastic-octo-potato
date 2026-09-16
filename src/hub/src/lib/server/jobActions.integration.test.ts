@@ -5,7 +5,8 @@ import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
 import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
-import { claimNextJobForRunner, insertJob } from "./repositories/jobRepository";
+import { SensitivityType } from "./db/sensitivityType";
+import { claimNextJobForRunner, insertJob, upsertJobIngredient, upsertJobResult } from "./repositories/jobRepository";
 import { cancelJob, createJob, getJobDetail, listJobsAction } from "./jobActions";
 
 function seedRegisteredApplication(db: Database.Database, id = 1): number {
@@ -133,6 +134,19 @@ describe("jobActions", () => {
 				status: 200,
 				body: { data: { ...job, transcript: [], results: [], ingredients: [] } }
 			});
+		});
+
+		it("never leaks a rawValue key anywhere in its serialized JSON", () => {
+			const xrefId = seedRegisteredApplication(getDb());
+			const job = insertTrainingJob(getDb(), xrefId);
+			upsertJobIngredient(getDb(), job.id, "ssn", "123-45-6789", SensitivityType.PII, new Date("2026-09-15T00:01:00.000Z"));
+			upsertJobResult(getDb(), job.id, "total", "10.00", SensitivityType.PII, new Date("2026-09-15T00:02:00.000Z"));
+
+			const result = getJobDetail(getDb(), String(job.id));
+
+			expect(JSON.stringify(result.body)).not.toContain("rawValue");
+			expect(JSON.stringify(result.body)).not.toContain("123-45-6789");
+			expect(JSON.stringify(result.body)).not.toContain("\"10.00\"");
 		});
 	});
 

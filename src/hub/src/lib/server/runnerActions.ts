@@ -5,12 +5,16 @@ import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
 import { SensitivityType } from "./db/sensitivityType";
 import {
+	appendAutoSequencedTranscriptEntry,
 	appendTranscriptEntry,
 	claimNextJobForRunner,
 	getJobById,
+	getSafeJobIngredientByFieldName,
 	JOB_CLAIMED_SEQUENCE,
+	maskValue,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
+	type TranscriptFieldRef,
 	updateJobHeartbeat,
 	updateJobStatus,
 	upsertJobResult
@@ -18,31 +22,100 @@ import {
 import { getRunnerById, updateRunnerHeartbeat } from "./repositories/runnerRepository";
 import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
 
-// Maps the Runner-submitted free-text kind onto the closed job_transcript_kind vocabulary — the
-// request body itself becomes a proper kind-discriminated union in a later step; this lookup is
-// the minimal bridge the schema change requires now that job_transcript_entry.kind is a foreign
-// key, not freeform TEXT.
-const TRANSCRIPT_KIND_BY_NAME: Record<string, TranscriptKind> = {
-	status: TranscriptKind.Status,
-	info: TranscriptKind.Info,
-	step: TranscriptKind.Step,
-	recover: TranscriptKind.Recover,
-	halt: TranscriptKind.Halt,
-	observe: TranscriptKind.Observe,
-	plan: TranscriptKind.Plan
-};
-
 export interface RunnerActionResult {
 	status: number;
 	body: { data: unknown } | { error: string };
 }
 
-export interface ReportStepBody {
-	sequence: number;
-	kind: string;
-	text: string;
-	resultField?: string;
-	resultValue?: string;
+// halt is deliberately excluded — it's a schema/enum slot for a future Intervention-Requested
+// status change, not something a Runner can submit as free text this spec.
+export type ReportStepBody =
+	| { kind: "status"; status: JobStatus; message: string }
+	| { kind: "info"; message: string }
+	| { kind: "step"; sequence: number; message: string; inputs: string[]; outputs: Array<{ fieldName: string; value: string }> }
+	| { kind: "recover"; message: string }
+	| { kind: "observe"; message: string }
+	| { kind: "plan"; message: string };
+
+const NON_STEP_TRANSCRIPT_KIND: Record<"info" | "recover" | "observe" | "plan", Exclude<TranscriptKind, TranscriptKind.Step>> = {
+	info: TranscriptKind.Info,
+	recover: TranscriptKind.Recover,
+	observe: TranscriptKind.Observe,
+	plan: TranscriptKind.Plan
+};
+
+const JOB_STATUS_VALUES = Object.values(JobStatus).filter((value): value is JobStatus => typeof value === "number");
+
+function isJobStatus(value: unknown): value is JobStatus {
+	return typeof value === "number" && JOB_STATUS_VALUES.includes(value as JobStatus);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function parseMessage(body: Record<string, unknown>): string | undefined {
+	return typeof body.message === "string" && body.message.trim() !== "" ? body.message : undefined;
+}
+
+type ParseResult = { ok: true; value: ReportStepBody } | { ok: false; error: string };
+
+// Validates the discriminant and per-kind required fields before any DB write — an
+// unrecognized kind or a kind/field mismatch is a 400, never a partially-applied write.
+function parseReportStepBody(body: unknown): ParseResult {
+	if (!isRecord(body) || typeof body.kind !== "string" || body.kind.trim() === "") {
+		return { ok: false, error: "kind is required" };
+	}
+
+	switch (body.kind) {
+		case "status": {
+			if (!isJobStatus(body.status)) {
+				return { ok: false, error: "status must be a valid JobStatus" };
+			}
+			const message = parseMessage(body);
+			if (message === undefined) {
+				return { ok: false, error: "message is required" };
+			}
+			return { ok: true, value: { kind: "status", status: body.status, message } };
+		}
+		case "info":
+		case "recover":
+		case "observe":
+		case "plan": {
+			const message = parseMessage(body);
+			if (message === undefined) {
+				return { ok: false, error: "message is required" };
+			}
+			return { ok: true, value: { kind: body.kind as "info" | "recover" | "observe" | "plan", message } };
+		}
+		case "step": {
+			if (!Number.isInteger(body.sequence) || (body.sequence as number) <= 0) {
+				return { ok: false, error: "sequence must be a positive integer" };
+			}
+			const message = parseMessage(body);
+			if (message === undefined) {
+				return { ok: false, error: "message is required" };
+			}
+			if (!Array.isArray(body.inputs) || !body.inputs.every((value): value is string => typeof value === "string")) {
+				return { ok: false, error: "inputs must be an array of field names" };
+			}
+			if (
+				!Array.isArray(body.outputs) ||
+				!body.outputs.every(
+					(value): value is { fieldName: string; value: string } =>
+						isRecord(value) && typeof value.fieldName === "string" && typeof value.value === "string"
+				)
+			) {
+				return { ok: false, error: "outputs must be an array of { fieldName, value }" };
+			}
+			return {
+				ok: true,
+				value: { kind: "step", sequence: body.sequence as number, message, inputs: body.inputs, outputs: body.outputs }
+			};
+		}
+		default:
+			return { ok: false, error: `Unrecognized kind: ${body.kind}` };
+	}
 }
 
 function requireRunnerBearerAuth(authHeader: string | null, sharedSecret: string): boolean {
@@ -136,7 +209,7 @@ export function reportJobStep(
 	rawJobId: string,
 	authHeader: string | null,
 	sharedSecret: string,
-	body: ReportStepBody
+	body: unknown
 ): RunnerActionResult {
 	if (!requireRunnerBearerAuth(authHeader, sharedSecret)) {
 		return { status: 401, body: { error: "Unauthorized" } };
@@ -159,18 +232,9 @@ export function reportJobStep(
 		throw new Error(`Job ${rawJobId} is not a Training Job — only Training Jobs report steps`);
 	}
 
-	if (!Number.isInteger(body.sequence) || body.sequence <= 0) {
-		return { status: 400, body: { error: "sequence must be a positive integer" } };
-	}
-	if (typeof body.kind !== "string" || body.kind.trim() === "") {
-		return { status: 400, body: { error: "kind is required" } };
-	}
-	if (typeof body.text !== "string" || body.text.trim() === "") {
-		return { status: 400, body: { error: "text is required" } };
-	}
-	const transcriptKind = TRANSCRIPT_KIND_BY_NAME[body.kind];
-	if (transcriptKind === undefined) {
-		return { status: 400, body: { error: `Unrecognized kind: ${body.kind}` } };
+	const parsed = parseReportStepBody(body);
+	if (!parsed.ok) {
+		return { status: 400, body: { error: parsed.error } };
 	}
 
 	if (TERMINAL_JOB_STATUSES.includes(job.jobStatusId)) {
@@ -178,21 +242,51 @@ export function reportJobStep(
 	}
 
 	const now = new Date();
-	if (transcriptKind === TranscriptKind.Step) {
-		appendTranscriptEntry(db, job.id, body.sequence, TranscriptKind.Step, { message: body.text, inputs: [], outputs: [] }, now);
+
+	if (parsed.value.kind === "status") {
+		appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Status, parsed.value.message, now, parsed.value.status);
+		updateJobHeartbeat(db, job.id, now);
+		updateRunnerHeartbeat(db, runner.id, now);
+		return { status: 200, body: { data: { jobStatusId: parsed.value.status } } };
 	}
-	else {
-		appendTranscriptEntry(db, job.id, body.sequence, transcriptKind, body.text, now);
+
+	if (parsed.value.kind !== "step") {
+		appendAutoSequencedTranscriptEntry(db, job.id, NON_STEP_TRANSCRIPT_KIND[parsed.value.kind], parsed.value.message, now);
+		updateJobHeartbeat(db, job.id, now);
+		updateRunnerHeartbeat(db, runner.id, now);
+		return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
 	}
-	if (body.resultField) {
-		// sensitivityType resolution from the scripted step definition lands with the
-		// kind-dispatched steps endpoint rework — defaulted to None until then.
-		upsertJobResult(db, job.id, body.resultField, body.resultValue ?? "", SensitivityType.None, now);
+
+	const step = parsed.value;
+
+	const resolvedInputs: TranscriptFieldRef[] = [];
+	for (const fieldName of step.inputs) {
+		const ingredient = getSafeJobIngredientByFieldName(db, job.id, fieldName);
+		if (!ingredient) {
+			return { status: 400, body: { error: `Unknown ingredient: ${fieldName}` } };
+		}
+		resolvedInputs.push(ingredient);
 	}
+
+	const resolvedOutputs: TranscriptFieldRef[] = [];
+	for (const output of step.outputs) {
+		const sensitivityType = SCRIPTED_TRAINING_STEPS.find((s) => s.resultField === output.fieldName)?.sensitivityType ?? SensitivityType.None;
+		upsertJobResult(db, job.id, output.fieldName, output.value, sensitivityType, now);
+		resolvedOutputs.push({ fieldName: output.fieldName, safeValue: maskValue(output.value, sensitivityType), sensitivityType });
+	}
+
+	appendTranscriptEntry(
+		db,
+		job.id,
+		step.sequence,
+		TranscriptKind.Step,
+		{ message: step.message, inputs: resolvedInputs, outputs: resolvedOutputs },
+		now
+	);
 	updateJobHeartbeat(db, job.id, now);
 	updateRunnerHeartbeat(db, runner.id, now);
 
-	if (body.sequence >= job.details.maxSteps) {
+	if (step.sequence >= job.details.maxSteps) {
 		updateJobStatus(db, job.id, JobStatus.CompletedFailed, now);
 		appendTranscriptEntry(
 			db,
@@ -206,7 +300,7 @@ export function reportJobStep(
 		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } };
 	}
 
-	if (body.sequence >= SCRIPTED_TRAINING_STEPS.length) {
+	if (step.sequence >= SCRIPTED_TRAINING_STEPS.length) {
 		updateJobStatus(db, job.id, JobStatus.CompletedSuccess, now);
 		appendTranscriptEntry(
 			db,
@@ -220,13 +314,13 @@ export function reportJobStep(
 		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } };
 	}
 
-	const next = SCRIPTED_TRAINING_STEPS[body.sequence];
+	const next = SCRIPTED_TRAINING_STEPS[step.sequence];
 	return {
 		status: 200,
 		body: {
 			data: {
 				jobStatusId: JobStatus.Running,
-				nextStep: { sequence: body.sequence + 1, kind: next.kind, text: next.text }
+				nextStep: { sequence: step.sequence + 1, kind: next.kind, text: next.text }
 			}
 		}
 	};
