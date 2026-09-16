@@ -15,12 +15,16 @@ describe("resetUserData", () => {
 			INSERT INTO runner (id, customer_application_xref_id) VALUES (1, 1);
 			INSERT INTO recipe (id, customer_application_xref_id, recipe_status_id, version, name, goal, definition, created_at)
 				VALUES (1, 1, 1, 1, 'Recipe', 'Goal', '{}', '2026-01-01T00:00:00.000Z');
-			INSERT INTO job (id, customer_application_xref_id, mode, job_status_id, goal, starting_url, allowlist, max_steps, created_at)
-				VALUES (1, 1, 'training', 1, 'Goal', 'https://example.com', 'https://example.com', 10, '2026-01-01T00:00:00.000Z');
-			INSERT INTO job_transcript_entry (job_id, sequence, kind, text, created_at)
-				VALUES (1, 1, 'step', 'Did a thing', '2026-01-01T00:00:00.000Z');
-			INSERT INTO job_result (job_id, field_name, value, created_at)
-				VALUES (1, 'field', 'value', '2026-01-01T00:00:00.000Z');
+			INSERT INTO job (id, customer_application_xref_id, job_type_id, job_status_id, created_at)
+				VALUES (1, 1, 1, 1, '2026-01-01T00:00:00.000Z');
+			INSERT INTO training_job (job_id, goal, starting_url, allowlist, max_steps)
+				VALUES (1, 'Goal', 'https://example.com', 'https://example.com', 10);
+			INSERT INTO job_transcript_entry (job_id, sequence, job_transcript_kind_id, text, created_at)
+				VALUES (1, 1, 3, 'Did a thing', '2026-01-01T00:00:00.000Z');
+			INSERT INTO job_result (job_id, field_name, raw_value, safe_value, sensitivity_type_id, created_at)
+				VALUES (1, 'field', 'value', 'value', 1, '2026-01-01T00:00:00.000Z');
+			INSERT INTO job_ingredient (job_id, field_name, raw_value, safe_value, sensitivity_type_id, created_at)
+				VALUES (1, 'field', 'value', 'value', 1, '2026-01-01T00:00:00.000Z');
 		`);
 	}
 
@@ -36,8 +40,11 @@ describe("resetUserData", () => {
 			"runner",
 			"recipe",
 			"job",
+			"training_job",
+			"recipe_job",
 			"job_transcript_entry",
-			"job_result"
+			"job_result",
+			"job_ingredient"
 		]) {
 			const { count } = getDb().prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as { count: number };
 			expect(count).toBe(0);

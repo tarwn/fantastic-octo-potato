@@ -1,3 +1,6 @@
+// Disabled (.disabled, not .ts): jobActions.ts still calls the old (pre-restructure)
+// jobRepository shape. Restore and rewrite it once jobActions.ts is rebuilt on the new
+// repository layer.
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 

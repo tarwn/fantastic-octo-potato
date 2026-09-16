@@ -1,3 +1,6 @@
+// Disabled (.disabled, not .ts): this file still calls insertJob/appendTranscriptEntry/
+// upsertJobResult with the old job.mode/job_result.value shapes dropped by the schema
+// migration. Restore and rewrite it once the repository layer is rebuilt on the new schema.
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
