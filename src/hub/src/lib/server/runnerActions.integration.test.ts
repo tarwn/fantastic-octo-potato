@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
-import { getJobById, insertJob } from "./repositories/jobRepository";
+import { getJobById, insertJob, listTranscriptEntries } from "./repositories/jobRepository";
 import { getRunnerById } from "./repositories/runnerRepository";
 import { reportJobStep, runnerInit, runnerPoll } from "./runnerActions";
 import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
@@ -128,6 +128,23 @@ describe("runnerActions", () => {
 				}
 			});
 			expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.Running);
+		});
+
+		it("records a status transcript entry announcing the claim", () => {
+			const db = getDb();
+			const runnerId = seedRunner(db);
+			const jobId = insertPendingJob(db, 1);
+
+			runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+			expect(listTranscriptEntries(db, jobId)).toEqual([
+				expect.objectContaining({
+					sequence: -1,
+					kind: "status",
+					text: `Picked up by Runner ${runnerId}`,
+					jobStatusId: JobStatus.Running
+				})
+			]);
 		});
 
 		it("never returns a Pending job belonging to a different xref", () => {
@@ -282,6 +299,14 @@ describe("runnerActions", () => {
 
 			expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } });
 			expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedFailed);
+			expect(listTranscriptEntries(db, jobId)).toContainEqual(
+				expect.objectContaining({
+					sequence: 2,
+					kind: "status",
+					text: "Reached max steps, marked Completed-Failed",
+					jobStatusId: JobStatus.CompletedFailed
+				})
+			);
 		});
 
 		it("sets Completed-Success once the scripted steps are exhausted, recording results along the way", () => {
@@ -304,6 +329,14 @@ describe("runnerActions", () => {
 
 			expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
 			expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
+			expect(listTranscriptEntries(db, jobId)).toContainEqual(
+				expect.objectContaining({
+					sequence: 101,
+					kind: "status",
+					text: "Run finished, marked Completed-Success",
+					jobStatusId: JobStatus.CompletedSuccess
+				})
+			);
 		});
 
 		it("returns the next scripted step while steps remain", () => {

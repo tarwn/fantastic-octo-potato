@@ -1,8 +1,18 @@
 <script lang="ts">
+	import { resolve } from "$app/paths";
+	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
+	import { formatJobDisplayId } from "$lib/jobDisplayId";
 	import { getRunnerStatus } from "$lib/runnerStatus";
 	import type { RunnerSummary } from "$lib/types/registeredApplication";
 
-	let { runners }: { runners: RunnerSummary[] } = $props();
+	const REFRESH_INTERVAL_SECONDS = 15;
+
+	let {
+		runners,
+		xrefId,
+		lastRefreshedOn,
+		onRefresh
+	}: { runners: RunnerSummary[]; xrefId: number; lastRefreshedOn: Date; onRefresh: () => void } = $props();
 
 	function formatHeartbeat(lastHeartbeatOn: Date | null): string {
 		return lastHeartbeatOn === null ? "Never" : lastHeartbeatOn.toLocaleString();
@@ -16,6 +26,7 @@
 <div class="panel">
 	<div class="panel-header">
 		<h2>Runners</h2>
+		<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} {onRefresh} />
 	</div>
 	{#if runners.length === 0}
 		<p class="panel-message">No runners registered yet.</p>
@@ -26,10 +37,16 @@
 				<li class="panel-row">
 					<span class="panel-row-label">Runner {runner.id}</span>
 					<span class="panel-row-value">
-						<span class={["runner-status", `runner-status--${status.toLowerCase()}`].join(" ")}>
-							{status}
-						</span>
-						Last heartbeat: {formatHeartbeat(runner.lastHeartbeatOn)}
+						{#if runner.currentJobId !== null}
+							<a href={resolve("/jobs/[id]", { id: String(runner.currentJobId) })}>
+								Running {formatJobDisplayId(xrefId, runner.currentJobId)}
+							</a>
+						{:else}
+							<span class={["runner-status", `runner-status--${status.toLowerCase()}`].join(" ")}>
+								{status}
+							</span>
+							Last heartbeat: {formatHeartbeat(runner.lastHeartbeatOn)}
+						{/if}
 					</span>
 				</li>
 			{/each}

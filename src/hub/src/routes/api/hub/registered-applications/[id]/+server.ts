@@ -4,6 +4,7 @@ import type { RequestHandler } from "./$types";
 
 import { getDb } from "$lib/server/db/db";
 import { getRegisteredApplicationById } from "$lib/server/repositories/customerApplicationXrefRepository";
+import { listRunningJobIdsByRunnerId } from "$lib/server/repositories/jobRepository";
 import { listRunnersByCustomerApplicationXrefId } from "$lib/server/repositories/runnerRepository";
 import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
 
@@ -15,9 +16,15 @@ export const GET: RequestHandler = ({ params }) => {
 		return json({ error: `Registered Application ${params.id} not found` }, { status: 404 });
 	}
 
-	const runners = listRunnersByCustomerApplicationXrefId(getDb(), registeredApplication.id).map((runner) => ({
+	const runnerRows = listRunnersByCustomerApplicationXrefId(getDb(), registeredApplication.id);
+	const runningJobIdByRunnerId = listRunningJobIdsByRunnerId(
+		getDb(),
+		runnerRows.map((runner) => runner.id)
+	);
+	const runners = runnerRows.map((runner) => ({
 		id: runner.id,
-		lastHeartbeatOn: runner.lastHeartbeatOn
+		lastHeartbeatOn: runner.lastHeartbeatOn,
+		currentJobId: runningJobIdByRunnerId.get(runner.id) ?? null
 	}));
 
 	return json({

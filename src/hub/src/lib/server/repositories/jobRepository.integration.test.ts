@@ -12,6 +12,7 @@ import {
 	type JobMode,
 	listJobResults,
 	listJobs,
+	listRunningJobIdsByRunnerId,
 	listTranscriptEntries,
 	updateJobHeartbeat,
 	updateJobStatus,
@@ -201,7 +202,52 @@ describe("jobRepository", () => {
 		appendTranscriptEntry(db, jobId, 1, "step", "Late duplicate report", new Date("2026-09-15T00:02:00.000Z"));
 
 		expect(listTranscriptEntries(db, jobId)).toEqual([
-			{ id: expect.any(Number), jobId, sequence: 1, kind: "step", text: "First report", createdAt: firstCreatedAt }
+			{
+				id: expect.any(Number),
+				jobId,
+				sequence: 1,
+				kind: "step",
+				text: "First report",
+				createdAt: firstCreatedAt,
+				jobStatusId: null
+			}
+		]);
+	});
+
+	it("maps only Runners with a currently-Running job, ignoring Pending/idle Runners", () => {
+		const db = getDb();
+		seedXref(db);
+		const runningRunnerId = seedRunner(db, 1);
+		const idleRunnerId = seedRunner(db, 1);
+		const jobId = insertPendingJob(db, 1);
+		claimNextJobForRunner(db, 1, runningRunnerId, new Date("2026-09-15T00:05:00.000Z"));
+
+		const result = listRunningJobIdsByRunnerId(db, [runningRunnerId, idleRunnerId]);
+
+		expect(result).toEqual(new Map([[runningRunnerId, jobId]]));
+	});
+
+	it("returns an empty map for no Runner ids", () => {
+		expect(listRunningJobIdsByRunnerId(getDb(), [])).toEqual(new Map());
+	});
+
+	it("records the Job's new status on a status-kind transcript entry", () => {
+		const db = getDb();
+		seedXref(db);
+		const jobId = insertPendingJob(db, 1);
+
+		appendTranscriptEntry(db, jobId, -1, "status", "Picked up by Runner 1", new Date("2026-09-15T00:01:00.000Z"), JobStatus.Running);
+
+		expect(listTranscriptEntries(db, jobId)).toEqual([
+			{
+				id: expect.any(Number),
+				jobId,
+				sequence: -1,
+				kind: "status",
+				text: "Picked up by Runner 1",
+				createdAt: new Date("2026-09-15T00:01:00.000Z"),
+				jobStatusId: JobStatus.Running
+			}
 		]);
 	});
 

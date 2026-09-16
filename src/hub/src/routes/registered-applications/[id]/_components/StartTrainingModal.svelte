@@ -1,5 +1,10 @@
 <script lang="ts">
-	let { open, onClose }: { open: boolean; onClose: () => void } = $props();
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
+	import { startTrainingRun } from "$lib/api/jobsApi";
+
+	let { open, onClose, registeredApplicationId }: { open: boolean; onClose: () => void; registeredApplicationId: number } =
+		$props();
 
 	let dialogEl = $state<HTMLDialogElement | undefined>();
 
@@ -10,6 +15,7 @@
 	let goalError = $state<string | null>(null);
 	let startingUrlError = $state<string | null>(null);
 	let maxStepsError = $state<string | null>(null);
+	let submitError = $state<string | null>(null);
 
 	$effect(() => {
 		if (!dialogEl) return;
@@ -30,6 +36,7 @@
 		goalError = null;
 		startingUrlError = null;
 		maxStepsError = null;
+		submitError = null;
 	}
 
 	function isValidUrl(value: string): boolean {
@@ -46,9 +53,10 @@
 		return /^[1-9]\d*$/.test(value);
 	}
 
-	function handleSubmit(event: SubmitEvent) {
+	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
+		submitError = null;
 		goalError = goal.trim() === "" ? "Goal statement is required." : null;
 		startingUrlError = startingUrl.trim() === ""
 			? "Starting URL is required."
@@ -59,8 +67,18 @@
 
 		if (goalError || startingUrlError || maxStepsError) return;
 
-	// No `job` table/API yet — a validated Start Training request does not
-	// create a Job. Wire this up once Jobs exist.
+		try {
+			const job = await startTrainingRun(registeredApplicationId, {
+				goal,
+				startingUrl,
+				maxSteps: Number(maxSteps)
+			});
+			dialogEl?.close();
+			await goto(resolve("/jobs/[id]", { id: String(job.id) }));
+		}
+		catch (err) {
+			submitError = err instanceof Error ? err.message : "Failed to start the Training Run.";
+		}
 	}
 
 	function handleCancel() {
@@ -107,6 +125,8 @@
 			/>
 			{#if maxStepsError}<span id="max-steps-error" class="field-error">{maxStepsError}</span>{/if}
 		</label>
+
+		{#if submitError}<span class="field-error">{submitError}</span>{/if}
 
 		<div class="modal-actions">
 			<button type="button" class="btn btn-secondary" onclick={handleCancel}>Cancel</button>

@@ -11,15 +11,23 @@
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
 	let loadError = $state<string | null>(null);
 	let trainingModalOpen = $state(false);
+	let lastRefreshedOn = $state(new Date());
 
-	onMount(async () => {
+	async function load() {
 		try {
 			registeredApplication = await fetchRegisteredApplication(Number(page.params.id));
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load registered application";
 		}
-	});
+	}
+
+	onMount(load);
+
+	async function refresh() {
+		await load();
+		lastRefreshedOn = new Date();
+	}
 
 	function beginTrainingRun() {
 		trainingModalOpen = true;
@@ -44,8 +52,17 @@
 			<h1>{registeredApplication.customerName} — {registeredApplication.applicationName}</h1>
 			<button type="button" class="btn btn-primary" onclick={beginTrainingRun}>Begin a Training Run</button>
 		</div>
-		<RunnersPanel runners={registeredApplication.runners} />
-		<StartTrainingModal open={trainingModalOpen} onClose={closeTrainingModal} />
+		<RunnersPanel
+			runners={registeredApplication.runners}
+			xrefId={registeredApplication.id}
+			{lastRefreshedOn}
+			onRefresh={refresh}
+		/>
+		<StartTrainingModal
+			open={trainingModalOpen}
+			onClose={closeTrainingModal}
+			registeredApplicationId={registeredApplication.id}
+		/>
 	{/if}
 </div>
 

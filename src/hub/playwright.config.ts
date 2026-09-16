@@ -1,6 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
+	// All specs share one seeded Customer/Application/Runner (see seed.ts) and the same
+	// webServer's sqlite file, with no per-test reset — job-claiming/heartbeat tests would
+	// race each other under file-level parallelism, so this whole suite runs serially.
+	workers: 1,
 	webServer: {
 		// db:reset first so state-mutating tests (e.g. runner heartbeat) don't leak between runs.
 		command: "npm run db:reset && npm run build:hub && npm run preview:hub",

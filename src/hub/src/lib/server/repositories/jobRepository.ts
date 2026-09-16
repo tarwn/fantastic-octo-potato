@@ -5,6 +5,17 @@ import { JobStatus } from "../db/jobStatus.ts";
 
 export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
 
+// Status-change transcript rows share job_transcript_entry's (job_id, sequence) column with
+// step reports, so they're pinned outside a step report's 1..maxSteps range: negative before
+// any step runs, maxSteps+1 (guaranteed unused — reportJobStep never reports past maxSteps)
+// once the Job reaches a terminal status.
+export const JOB_CREATED_SEQUENCE = -2;
+export const JOB_CLAIMED_SEQUENCE = -1;
+
+export function terminalTranscriptSequence(maxSteps: number): number {
+	return maxSteps + 1;
+}
+
 // Grows to include "trial"/"execute" once those modes exist; until then, only "training" is valid.
 export const JOB_MODES = ["training"] as const;
 export type JobMode = (typeof JOB_MODES)[number];
@@ -38,6 +49,9 @@ export interface JobTranscriptEntry {
 	kind: string;
 	text: string;
 	createdAt: Date;
+	// Set only on a "status" kind entry — the Job's new status, captured in the same
+	// INSERT as the message, at the same moment its job.job_status_id was updated.
+	jobStatusId: JobStatus | null;
 }
 
 export interface JobResult {
@@ -71,6 +85,7 @@ interface JobTranscriptEntryRow {
 	kind: string;
 	text: string;
 	createdAt: string;
+	jobStatusId: number | null;
 }
 
 interface JobResultRow {
@@ -163,6 +178,19 @@ export function listJobs(db: Database.Database): Job[] {
 	return rows.map(mapJobRow);
 }
 
+// Batched so RunnersPanel can resolve every listed Runner's current Job in one query instead of one per Runner.
+export function listRunningJobIdsByRunnerId(db: Database.Database, runnerIds: number[]): Map<number, number> {
+	if (runnerIds.length === 0) {
+		return new Map();
+	}
+
+	const placeholders = runnerIds.map(() => "?").join(",");
+	const rows = db
+		.prepare(`SELECT id, runner_id AS runnerId FROM job WHERE job_status_id = ? AND runner_id IN (${placeholders})`)
+		.all(JobStatus.Running, ...runnerIds) as { id: number; runnerId: number }[];
+	return new Map(rows.map((row) => [row.runnerId, row.id]));
+}
+
 // Runs the find-and-claim as one transaction so two Runners racing for the same xref's oldest
 // Pending Job can't both win it — the conditional UPDATE's affected-row count is the arbiter.
 export function claimNextJobForRunner(
@@ -204,28 +232,26 @@ export function updateJobHeartbeat(db: Database.Database, jobId: number, when: D
 }
 
 // UNIQUE(job_id, sequence) plus INSERT OR IGNORE makes a repeated/late report a no-op,
-// not a duplicate transcript row.
+// not a duplicate transcript row. jobStatusId is set only for a "status" kind entry —
+// callers pass the Job's new status in the same INSERT as the row that announces it.
 export function appendTranscriptEntry(
 	db: Database.Database,
 	jobId: number,
 	sequence: number,
 	kind: string,
 	text: string,
-	createdAt: Date
+	createdAt: Date,
+	jobStatusId: JobStatus | null = null
 ): void {
-	db.prepare("INSERT OR IGNORE INTO job_transcript_entry (job_id, sequence, kind, text, created_at) VALUES (?, ?, ?, ?, ?)").run(
-		jobId,
-		sequence,
-		kind,
-		text,
-		toDbDate(createdAt)
-	);
+	db.prepare(
+		"INSERT OR IGNORE INTO job_transcript_entry (job_id, sequence, kind, text, created_at, job_status_id) VALUES (?, ?, ?, ?, ?, ?)"
+	).run(jobId, sequence, kind, text, toDbDate(createdAt), jobStatusId);
 }
 
 export function listTranscriptEntries(db: Database.Database, jobId: number): JobTranscriptEntry[] {
 	const rows = db
 		.prepare(
-			"SELECT id, job_id AS jobId, sequence, kind, text, created_at AS createdAt FROM job_transcript_entry WHERE job_id = ? ORDER BY sequence"
+			"SELECT id, job_id AS jobId, sequence, kind, text, created_at AS createdAt, job_status_id AS jobStatusId FROM job_transcript_entry WHERE job_id = ? ORDER BY sequence"
 		)
 		.all(jobId) as JobTranscriptEntryRow[];
 	return rows.map(mapTranscriptEntryRow);

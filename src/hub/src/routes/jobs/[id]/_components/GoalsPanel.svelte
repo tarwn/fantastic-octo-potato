@@ -1,15 +1,13 @@
 <script lang="ts">
-	import type { JobGoals } from "./jobTypes";
-
-	let { goals }: { goals: JobGoals } = $props();
+	let { goal, allowlist }: { goal: string; allowlist: string } = $props();
 </script>
 
 <div class="panel">
 	<div class="panel-header">
 		<h2>Goals</h2>
 	</div>
-	<p class="panel-description">{goals.description}</p>
-	<p class="panel-allowlist">allowlist: {goals.allowlist}</p>
+	<p class="panel-description">{goal}</p>
+	<p class="panel-allowlist">allowlist: {allowlist}</p>
 </div>
 
 <style lang="scss">

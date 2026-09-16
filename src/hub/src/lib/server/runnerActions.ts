@@ -5,7 +5,9 @@ import {
 	appendTranscriptEntry,
 	claimNextJobForRunner,
 	getJobById,
+	JOB_CLAIMED_SEQUENCE,
 	TERMINAL_JOB_STATUSES,
+	terminalTranscriptSequence,
 	updateJobHeartbeat,
 	updateJobStatus,
 	upsertJobResult
@@ -72,12 +74,15 @@ export function runnerPoll(
 		return { status: 404, body: { error: `Runner ${rawId} not found` } };
 	}
 
-	updateRunnerHeartbeat(db, runner.id, new Date());
+	const now = new Date();
+	updateRunnerHeartbeat(db, runner.id, now);
 
-	const job = claimNextJobForRunner(db, runner.customerApplicationXrefId, runner.id, new Date());
+	const job = claimNextJobForRunner(db, runner.customerApplicationXrefId, runner.id, now);
 	if (!job) {
 		return { status: 200, body: { data: { hasWork: false } } };
 	}
+
+	appendTranscriptEntry(db, job.id, JOB_CLAIMED_SEQUENCE, "status", `Picked up by Runner ${runner.id}`, now, JobStatus.Running);
 
 	// The claim hands back scripted step 1 too, so the Runner has something to perform before its first `steps` call.
 	const firstStep = SCRIPTED_TRAINING_STEPS[0];
@@ -155,11 +160,29 @@ export function reportJobStep(
 
 	if (body.sequence >= job.maxSteps) {
 		updateJobStatus(db, job.id, JobStatus.CompletedFailed, now);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.maxSteps),
+			"status",
+			"Reached max steps, marked Completed-Failed",
+			now,
+			JobStatus.CompletedFailed
+		);
 		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } };
 	}
 
 	if (body.sequence >= SCRIPTED_TRAINING_STEPS.length) {
 		updateJobStatus(db, job.id, JobStatus.CompletedSuccess, now);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.maxSteps),
+			"status",
+			"Run finished, marked Completed-Success",
+			now,
+			JobStatus.CompletedSuccess
+		);
 		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } };
 	}
 

@@ -71,6 +71,23 @@ describe("jobActions", () => {
 				})
 			});
 		});
+
+		it("records a status transcript entry announcing the new Pending Job", () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = createJob(getDb(), String(id), { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 5 });
+			const job = (result.body as { data: { id: number } }).data;
+
+			const detail = getJobDetail(getDb(), String(job.id));
+			expect((detail.body as { data: { transcript: unknown[] } }).data.transcript).toEqual([
+				expect.objectContaining({
+					sequence: -2,
+					kind: "status",
+					text: "Job created, queued for a Runner",
+					jobStatusId: JobStatus.Pending
+				})
+			]);
+		});
 	});
 
 	describe("listJobsAction", () => {
@@ -162,6 +179,31 @@ describe("jobActions", () => {
 
 			expect(result.status).toBe(200);
 			expect((result.body as { data: { jobStatusId: JobStatus } }).data.jobStatusId).toBe(JobStatus.CompletedCancelled);
+		});
+
+		it("records a status transcript entry announcing the cancellation", () => {
+			const xrefId = seedRegisteredApplication(getDb());
+			const job = insertJob(getDb(), {
+				customerApplicationXrefId: xrefId,
+				mode: "training",
+				goal: "Goal",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 5,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			});
+
+			cancelJob(getDb(), String(job.id));
+
+			const detail = getJobDetail(getDb(), String(job.id));
+			expect((detail.body as { data: { transcript: unknown[] } }).data.transcript).toEqual([
+				expect.objectContaining({
+					sequence: 6,
+					kind: "status",
+					text: "Cancelled by operator",
+					jobStatusId: JobStatus.CompletedCancelled
+				})
+			]);
 		});
 
 		it("rejects cancelling an already-terminal Job with 409", () => {

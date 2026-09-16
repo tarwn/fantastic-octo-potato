@@ -1,7 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import StartTrainingModal from "./StartTrainingModal.svelte";
+
+import { goto } from "$app/navigation";
+import { startTrainingRun } from "$lib/api/jobsApi";
+
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+vi.mock("$lib/api/jobsApi", () => ({ startTrainingRun: vi.fn() }));
 
 // jsdom recognizes <dialog> but doesn't implement showModal()/close() (only the
 // `open` attribute reflection), so polyfill them for this component's tests.
@@ -20,8 +26,28 @@ beforeAll(() => {
 });
 
 describe("StartTrainingModal", () => {
+	beforeEach(() => {
+		vi.mocked(startTrainingRun).mockReset();
+		vi.mocked(goto).mockReset();
+		vi.mocked(startTrainingRun).mockResolvedValue({
+			id: 42,
+			customerApplicationXrefId: 1,
+			mode: "training",
+			jobStatusId: 1,
+			goal: "Extract invoices",
+			startingUrl: "https://example.com",
+			allowlist: "https://example.com",
+			maxSteps: 10,
+			runnerId: null,
+			createdAt: new Date(),
+			startedAt: null,
+			heartbeatOn: null,
+			completedAt: null
+		});
+	});
+
 	it("shows goal, starting URL, and maximum steps fields when open", () => {
-		render(StartTrainingModal, { open: true, onClose: vi.fn() });
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
 		expect(screen.getByLabelText(/goal/i)).toBeInTheDocument();
 		expect(screen.getByLabelText(/starting url/i)).toBeInTheDocument();
@@ -29,7 +55,7 @@ describe("StartTrainingModal", () => {
 	});
 
 	it("shows a required message for each field on empty submit", async () => {
-		render(StartTrainingModal, { open: true, onClose: vi.fn() });
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
 		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
 
@@ -37,7 +63,7 @@ describe("StartTrainingModal", () => {
 	});
 
 	it("shows an invalid-URL message for a non-URL starting URL value", async () => {
-		render(StartTrainingModal, { open: true, onClose: vi.fn() });
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
 		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "not-a-url" } });
@@ -48,7 +74,7 @@ describe("StartTrainingModal", () => {
 	});
 
 	it("shows a positive-integer message for a non-positive maximum steps value", async () => {
-		render(StartTrainingModal, { open: true, onClose: vi.fn() });
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
 		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
@@ -59,7 +85,7 @@ describe("StartTrainingModal", () => {
 	});
 
 	it("shows no validation messages once all fields are valid", async () => {
-		render(StartTrainingModal, { open: true, onClose: vi.fn() });
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
 		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
@@ -71,9 +97,38 @@ describe("StartTrainingModal", () => {
 		expect(screen.queryByText(/positive whole number/i)).not.toBeInTheDocument();
 	});
 
+	it("submits the Training Run and navigates to the new Job's detail page", async () => {
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 7 });
+
+		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
+		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
+		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
+
+		expect(startTrainingRun).toHaveBeenCalledWith(7, {
+			goal: "Extract invoices",
+			startingUrl: "https://example.com",
+			maxSteps: 10
+		});
+		expect(goto).toHaveBeenCalledWith("/jobs/42");
+	});
+
+	it("shows a server error inline instead of navigating when the submit call fails", async () => {
+		vi.mocked(startTrainingRun).mockRejectedValue(new Error("Registered Application 7 not found"));
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 7 });
+
+		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
+		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
+		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
+
+		expect(await screen.findByText("Registered Application 7 not found")).toBeInTheDocument();
+		expect(goto).not.toHaveBeenCalled();
+	});
+
 	it("calls onClose when the cancel button is clicked", async () => {
 		const onClose = vi.fn();
-		render(StartTrainingModal, { open: true, onClose });
+		render(StartTrainingModal, { open: true, onClose, registeredApplicationId: 1 });
 
 		await fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 

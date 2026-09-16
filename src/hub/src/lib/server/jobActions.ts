@@ -3,12 +3,15 @@ import type Database from "better-sqlite3";
 import { JobStatus } from "./db/jobStatus";
 import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
 import {
+	appendTranscriptEntry,
 	getJobById,
 	insertJob,
+	JOB_CREATED_SEQUENCE,
 	listJobResults,
 	listJobs,
 	listTranscriptEntries,
 	TERMINAL_JOB_STATUSES,
+	terminalTranscriptSequence,
 	updateJobStatus
 } from "./repositories/jobRepository";
 
@@ -66,6 +69,7 @@ export function createJob(db: Database.Database, rawRegisteredApplicationId: str
 		maxSteps,
 		createdAt: new Date()
 	});
+	appendTranscriptEntry(db, job.id, JOB_CREATED_SEQUENCE, "status", "Job created, queued for a Runner", job.createdAt, JobStatus.Pending);
 
 	return { status: 201, body: { data: job } };
 }
@@ -106,6 +110,15 @@ export function cancelJob(db: Database.Database, rawId: string): JobActionResult
 
 	const completedAt = new Date();
 	updateJobStatus(db, job.id, JobStatus.CompletedCancelled, completedAt);
+	appendTranscriptEntry(
+		db,
+		job.id,
+		terminalTranscriptSequence(job.maxSteps),
+		"status",
+		"Cancelled by operator",
+		completedAt,
+		JobStatus.CompletedCancelled
+	);
 
 	return { status: 200, body: { data: getJobById(db, job.id) } };
 }
