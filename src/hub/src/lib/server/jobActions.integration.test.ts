@@ -1,0 +1,185 @@
+import type Database from "better-sqlite3";
+import { describe, expect, it } from "vitest";
+
+import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
+import { JobStatus } from "./db/jobStatus";
+import { claimNextJobForRunner, insertJob } from "./repositories/jobRepository";
+import { cancelJob, createJob, getJobDetail, listJobsAction } from "./jobActions";
+
+function seedRegisteredApplication(db: Database.Database, id = 1): number {
+	db.exec(`
+		INSERT INTO customer (id, name) VALUES (${id}, 'Acme');
+		INSERT INTO application (id, name) VALUES (${id}, 'Widgets');
+		INSERT INTO customer_application_xref (id, customer_id, application_id) VALUES (${id}, ${id}, ${id});
+	`);
+	return id;
+}
+
+describe("jobActions", () => {
+	const getDb = useIntegrationTestDb();
+
+	describe("createJob", () => {
+		it("rejects an unknown Registered Application", () => {
+			const result = createJob(getDb(), "999", { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 5 });
+
+			expect(result).toEqual({ status: 404, body: { error: "Registered Application 999 not found" } });
+		});
+
+		it("rejects a missing goal", () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = createJob(getDb(), String(id), { goal: "  ", startingUrl: "https://example.com/start", maxSteps: 5 });
+
+			expect(result).toEqual({ status: 400, body: { error: "goal is required" } });
+		});
+
+		it("rejects an invalid starting URL", () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = createJob(getDb(), String(id), { goal: "Goal", startingUrl: "not-a-url", maxSteps: 5 });
+
+			expect(result).toEqual({ status: 400, body: { error: "startingUrl must be a valid URL" } });
+		});
+
+		it("rejects a non-positive maxSteps", () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = createJob(getDb(), String(id), { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 0 });
+
+			expect(result).toEqual({ status: 400, body: { error: "maxSteps must be a positive integer" } });
+		});
+
+		it("creates a Pending training Job with the allowlist derived from the starting URL's origin", () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = createJob(getDb(), String(id), {
+				goal: "Extract invoice total",
+				startingUrl: "https://example.com/start?x=1",
+				maxSteps: 5
+			});
+
+			expect(result.status).toBe(201);
+			expect(result.body).toEqual({
+				data: expect.objectContaining({
+					customerApplicationXrefId: id,
+					mode: "training",
+					jobStatusId: JobStatus.Pending,
+					goal: "Extract invoice total",
+					startingUrl: "https://example.com/start?x=1",
+					allowlist: "https://example.com",
+					maxSteps: 5
+				})
+			});
+		});
+	});
+
+	describe("listJobsAction", () => {
+		it("returns every Job", () => {
+			const id = seedRegisteredApplication(getDb());
+			insertJob(getDb(), {
+				customerApplicationXrefId: id,
+				mode: "training",
+				goal: "Goal",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 5,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			});
+
+			const result = listJobsAction(getDb());
+
+			expect(result.status).toBe(200);
+			expect((result.body as { data: unknown[] }).data).toHaveLength(1);
+		});
+	});
+
+	describe("getJobDetail", () => {
+		it("returns 404 for an unknown Job", () => {
+			expect(getJobDetail(getDb(), "999")).toEqual({ status: 404, body: { error: "Job 999 not found" } });
+		});
+
+		it("returns the Job with its transcript and results", () => {
+			const xrefId = seedRegisteredApplication(getDb());
+			const job = insertJob(getDb(), {
+				customerApplicationXrefId: xrefId,
+				mode: "training",
+				goal: "Goal",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 5,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			});
+
+			const result = getJobDetail(getDb(), String(job.id));
+
+			expect(result).toEqual({
+				status: 200,
+				body: { data: { ...job, transcript: [], results: [] } }
+			});
+		});
+	});
+
+	describe("cancelJob", () => {
+		it("returns 404 for an unknown Job", () => {
+			expect(cancelJob(getDb(), "999")).toEqual({ status: 404, body: { error: "Job 999 not found" } });
+		});
+
+		it("cancels a Pending Job", () => {
+			const xrefId = seedRegisteredApplication(getDb());
+			const job = insertJob(getDb(), {
+				customerApplicationXrefId: xrefId,
+				mode: "training",
+				goal: "Goal",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 5,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			});
+
+			const result = cancelJob(getDb(), String(job.id));
+
+			expect(result.status).toBe(200);
+			expect((result.body as { data: { jobStatusId: JobStatus } }).data.jobStatusId).toBe(JobStatus.CompletedCancelled);
+		});
+
+		it("cancels a Running Job", () => {
+			const xrefId = seedRegisteredApplication(getDb());
+			const job = insertJob(getDb(), {
+				customerApplicationXrefId: xrefId,
+				mode: "training",
+				goal: "Goal",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 5,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			});
+			const { lastInsertRowid: runnerId } = getDb()
+				.prepare("INSERT INTO runner (customer_application_xref_id) VALUES (?)")
+				.run(xrefId);
+			claimNextJobForRunner(getDb(), xrefId, Number(runnerId), new Date("2026-09-15T00:01:00.000Z"));
+
+			const result = cancelJob(getDb(), String(job.id));
+
+			expect(result.status).toBe(200);
+			expect((result.body as { data: { jobStatusId: JobStatus } }).data.jobStatusId).toBe(JobStatus.CompletedCancelled);
+		});
+
+		it("rejects cancelling an already-terminal Job with 409", () => {
+			const xrefId = seedRegisteredApplication(getDb());
+			const job = insertJob(getDb(), {
+				customerApplicationXrefId: xrefId,
+				mode: "training",
+				goal: "Goal",
+				startingUrl: "https://example.com/start",
+				allowlist: "https://example.com",
+				maxSteps: 5,
+				createdAt: new Date("2026-09-15T00:00:00.000Z")
+			});
+			cancelJob(getDb(), String(job.id));
+
+			const result = cancelJob(getDb(), String(job.id));
+
+			expect(result).toEqual({ status: 409, body: { error: `Job ${job.id} is already in a terminal status` } });
+		});
+	});
+});

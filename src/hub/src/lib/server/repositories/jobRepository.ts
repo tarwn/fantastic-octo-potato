@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { fromDbDate, toDbDate } from "../db/dates.ts";
 import { JobStatus } from "../db/jobStatus.ts";
 
-const TERMINAL_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
+export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
 
 // Grows to include "trial"/"execute" once those modes exist; until then, only "training" is valid.
 export const JOB_MODES = ["training"] as const;
@@ -195,7 +195,7 @@ export function claimNextJobForRunner(
 // status/timestamp must not be overwritten by a late or mismatched call.
 export function updateJobStatus(db: Database.Database, jobId: number, status: JobStatus, completedAt: Date | null = null): void {
 	db.prepare(
-		`UPDATE job SET job_status_id = ?, completed_at = ? WHERE id = ? AND job_status_id NOT IN (${TERMINAL_STATUSES.join(",")})`
+		`UPDATE job SET job_status_id = ?, completed_at = ? WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
 	).run(status, toDbDate(completedAt), jobId);
 }
 
