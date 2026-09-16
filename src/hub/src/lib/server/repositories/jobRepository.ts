@@ -2,6 +2,9 @@ import type Database from "better-sqlite3";
 
 import { fromDbDate, toDbDate } from "../db/dates.ts";
 import { JobStatus } from "../db/jobStatus.ts";
+import { TranscriptKind } from "../db/jobTranscriptKind.ts";
+import { JobType } from "../db/jobType.ts";
+import { SensitivityType } from "../db/sensitivityType.ts";
 
 export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
 
@@ -16,25 +19,28 @@ export function terminalTranscriptSequence(maxSteps: number): number {
 	return maxSteps + 1;
 }
 
-// Grows to include "trial"/"execute" once those modes exist; until then, only "training" is valid.
-export const JOB_MODES = ["training"] as const;
-export type JobMode = (typeof JOB_MODES)[number];
+// Fixed masking token, not real PII/secret detection — a placeholder until real Runner/Hub masking lands.
+const MASK_TOKEN = "••••••";
 
-function assertValidJobMode(mode: string): asserts mode is JobMode {
-	if (!(JOB_MODES as readonly string[]).includes(mode)) {
-		throw new Error(`Invalid job mode: ${mode}`);
-	}
+function maskValue(rawValue: string, sensitivityType: SensitivityType): string {
+	return sensitivityType === SensitivityType.None ? rawValue : MASK_TOKEN;
 }
 
-export interface Job {
-	id: number;
-	customerApplicationXrefId: number;
-	mode: JobMode;
-	jobStatusId: JobStatus;
+export interface TrainingJob {
 	goal: string;
 	startingUrl: string;
 	allowlist: string;
 	maxSteps: number;
+}
+
+export interface RecipeJob {
+	recipeId: number | null;
+}
+
+interface JobBase {
+	id: number;
+	customerApplicationXrefId: number;
+	jobStatusId: JobStatus;
 	runnerId: number | null;
 	createdAt: Date;
 	startedAt: Date | null;
@@ -42,139 +48,237 @@ export interface Job {
 	completedAt: Date | null;
 }
 
-export interface JobTranscriptEntry {
+export type Job =
+	| (JobBase & { jobType: JobType.Training; details: TrainingJob })
+	| (JobBase & { jobType: JobType.Recipe; details: RecipeJob });
+
+export type InsertJobParams =
+	| {
+			jobType: JobType.Training;
+			customerApplicationXrefId: number;
+			goal: string;
+			startingUrl: string;
+			allowlist: string;
+			maxSteps: number;
+			createdAt: Date;
+	  }
+	| {
+			jobType: JobType.Recipe;
+			customerApplicationXrefId: number;
+			recipeId: number | null;
+			createdAt: Date;
+	  };
+
+export interface TranscriptFieldRef {
+	fieldName: string;
+	safeValue: string;
+	sensitivityType: SensitivityType;
+}
+
+interface StepTranscriptText {
+	message: string;
+	inputs: TranscriptFieldRef[];
+	outputs: TranscriptFieldRef[];
+}
+
+interface TranscriptEntryBase {
 	id: number;
 	jobId: number;
 	sequence: number;
-	kind: string;
-	text: string;
 	createdAt: Date;
-	// Set only on a "status" kind entry — the Job's new status, captured in the same
+	// Set only on a Status-kind entry — the Job's new status, captured in the same
 	// INSERT as the message, at the same moment its job.job_status_id was updated.
 	jobStatusId: JobStatus | null;
 }
 
-export interface JobResult {
-	id: number;
-	jobId: number;
+export type JobTranscriptEntry =
+	| (TranscriptEntryBase & { kind: TranscriptKind.Step; text: StepTranscriptText })
+	| (TranscriptEntryBase & { kind: Exclude<TranscriptKind, TranscriptKind.Step>; text: string });
+
+export interface SafeIngredient {
 	fieldName: string;
-	value: string;
-	createdAt: Date;
+	safeValue: string;
+	sensitivityType: SensitivityType;
 }
+
+export type SensitiveIngredient = SafeIngredient & { rawValue: string };
+
+export interface SafeResult {
+	fieldName: string;
+	safeValue: string;
+	sensitivityType: SensitivityType;
+}
+
+export type SensitiveResult = SafeResult & { rawValue: string };
 
 interface JobRow {
 	id: number;
 	customerApplicationXrefId: number;
-	mode: string;
+	jobTypeId: number;
 	jobStatusId: number;
-	goal: string;
-	startingUrl: string;
-	allowlist: string;
-	maxSteps: number;
 	runnerId: number | null;
 	createdAt: string;
 	startedAt: string | null;
 	heartbeatOn: string | null;
 	completedAt: string | null;
+	trainingGoal: string | null;
+	trainingStartingUrl: string | null;
+	trainingAllowlist: string | null;
+	trainingMaxSteps: number | null;
+	recipeId: number | null;
+	recipeJobId: number | null;
 }
 
 interface JobTranscriptEntryRow {
 	id: number;
 	jobId: number;
 	sequence: number;
-	kind: string;
+	jobTranscriptKindId: number;
 	text: string;
 	createdAt: string;
 	jobStatusId: number | null;
 }
 
-interface JobResultRow {
-	id: number;
-	jobId: number;
+interface JobIngredientRow {
 	fieldName: string;
-	value: string;
-	createdAt: string;
+	rawValue: string;
+	safeValue: string;
+	sensitivityTypeId: number;
+}
+
+interface JobResultRow {
+	fieldName: string;
+	rawValue: string;
+	safeValue: string;
+	sensitivityTypeId: number;
 }
 
 const JOB_SELECT = `
-	SELECT id, customer_application_xref_id AS customerApplicationXrefId, mode, job_status_id AS jobStatusId,
-	       goal, starting_url AS startingUrl, allowlist, max_steps AS maxSteps, runner_id AS runnerId,
-	       created_at AS createdAt, started_at AS startedAt, heartbeat_on AS heartbeatOn, completed_at AS completedAt
+	SELECT job.id, job.customer_application_xref_id AS customerApplicationXrefId, job.job_type_id AS jobTypeId,
+	       job.job_status_id AS jobStatusId, job.runner_id AS runnerId, job.created_at AS createdAt,
+	       job.started_at AS startedAt, job.heartbeat_on AS heartbeatOn, job.completed_at AS completedAt,
+	       training_job.goal AS trainingGoal, training_job.starting_url AS trainingStartingUrl,
+	       training_job.allowlist AS trainingAllowlist, training_job.max_steps AS trainingMaxSteps,
+	       recipe_job.recipe_id AS recipeId, recipe_job.job_id AS recipeJobId
 	FROM job
+	LEFT JOIN training_job ON training_job.job_id = job.id
+	LEFT JOIN recipe_job ON recipe_job.job_id = job.id
 `;
 
 function mapJobRow(row: JobRow): Job {
-	assertValidJobMode(row.mode);
-	return {
-		...row,
-		mode: row.mode,
+	const base: JobBase = {
+		id: row.id,
+		customerApplicationXrefId: row.customerApplicationXrefId,
+		jobStatusId: row.jobStatusId,
+		runnerId: row.runnerId,
 		createdAt: fromDbDate(row.createdAt),
 		startedAt: fromDbDate(row.startedAt),
 		heartbeatOn: fromDbDate(row.heartbeatOn),
 		completedAt: fromDbDate(row.completedAt)
 	};
+
+	if (row.jobTypeId === JobType.Training) {
+		if (row.trainingGoal === null || row.trainingStartingUrl === null || row.trainingAllowlist === null || row.trainingMaxSteps === null) {
+			throw new Error(`Job ${row.id} is job_type Training but has no training_job row`);
+		}
+		return {
+			...base,
+			jobType: JobType.Training,
+			details: {
+				goal: row.trainingGoal,
+				startingUrl: row.trainingStartingUrl,
+				allowlist: row.trainingAllowlist,
+				maxSteps: row.trainingMaxSteps
+			}
+		};
+	}
+
+	if (row.jobTypeId === JobType.Recipe) {
+		if (row.recipeJobId === null) {
+			throw new Error(`Job ${row.id} is job_type Recipe but has no recipe_job row`);
+		}
+		return { ...base, jobType: JobType.Recipe, details: { recipeId: row.recipeId } };
+	}
+
+	throw new Error(`Invalid job type: ${row.jobTypeId}`);
 }
 
 function mapTranscriptEntryRow(row: JobTranscriptEntryRow): JobTranscriptEntry {
-	return { ...row, createdAt: fromDbDate(row.createdAt) };
+	const base = {
+		id: row.id,
+		jobId: row.jobId,
+		sequence: row.sequence,
+		createdAt: fromDbDate(row.createdAt),
+		jobStatusId: row.jobStatusId
+	};
+
+	if (row.jobTranscriptKindId === TranscriptKind.Step) {
+		return { ...base, kind: TranscriptKind.Step, text: JSON.parse(row.text) as StepTranscriptText };
+	}
+	return { ...base, kind: row.jobTranscriptKindId as Exclude<TranscriptKind, TranscriptKind.Step>, text: row.text };
 }
 
-function mapJobResultRow(row: JobResultRow): JobResult {
-	return { ...row, createdAt: fromDbDate(row.createdAt) };
+function mapSafeIngredientRow(row: JobIngredientRow): SafeIngredient {
+	return { fieldName: row.fieldName, safeValue: row.safeValue, sensitivityType: row.sensitivityTypeId };
 }
 
-export interface InsertJobParams {
-	customerApplicationXrefId: number;
-	mode: JobMode;
-	goal: string;
-	startingUrl: string;
-	allowlist: string;
-	maxSteps: number;
-	createdAt: Date;
+function mapSensitiveIngredientRow(row: JobIngredientRow): SensitiveIngredient {
+	return { ...mapSafeIngredientRow(row), rawValue: row.rawValue };
+}
+
+function mapSafeResultRow(row: JobResultRow): SafeResult {
+	return { fieldName: row.fieldName, safeValue: row.safeValue, sensitivityType: row.sensitivityTypeId };
+}
+
+function mapSensitiveResultRow(row: JobResultRow): SensitiveResult {
+	return { ...mapSafeResultRow(row), rawValue: row.rawValue };
 }
 
 export function insertJob(db: Database.Database, params: InsertJobParams): Job {
-	assertValidJobMode(params.mode);
+	return db.transaction((): Job => {
+		const { lastInsertRowid } = db
+			.prepare("INSERT INTO job (customer_application_xref_id, job_type_id, job_status_id, created_at) VALUES (?, ?, ?, ?)")
+			.run(params.customerApplicationXrefId, params.jobType, JobStatus.Pending, toDbDate(params.createdAt));
+		const jobId = Number(lastInsertRowid);
 
-	const { lastInsertRowid } = db
-		.prepare(
-			`INSERT INTO job (customer_application_xref_id, mode, job_status_id, goal, starting_url, allowlist, max_steps, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-		)
-		.run(
-			params.customerApplicationXrefId,
-			params.mode,
-			JobStatus.Pending,
-			params.goal,
-			params.startingUrl,
-			params.allowlist,
-			params.maxSteps,
-			toDbDate(params.createdAt)
-		);
-	return {
-		id: Number(lastInsertRowid),
-		customerApplicationXrefId: params.customerApplicationXrefId,
-		mode: params.mode,
-		jobStatusId: JobStatus.Pending,
-		goal: params.goal,
-		startingUrl: params.startingUrl,
-		allowlist: params.allowlist,
-		maxSteps: params.maxSteps,
-		runnerId: null,
-		createdAt: params.createdAt,
-		startedAt: null,
-		heartbeatOn: null,
-		completedAt: null
-	};
+		const base: JobBase = {
+			id: jobId,
+			customerApplicationXrefId: params.customerApplicationXrefId,
+			jobStatusId: JobStatus.Pending,
+			runnerId: null,
+			createdAt: params.createdAt,
+			startedAt: null,
+			heartbeatOn: null,
+			completedAt: null
+		};
+
+		if (params.jobType === JobType.Training) {
+			db.prepare("INSERT INTO training_job (job_id, goal, starting_url, allowlist, max_steps) VALUES (?, ?, ?, ?, ?)").run(
+				jobId,
+				params.goal,
+				params.startingUrl,
+				params.allowlist,
+				params.maxSteps
+			);
+			return {
+				...base,
+				jobType: JobType.Training,
+				details: { goal: params.goal, startingUrl: params.startingUrl, allowlist: params.allowlist, maxSteps: params.maxSteps }
+			};
+		}
+
+		db.prepare("INSERT INTO recipe_job (job_id, recipe_id) VALUES (?, ?)").run(jobId, params.recipeId);
+		return { ...base, jobType: JobType.Recipe, details: { recipeId: params.recipeId } };
+	})();
 }
 
 export function getJobById(db: Database.Database, id: number): Job | undefined {
-	const row = db.prepare(`${JOB_SELECT} WHERE id = ?`).get(id) as JobRow | undefined;
+	const row = db.prepare(`${JOB_SELECT} WHERE job.id = ?`).get(id) as JobRow | undefined;
 	return row ? mapJobRow(row) : undefined;
 }
 
 export function listJobs(db: Database.Database): Job[] {
-	const rows = db.prepare(`${JOB_SELECT} ORDER BY created_at DESC, id DESC`).all() as JobRow[];
+	const rows = db.prepare(`${JOB_SELECT} ORDER BY job.created_at DESC, job.id DESC`).all() as JobRow[];
 	return rows.map(mapJobRow);
 }
 
@@ -201,7 +305,7 @@ export function claimNextJobForRunner(
 ): Job | undefined {
 	return db.transaction(() => {
 		const candidate = db
-			.prepare(`${JOB_SELECT} WHERE customer_application_xref_id = ? AND job_status_id = ? ORDER BY created_at, id LIMIT 1`)
+			.prepare(`${JOB_SELECT} WHERE job.customer_application_xref_id = ? AND job.job_status_id = ? ORDER BY job.created_at, job.id LIMIT 1`)
 			.get(customerApplicationXrefId, JobStatus.Pending) as JobRow | undefined;
 		if (!candidate) {
 			return undefined;
@@ -231,43 +335,132 @@ export function updateJobHeartbeat(db: Database.Database, jobId: number, when: D
 	db.prepare("UPDATE job SET heartbeat_on = ? WHERE id = ?").run(toDbDate(when), jobId);
 }
 
-// UNIQUE(job_id, sequence) plus INSERT OR IGNORE makes a repeated/late report a no-op,
-// not a duplicate transcript row. jobStatusId is set only for a "status" kind entry —
-// callers pass the Job's new status in the same INSERT as the row that announces it.
+// UNIQUE(job_id, sequence) plus INSERT OR IGNORE makes a repeated/late report a no-op, not a
+// duplicate transcript row. jobStatusId is set only for a Status-kind entry — callers pass the
+// Job's new status in the same INSERT as the row that announces it. JSON serialization of a
+// Step's structured text happens only here — no other code JSON-stringifies this column.
 export function appendTranscriptEntry(
 	db: Database.Database,
 	jobId: number,
 	sequence: number,
-	kind: string,
-	text: string,
+	kind: Exclude<TranscriptKind, TranscriptKind.Step>,
+	message: string,
+	createdAt: Date,
+	jobStatusId?: JobStatus | null
+): void;
+export function appendTranscriptEntry(
+	db: Database.Database,
+	jobId: number,
+	sequence: number,
+	kind: TranscriptKind.Step,
+	details: StepTranscriptText,
+	createdAt: Date
+): void;
+export function appendTranscriptEntry(
+	db: Database.Database,
+	jobId: number,
+	sequence: number,
+	kind: TranscriptKind,
+	messageOrDetails: string | StepTranscriptText,
 	createdAt: Date,
 	jobStatusId: JobStatus | null = null
 ): void {
+	const text = kind === TranscriptKind.Step ? JSON.stringify(messageOrDetails) : (messageOrDetails as string);
 	db.prepare(
-		"INSERT OR IGNORE INTO job_transcript_entry (job_id, sequence, kind, text, created_at, job_status_id) VALUES (?, ?, ?, ?, ?, ?)"
+		"INSERT OR IGNORE INTO job_transcript_entry (job_id, sequence, job_transcript_kind_id, text, created_at, job_status_id) VALUES (?, ?, ?, ?, ?, ?)"
 	).run(jobId, sequence, kind, text, toDbDate(createdAt), jobStatusId);
 }
 
 export function listTranscriptEntries(db: Database.Database, jobId: number): JobTranscriptEntry[] {
 	const rows = db
 		.prepare(
-			"SELECT id, job_id AS jobId, sequence, kind, text, created_at AS createdAt, job_status_id AS jobStatusId FROM job_transcript_entry WHERE job_id = ? ORDER BY sequence"
+			"SELECT id, job_id AS jobId, sequence, job_transcript_kind_id AS jobTranscriptKindId, text, created_at AS createdAt, job_status_id AS jobStatusId FROM job_transcript_entry WHERE job_id = ? ORDER BY sequence"
 		)
 		.all(jobId) as JobTranscriptEntryRow[];
 	return rows.map(mapTranscriptEntryRow);
 }
 
-// UNIQUE(job_id, field_name) plus the upsert makes the latest write win.
-export function upsertJobResult(db: Database.Database, jobId: number, fieldName: string, value: string, createdAt: Date): void {
+// UNIQUE(job_id, field_name) plus the upsert makes the latest write win. safe_value is derived
+// from sensitivityType here — callers never compute or pass a masked value themselves.
+export function upsertJobIngredient(
+	db: Database.Database,
+	jobId: number,
+	fieldName: string,
+	rawValue: string,
+	sensitivityType: SensitivityType,
+	createdAt: Date
+): void {
+	const safeValue = maskValue(rawValue, sensitivityType);
 	db.prepare(
-		`INSERT INTO job_result (job_id, field_name, value, created_at) VALUES (?, ?, ?, ?)
-		 ON CONFLICT (job_id, field_name) DO UPDATE SET value = excluded.value, created_at = excluded.created_at`
-	).run(jobId, fieldName, value, toDbDate(createdAt));
+		`INSERT INTO job_ingredient (job_id, field_name, raw_value, safe_value, sensitivity_type_id, created_at) VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (job_id, field_name) DO UPDATE SET raw_value = excluded.raw_value, safe_value = excluded.safe_value,
+		   sensitivity_type_id = excluded.sensitivity_type_id, created_at = excluded.created_at`
+	).run(jobId, fieldName, rawValue, safeValue, sensitivityType, toDbDate(createdAt));
 }
 
-export function listJobResults(db: Database.Database, jobId: number): JobResult[] {
+export function listSafeJobIngredients(db: Database.Database, jobId: number): SafeIngredient[] {
 	const rows = db
-		.prepare("SELECT id, job_id AS jobId, field_name AS fieldName, value, created_at AS createdAt FROM job_result WHERE job_id = ? ORDER BY field_name")
+		.prepare(
+			"SELECT field_name AS fieldName, safe_value AS safeValue, sensitivity_type_id AS sensitivityTypeId FROM job_ingredient WHERE job_id = ? ORDER BY field_name"
+		)
+		.all(jobId) as JobIngredientRow[];
+	return rows.map(mapSafeIngredientRow);
+}
+
+export function getSafeJobIngredientByFieldName(db: Database.Database, jobId: number, fieldName: string): SafeIngredient | undefined {
+	const row = db
+		.prepare(
+			"SELECT field_name AS fieldName, safe_value AS safeValue, sensitivity_type_id AS sensitivityTypeId FROM job_ingredient WHERE job_id = ? AND field_name = ?"
+		)
+		.get(jobId, fieldName) as JobIngredientRow | undefined;
+	return row ? mapSafeIngredientRow(row) : undefined;
+}
+
+// Unused for now (no export/reporting feature exists yet) — exists to make the safe/raw
+// boundary real and enforced by type, not because something consumes it yet.
+export function listSensitiveJobIngredients(db: Database.Database, jobId: number): SensitiveIngredient[] {
+	const rows = db
+		.prepare(
+			"SELECT field_name AS fieldName, raw_value AS rawValue, safe_value AS safeValue, sensitivity_type_id AS sensitivityTypeId FROM job_ingredient WHERE job_id = ? ORDER BY field_name"
+		)
+		.all(jobId) as JobIngredientRow[];
+	return rows.map(mapSensitiveIngredientRow);
+}
+
+// UNIQUE(job_id, field_name) plus the upsert makes the latest write win. safe_value is derived
+// from sensitivityType here — callers never compute or pass a masked value themselves.
+export function upsertJobResult(
+	db: Database.Database,
+	jobId: number,
+	fieldName: string,
+	rawValue: string,
+	sensitivityType: SensitivityType,
+	createdAt: Date
+): void {
+	const safeValue = maskValue(rawValue, sensitivityType);
+	db.prepare(
+		`INSERT INTO job_result (job_id, field_name, raw_value, safe_value, sensitivity_type_id, created_at) VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (job_id, field_name) DO UPDATE SET raw_value = excluded.raw_value, safe_value = excluded.safe_value,
+		   sensitivity_type_id = excluded.sensitivity_type_id, created_at = excluded.created_at`
+	).run(jobId, fieldName, rawValue, safeValue, sensitivityType, toDbDate(createdAt));
+}
+
+export function listSafeJobResults(db: Database.Database, jobId: number): SafeResult[] {
+	const rows = db
+		.prepare(
+			"SELECT field_name AS fieldName, safe_value AS safeValue, sensitivity_type_id AS sensitivityTypeId FROM job_result WHERE job_id = ? ORDER BY field_name"
+		)
 		.all(jobId) as JobResultRow[];
-	return rows.map(mapJobResultRow);
+	return rows.map(mapSafeResultRow);
+}
+
+// Unused for now (no export/reporting feature exists yet) — exists to make the safe/raw
+// boundary real and enforced by type, not because something consumes it yet.
+export function listSensitiveJobResults(db: Database.Database, jobId: number): SensitiveResult[] {
+	const rows = db
+		.prepare(
+			"SELECT field_name AS fieldName, raw_value AS rawValue, safe_value AS safeValue, sensitivity_type_id AS sensitivityTypeId FROM job_result WHERE job_id = ? ORDER BY field_name"
+		)
+		.all(jobId) as JobResultRow[];
+	return rows.map(mapSensitiveResultRow);
 }

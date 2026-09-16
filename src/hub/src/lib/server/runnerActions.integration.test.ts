@@ -1,11 +1,10 @@
-// Disabled (.disabled, not .ts): runnerActions.ts still calls the old (pre-restructure)
-// jobRepository shape. Restore and rewrite it once runnerActions.ts is rebuilt on the new
-// repository/action layer.
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
+import { TranscriptKind } from "./db/jobTranscriptKind";
+import { JobType } from "./db/jobType";
 import { getJobById, insertJob, listTranscriptEntries } from "./repositories/jobRepository";
 import { getRunnerById } from "./repositories/runnerRepository";
 import { reportJobStep, runnerInit, runnerPoll } from "./runnerActions";
@@ -38,8 +37,8 @@ function seedXref(db: Database.Database, id: number): void {
 
 function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10): number {
 	return insertJob(db, {
+		jobType: JobType.Training,
 		customerApplicationXrefId: xrefId,
-		mode: "training",
 		goal: "Extract invoice total",
 		startingUrl: "https://example.com/start",
 		allowlist: "https://example.com",
@@ -143,7 +142,7 @@ describe("runnerActions", () => {
 			expect(listTranscriptEntries(db, jobId)).toEqual([
 				expect.objectContaining({
 					sequence: -1,
-					kind: "status",
+					kind: TranscriptKind.Status,
 					text: `Picked up by Runner ${runnerId}`,
 					jobStatusId: JobStatus.Running
 				})
@@ -268,6 +267,21 @@ describe("runnerActions", () => {
 			expect(result).toEqual({ status: 400, body: { error: "text is required" } });
 		});
 
+		it("rejects an unrecognized kind with 400", () => {
+			const db = getDb();
+			const runnerId = seedRunner(db);
+			const jobId = insertPendingJob(db, 1);
+			runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+			const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+				sequence: 1,
+				kind: "bogus",
+				text: "did a thing"
+			});
+
+			expect(result).toEqual({ status: 400, body: { error: "Unrecognized kind: bogus" } });
+		});
+
 		it("no-ops and returns the current status without mutating an already-terminal Job", () => {
 			const db = getDb();
 			const runnerId = seedRunner(db);
@@ -305,7 +319,7 @@ describe("runnerActions", () => {
 			expect(listTranscriptEntries(db, jobId)).toContainEqual(
 				expect.objectContaining({
 					sequence: 2,
-					kind: "status",
+					kind: TranscriptKind.Status,
 					text: "Reached max steps, marked Completed-Failed",
 					jobStatusId: JobStatus.CompletedFailed
 				})
@@ -335,7 +349,7 @@ describe("runnerActions", () => {
 			expect(listTranscriptEntries(db, jobId)).toContainEqual(
 				expect.objectContaining({
 					sequence: 101,
-					kind: "status",
+					kind: TranscriptKind.Status,
 					text: "Run finished, marked Completed-Success",
 					jobStatusId: JobStatus.CompletedSuccess
 				})

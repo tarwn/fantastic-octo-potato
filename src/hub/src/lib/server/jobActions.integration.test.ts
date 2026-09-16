@@ -1,11 +1,10 @@
-// Disabled (.disabled, not .ts): jobActions.ts still calls the old (pre-restructure)
-// jobRepository shape. Restore and rewrite it once jobActions.ts is rebuilt on the new
-// repository layer.
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
+import { TranscriptKind } from "./db/jobTranscriptKind";
+import { JobType } from "./db/jobType";
 import { claimNextJobForRunner, insertJob } from "./repositories/jobRepository";
 import { cancelJob, createJob, getJobDetail, listJobsAction } from "./jobActions";
 
@@ -16,6 +15,18 @@ function seedRegisteredApplication(db: Database.Database, id = 1): number {
 		INSERT INTO customer_application_xref (id, customer_id, application_id) VALUES (${id}, ${id}, ${id});
 	`);
 	return id;
+}
+
+function insertTrainingJob(db: Database.Database, xrefId: number) {
+	return insertJob(db, {
+		jobType: JobType.Training,
+		customerApplicationXrefId: xrefId,
+		goal: "Goal",
+		startingUrl: "https://example.com/start",
+		allowlist: "https://example.com",
+		maxSteps: 5,
+		createdAt: new Date("2026-09-15T00:00:00.000Z")
+	});
 }
 
 describe("jobActions", () => {
@@ -52,7 +63,7 @@ describe("jobActions", () => {
 			expect(result).toEqual({ status: 400, body: { error: "maxSteps must be a positive integer" } });
 		});
 
-		it("creates a Pending training Job with the allowlist derived from the starting URL's origin", () => {
+		it("creates a Pending Training Job with the allowlist derived from the starting URL's origin", () => {
 			const id = seedRegisteredApplication(getDb());
 
 			const result = createJob(getDb(), String(id), {
@@ -65,12 +76,14 @@ describe("jobActions", () => {
 			expect(result.body).toEqual({
 				data: expect.objectContaining({
 					customerApplicationXrefId: id,
-					mode: "training",
+					jobType: JobType.Training,
 					jobStatusId: JobStatus.Pending,
-					goal: "Extract invoice total",
-					startingUrl: "https://example.com/start?x=1",
-					allowlist: "https://example.com",
-					maxSteps: 5
+					details: {
+						goal: "Extract invoice total",
+						startingUrl: "https://example.com/start?x=1",
+						allowlist: "https://example.com",
+						maxSteps: 5
+					}
 				})
 			});
 		});
@@ -85,7 +98,7 @@ describe("jobActions", () => {
 			expect((detail.body as { data: { transcript: unknown[] } }).data.transcript).toEqual([
 				expect.objectContaining({
 					sequence: -2,
-					kind: "status",
+					kind: TranscriptKind.Status,
 					text: "Job created, queued for a Runner",
 					jobStatusId: JobStatus.Pending
 				})
@@ -96,15 +109,7 @@ describe("jobActions", () => {
 	describe("listJobsAction", () => {
 		it("returns every Job", () => {
 			const id = seedRegisteredApplication(getDb());
-			insertJob(getDb(), {
-				customerApplicationXrefId: id,
-				mode: "training",
-				goal: "Goal",
-				startingUrl: "https://example.com/start",
-				allowlist: "https://example.com",
-				maxSteps: 5,
-				createdAt: new Date("2026-09-15T00:00:00.000Z")
-			});
+			insertTrainingJob(getDb(), id);
 
 			const result = listJobsAction(getDb());
 
@@ -118,23 +123,15 @@ describe("jobActions", () => {
 			expect(getJobDetail(getDb(), "999")).toEqual({ status: 404, body: { error: "Job 999 not found" } });
 		});
 
-		it("returns the Job with its transcript and results", () => {
+		it("returns the Job with its transcript, results, and ingredients", () => {
 			const xrefId = seedRegisteredApplication(getDb());
-			const job = insertJob(getDb(), {
-				customerApplicationXrefId: xrefId,
-				mode: "training",
-				goal: "Goal",
-				startingUrl: "https://example.com/start",
-				allowlist: "https://example.com",
-				maxSteps: 5,
-				createdAt: new Date("2026-09-15T00:00:00.000Z")
-			});
+			const job = insertTrainingJob(getDb(), xrefId);
 
 			const result = getJobDetail(getDb(), String(job.id));
 
 			expect(result).toEqual({
 				status: 200,
-				body: { data: { ...job, transcript: [], results: [] } }
+				body: { data: { ...job, transcript: [], results: [], ingredients: [] } }
 			});
 		});
 	});
@@ -146,15 +143,7 @@ describe("jobActions", () => {
 
 		it("cancels a Pending Job", () => {
 			const xrefId = seedRegisteredApplication(getDb());
-			const job = insertJob(getDb(), {
-				customerApplicationXrefId: xrefId,
-				mode: "training",
-				goal: "Goal",
-				startingUrl: "https://example.com/start",
-				allowlist: "https://example.com",
-				maxSteps: 5,
-				createdAt: new Date("2026-09-15T00:00:00.000Z")
-			});
+			const job = insertTrainingJob(getDb(), xrefId);
 
 			const result = cancelJob(getDb(), String(job.id));
 
@@ -164,18 +153,8 @@ describe("jobActions", () => {
 
 		it("cancels a Running Job", () => {
 			const xrefId = seedRegisteredApplication(getDb());
-			const job = insertJob(getDb(), {
-				customerApplicationXrefId: xrefId,
-				mode: "training",
-				goal: "Goal",
-				startingUrl: "https://example.com/start",
-				allowlist: "https://example.com",
-				maxSteps: 5,
-				createdAt: new Date("2026-09-15T00:00:00.000Z")
-			});
-			const { lastInsertRowid: runnerId } = getDb()
-				.prepare("INSERT INTO runner (customer_application_xref_id) VALUES (?)")
-				.run(xrefId);
+			const job = insertTrainingJob(getDb(), xrefId);
+			const { lastInsertRowid: runnerId } = getDb().prepare("INSERT INTO runner (customer_application_xref_id) VALUES (?)").run(xrefId);
 			claimNextJobForRunner(getDb(), xrefId, Number(runnerId), new Date("2026-09-15T00:01:00.000Z"));
 
 			const result = cancelJob(getDb(), String(job.id));
@@ -186,15 +165,7 @@ describe("jobActions", () => {
 
 		it("records a status transcript entry announcing the cancellation", () => {
 			const xrefId = seedRegisteredApplication(getDb());
-			const job = insertJob(getDb(), {
-				customerApplicationXrefId: xrefId,
-				mode: "training",
-				goal: "Goal",
-				startingUrl: "https://example.com/start",
-				allowlist: "https://example.com",
-				maxSteps: 5,
-				createdAt: new Date("2026-09-15T00:00:00.000Z")
-			});
+			const job = insertTrainingJob(getDb(), xrefId);
 
 			cancelJob(getDb(), String(job.id));
 
@@ -202,7 +173,7 @@ describe("jobActions", () => {
 			expect((detail.body as { data: { transcript: unknown[] } }).data.transcript).toEqual([
 				expect.objectContaining({
 					sequence: 6,
-					kind: "status",
+					kind: TranscriptKind.Status,
 					text: "Cancelled by operator",
 					jobStatusId: JobStatus.CompletedCancelled
 				})
@@ -211,15 +182,7 @@ describe("jobActions", () => {
 
 		it("rejects cancelling an already-terminal Job with 409", () => {
 			const xrefId = seedRegisteredApplication(getDb());
-			const job = insertJob(getDb(), {
-				customerApplicationXrefId: xrefId,
-				mode: "training",
-				goal: "Goal",
-				startingUrl: "https://example.com/start",
-				allowlist: "https://example.com",
-				maxSteps: 5,
-				createdAt: new Date("2026-09-15T00:00:00.000Z")
-			});
+			const job = insertTrainingJob(getDb(), xrefId);
 			cancelJob(getDb(), String(job.id));
 
 			const result = cancelJob(getDb(), String(job.id));

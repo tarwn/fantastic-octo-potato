@@ -1,6 +1,9 @@
 import type Database from "better-sqlite3";
 
 import { JobStatus } from "./db/jobStatus";
+import { TranscriptKind } from "./db/jobTranscriptKind";
+import { JobType } from "./db/jobType";
+import { SensitivityType } from "./db/sensitivityType";
 import {
 	appendTranscriptEntry,
 	claimNextJobForRunner,
@@ -14,6 +17,20 @@ import {
 } from "./repositories/jobRepository";
 import { getRunnerById, updateRunnerHeartbeat } from "./repositories/runnerRepository";
 import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
+
+// Maps the Runner-submitted free-text kind onto the closed job_transcript_kind vocabulary — the
+// request body itself becomes a proper kind-discriminated union in a later step; this lookup is
+// the minimal bridge the schema change requires now that job_transcript_entry.kind is a foreign
+// key, not freeform TEXT.
+const TRANSCRIPT_KIND_BY_NAME: Record<string, TranscriptKind> = {
+	status: TranscriptKind.Status,
+	info: TranscriptKind.Info,
+	step: TranscriptKind.Step,
+	recover: TranscriptKind.Recover,
+	halt: TranscriptKind.Halt,
+	observe: TranscriptKind.Observe,
+	plan: TranscriptKind.Plan
+};
 
 export interface RunnerActionResult {
 	status: number;
@@ -81,8 +98,11 @@ export function runnerPoll(
 	if (!job) {
 		return { status: 200, body: { data: { hasWork: false } } };
 	}
+	if (job.jobType !== JobType.Training) {
+		throw new Error(`Job ${job.id} is not a Training Job — only Training Jobs are claimable`);
+	}
 
-	appendTranscriptEntry(db, job.id, JOB_CLAIMED_SEQUENCE, "status", `Picked up by Runner ${runner.id}`, now, JobStatus.Running);
+	appendTranscriptEntry(db, job.id, JOB_CLAIMED_SEQUENCE, TranscriptKind.Status, `Picked up by Runner ${runner.id}`, now, JobStatus.Running);
 
 	// The claim hands back scripted step 1 too, so the Runner has something to perform before its first `steps` call.
 	const firstStep = SCRIPTED_TRAINING_STEPS[0];
@@ -93,10 +113,10 @@ export function runnerPoll(
 				hasWork: true,
 				job: {
 					id: job.id,
-					goal: job.goal,
-					startingUrl: job.startingUrl,
-					allowlist: job.allowlist,
-					maxSteps: job.maxSteps,
+					goal: job.details.goal,
+					startingUrl: job.details.startingUrl,
+					allowlist: job.details.allowlist,
+					maxSteps: job.details.maxSteps,
 					nextStep: { sequence: 1, kind: firstStep.kind, text: firstStep.text }
 				}
 			}
@@ -135,6 +155,9 @@ export function reportJobStep(
 	if (job.runnerId !== runner.id) {
 		return { status: 403, body: { error: `Runner ${rawRunnerId} is not assigned to Job ${rawJobId}` } };
 	}
+	if (job.jobType !== JobType.Training) {
+		throw new Error(`Job ${rawJobId} is not a Training Job — only Training Jobs report steps`);
+	}
 
 	if (!Number.isInteger(body.sequence) || body.sequence <= 0) {
 		return { status: 400, body: { error: "sequence must be a positive integer" } };
@@ -145,26 +168,37 @@ export function reportJobStep(
 	if (typeof body.text !== "string" || body.text.trim() === "") {
 		return { status: 400, body: { error: "text is required" } };
 	}
+	const transcriptKind = TRANSCRIPT_KIND_BY_NAME[body.kind];
+	if (transcriptKind === undefined) {
+		return { status: 400, body: { error: `Unrecognized kind: ${body.kind}` } };
+	}
 
 	if (TERMINAL_JOB_STATUSES.includes(job.jobStatusId)) {
 		return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
 	}
 
 	const now = new Date();
-	appendTranscriptEntry(db, job.id, body.sequence, body.kind, body.text, now);
+	if (transcriptKind === TranscriptKind.Step) {
+		appendTranscriptEntry(db, job.id, body.sequence, TranscriptKind.Step, { message: body.text, inputs: [], outputs: [] }, now);
+	}
+	else {
+		appendTranscriptEntry(db, job.id, body.sequence, transcriptKind, body.text, now);
+	}
 	if (body.resultField) {
-		upsertJobResult(db, job.id, body.resultField, body.resultValue ?? "", now);
+		// sensitivityType resolution from the scripted step definition lands with the
+		// kind-dispatched steps endpoint rework — defaulted to None until then.
+		upsertJobResult(db, job.id, body.resultField, body.resultValue ?? "", SensitivityType.None, now);
 	}
 	updateJobHeartbeat(db, job.id, now);
 	updateRunnerHeartbeat(db, runner.id, now);
 
-	if (body.sequence >= job.maxSteps) {
+	if (body.sequence >= job.details.maxSteps) {
 		updateJobStatus(db, job.id, JobStatus.CompletedFailed, now);
 		appendTranscriptEntry(
 			db,
 			job.id,
-			terminalTranscriptSequence(job.maxSteps),
-			"status",
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
 			"Reached max steps, marked Completed-Failed",
 			now,
 			JobStatus.CompletedFailed
@@ -177,8 +211,8 @@ export function reportJobStep(
 		appendTranscriptEntry(
 			db,
 			job.id,
-			terminalTranscriptSequence(job.maxSteps),
-			"status",
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
 			"Run finished, marked Completed-Success",
 			now,
 			JobStatus.CompletedSuccess

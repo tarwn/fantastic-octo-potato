@@ -1,14 +1,17 @@
 import type Database from "better-sqlite3";
 
 import { JobStatus } from "./db/jobStatus";
+import { TranscriptKind } from "./db/jobTranscriptKind";
+import { JobType } from "./db/jobType";
 import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
 import {
 	appendTranscriptEntry,
 	getJobById,
 	insertJob,
 	JOB_CREATED_SEQUENCE,
-	listJobResults,
 	listJobs,
+	listSafeJobIngredients,
+	listSafeJobResults,
 	listTranscriptEntries,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
@@ -61,15 +64,23 @@ export function createJob(db: Database.Database, rawRegisteredApplicationId: str
 	}
 
 	const job = insertJob(db, {
+		jobType: JobType.Training,
 		customerApplicationXrefId: registeredApplication.id,
-		mode: "training",
 		goal,
 		startingUrl,
 		allowlist,
 		maxSteps,
 		createdAt: new Date()
 	});
-	appendTranscriptEntry(db, job.id, JOB_CREATED_SEQUENCE, "status", "Job created, queued for a Runner", job.createdAt, JobStatus.Pending);
+	appendTranscriptEntry(
+		db,
+		job.id,
+		JOB_CREATED_SEQUENCE,
+		TranscriptKind.Status,
+		"Job created, queued for a Runner",
+		job.createdAt,
+		JobStatus.Pending
+	);
 
 	return { status: 201, body: { data: job } };
 }
@@ -91,7 +102,8 @@ export function getJobDetail(db: Database.Database, rawId: string): JobActionRes
 			data: {
 				...job,
 				transcript: listTranscriptEntries(db, job.id),
-				results: listJobResults(db, job.id)
+				results: listSafeJobResults(db, job.id),
+				ingredients: listSafeJobIngredients(db, job.id)
 			}
 		}
 	};
@@ -107,14 +119,17 @@ export function cancelJob(db: Database.Database, rawId: string): JobActionResult
 	if (TERMINAL_JOB_STATUSES.includes(job.jobStatusId)) {
 		return { status: 409, body: { error: `Job ${rawId} is already in a terminal status` } };
 	}
+	if (job.jobType !== JobType.Training) {
+		throw new Error(`Job ${rawId} is not a Training Job — Recipe Jobs are not cancellable`);
+	}
 
 	const completedAt = new Date();
 	updateJobStatus(db, job.id, JobStatus.CompletedCancelled, completedAt);
 	appendTranscriptEntry(
 		db,
 		job.id,
-		terminalTranscriptSequence(job.maxSteps),
-		"status",
+		terminalTranscriptSequence(job.details.maxSteps),
+		TranscriptKind.Status,
 		"Cancelled by operator",
 		completedAt,
 		JobStatus.CompletedCancelled
