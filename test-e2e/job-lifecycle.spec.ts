@@ -16,6 +16,17 @@ const RUNNER_SHARED_SECRET = "test-e2e-shared-secret";
 // The baseline seeded Runner (seed.ts): Acme/Widgets, runner id 1.
 const PRIMARY_RUNNER_ID = "1";
 
+// Hub's wire contract carries jobStatusId (numeric), never a status label string — this test
+// runs as a separate process/service and can't import Hub's $lib/jobStatus.ts, so it duplicates
+// the label lookup (mirrors src/hub/src/lib/jobStatus.ts's JOB_STATUS_LABELS) for readable assertions.
+const JOB_STATUS_LABELS: Record<number, string> = {
+	1: "Pending",
+	2: "Running",
+	3: "Completed-Success",
+	4: "Completed-Failed",
+	5: "Completed-Cancelled"
+};
+
 // Step 3's scripted-step stand-in is goal/value-agnostic dev fixture content, not something this
 // guard can read from Hub's source — this test pins the exact canned steps Step 3 must hardcode so
 // the assertions below (and the Runner's console output) have something concrete to check against.
@@ -32,9 +43,9 @@ interface RegisteredApplicationSummary {
 
 interface JobDetail {
 	id: number;
-	status: string;
+	jobStatusId: number;
 	transcript: { sequence: number; kind: string; text: string }[];
-	results: { fieldName: string; value: string }[];
+	results: { fieldName: string; safeValue: string }[];
 }
 
 // No create-customer/application/runner API exists yet, so a second Runner on a different
@@ -110,8 +121,8 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 			data: { goal: "Learn the thing", startingUrl: "https://teller.northwind.test/start", maxSteps: 5 }
 		});
 		expect(createResponse.status()).toBe(201);
-		const { data: created } = (await createResponse.json()) as { data: { id: number; status: string } };
-		expect(created.status).toBe("Pending");
+		const { data: created } = (await createResponse.json()) as { data: { id: number; jobStatusId: number } };
+		expect(JOB_STATUS_LABELS[created.jobStatusId]).toBe("Pending");
 
 		const jobId = created.id;
 		const jobDetailUrl = `/api/hub/jobs/${jobId}`;
@@ -131,9 +142,11 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 
 		// The matching Runner claims it on its next poll.
 		await expect
-			.poll(async () => ((await (await request.get(jobDetailUrl)).json()) as { data: JobDetail }).data.status, {
-				timeout: 15_000
-			})
+			.poll(
+				async () =>
+					JOB_STATUS_LABELS[((await (await request.get(jobDetailUrl)).json()) as { data: JobDetail }).data.jobStatusId],
+				{ timeout: 15_000 }
+			)
 			.toBe("Running");
 
 		// Transcript entries accumulate, visible on the Job screen without a manual reload assumption
@@ -169,9 +182,9 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 			)
 			.toEqual(
 				expect.objectContaining({
-					status: "Completed-Success",
+					jobStatusId: 3,
 					results: expect.arrayContaining([
-						expect.objectContaining({ fieldName: SCRIPTED_RESULT_FIELD, value: SCRIPTED_RESULT_VALUE })
+						expect.objectContaining({ fieldName: SCRIPTED_RESULT_FIELD, safeValue: SCRIPTED_RESULT_VALUE })
 					])
 				})
 			);
@@ -188,18 +201,26 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 		const secondJobDetailUrl = `/api/hub/jobs/${secondCreated.id}`;
 
 		await expect
-			.poll(async () => ((await (await request.get(secondJobDetailUrl)).json()) as { data: JobDetail }).data.status, {
-				timeout: 15_000
-			})
+			.poll(
+				async () =>
+					JOB_STATUS_LABELS[
+						((await (await request.get(secondJobDetailUrl)).json()) as { data: JobDetail }).data.jobStatusId
+					],
+				{ timeout: 15_000 }
+			)
 			.toBe("Running");
 
 		const cancelResponse = await request.post(`/api/hub/jobs/${secondCreated.id}/cancel`);
 		expect(cancelResponse.status()).toBe(200);
 
 		await expect
-			.poll(async () => ((await (await request.get(secondJobDetailUrl)).json()) as { data: JobDetail }).data.status, {
-				timeout: 15_000
-			})
+			.poll(
+				async () =>
+					JOB_STATUS_LABELS[
+						((await (await request.get(secondJobDetailUrl)).json()) as { data: JobDetail }).data.jobStatusId
+					],
+				{ timeout: 15_000 }
+			)
 			.toBe("Completed-Cancelled");
 
 		await expect

@@ -228,7 +228,9 @@ describe("reportJobStep outcomes", () => {
 					nextStep: {
 						sequence: 2,
 						kind: SCRIPTED_TRAINING_STEPS[1].kind,
-						text: SCRIPTED_TRAINING_STEPS[1].text
+						text: SCRIPTED_TRAINING_STEPS[1].text,
+						resultField: SCRIPTED_TRAINING_STEPS[1].resultField,
+						resultValue: SCRIPTED_TRAINING_STEPS[1].resultValue
 					}
 				}
 			}

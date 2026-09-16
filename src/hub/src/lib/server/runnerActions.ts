@@ -20,7 +20,7 @@ import {
 	upsertJobResult
 } from "./repositories/jobRepository";
 import { getRunnerById, updateRunnerHeartbeat } from "./repositories/runnerRepository";
-import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
+import { SCRIPTED_TRAINING_STEPS, type ScriptedTrainingStep } from "./scriptedTrainingSteps";
 
 export interface RunnerActionResult {
 	status: number;
@@ -118,6 +118,17 @@ function parseReportStepBody(body: unknown): ParseResult {
 	}
 }
 
+// The Runner has no other way to learn a step's fake-extracted resultField/resultValue (there's
+// no real browser automation to derive it from) — it only ever echoes back what this hands it.
+function toWireStep(sequence: number, step: ScriptedTrainingStep) {
+	return {
+		sequence,
+		kind: step.kind,
+		text: step.text,
+		...(step.resultField !== undefined ? { resultField: step.resultField, resultValue: step.resultValue } : {})
+	};
+}
+
 function requireRunnerBearerAuth(authHeader: string | null, sharedSecret: string): boolean {
 	return authHeader === `Bearer ${sharedSecret}`;
 }
@@ -190,7 +201,7 @@ export function runnerPoll(
 					startingUrl: job.details.startingUrl,
 					allowlist: job.details.allowlist,
 					maxSteps: job.details.maxSteps,
-					nextStep: { sequence: 1, kind: firstStep.kind, text: firstStep.text }
+					nextStep: toWireStep(1, firstStep)
 				}
 			}
 		}
@@ -320,7 +331,7 @@ export function reportJobStep(
 		body: {
 			data: {
 				jobStatusId: JobStatus.Running,
-				nextStep: { sequence: step.sequence + 1, kind: next.kind, text: next.text }
+				nextStep: toWireStep(step.sequence + 1, next)
 			}
 		}
 	};

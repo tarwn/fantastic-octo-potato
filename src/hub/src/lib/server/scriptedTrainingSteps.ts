@@ -11,7 +11,6 @@ export interface ScriptedTrainingStep {
 }
 
 export const SCRIPTED_TRAINING_STEPS: ScriptedTrainingStep[] = [
-	{ kind: "step", text: "Open the starting URL" },
-	{ kind: "step", text: "Locate the target field" },
-	{ kind: "step", text: "Extract the target field", resultField: "example_field", resultValue: "42.00", sensitivityType: SensitivityType.None }
+	{ kind: "step", text: "navigate to starting URL" },
+	{ kind: "step", text: "extract sample_field", resultField: "sample_field", resultValue: "sample-value", sensitivityType: SensitivityType.None }
 ];
