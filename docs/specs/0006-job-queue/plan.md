@@ -11,4 +11,4 @@ This is the plan for [0006-job-queue/spec.md](./spec.md).
     - [x] Hub action/API layer: kind-dispatched `steps` endpoint, ingredient/result sensitivity resolution
     - [x] Hub UI: consume real sensitivity signals, render structured `Step` transcript rows
 - [x] 6. Runner-web: job-aware main loop
-- [ ] 7. Docs
+- [x] 7. Docs
