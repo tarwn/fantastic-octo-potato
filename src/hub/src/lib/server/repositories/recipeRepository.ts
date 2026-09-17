@@ -108,6 +108,15 @@ export function getRecipeById(db: Database.Database, id: number): Recipe | undef
 	return row ? mapRecipeRow(row) : undefined;
 }
 
+// Lists every Recipe (draft and published) scoped to one Customer x Application, for Start
+// Trial/Start Job to filter by state client-side rather than issuing two separate queries.
+export function listRecipesForApplication(db: Database.Database, customerApplicationXrefId: number): Recipe[] {
+	const rows = db
+		.prepare(`${RECIPE_SELECT} WHERE customer_application_xref_id = ? ORDER BY name`)
+		.all(customerApplicationXrefId) as RecipeRow[];
+	return rows.map(mapRecipeRow);
+}
+
 export function getRecipeByIdAndVersion(db: Database.Database, id: number, version: number): Recipe | undefined {
 	const row = db.prepare(`${RECIPE_SELECT} WHERE id = ? AND version = ?`).get(id, version) as RecipeRow | undefined;
 	return row ? mapRecipeRow(row) : undefined;

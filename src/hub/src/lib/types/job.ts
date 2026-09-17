@@ -70,8 +70,15 @@ export interface JobResult {
 	sensitivityType: SensitivityType;
 }
 
+export interface JobStepArtifact {
+	id: number;
+	stepId: string;
+	createdAt: Date;
+}
+
 export type JobDetail = Job & {
 	transcript: JobTranscriptEntry[];
 	results: JobResult[];
 	ingredients: SafeIngredient[];
+	artifacts: JobStepArtifact[];
 };

@@ -572,11 +572,21 @@ export function insertJobStepArtifact(db: Database.Database, jobId: number, step
 	return { id: Number(lastInsertRowid), jobId, stepId, filePath, createdAt };
 }
 
+const JOB_STEP_ARTIFACT_SELECT =
+	"SELECT id, job_id AS jobId, step_id AS stepId, file_path AS filePath, created_at AS createdAt FROM job_step_artifact";
+
+function mapJobStepArtifactRow(row: JobStepArtifactRow): JobStepArtifact {
+	return { id: row.id, jobId: row.jobId, stepId: row.stepId, filePath: row.filePath, createdAt: fromDbDate(row.createdAt) };
+}
+
 export function getJobStepArtifactById(db: Database.Database, id: number): JobStepArtifact | undefined {
-	const row = db
-		.prepare(
-			"SELECT id, job_id AS jobId, step_id AS stepId, file_path AS filePath, created_at AS createdAt FROM job_step_artifact WHERE id = ?"
-		)
-		.get(id) as JobStepArtifactRow | undefined;
-	return row ? { id: row.id, jobId: row.jobId, stepId: row.stepId, filePath: row.filePath, createdAt: fromDbDate(row.createdAt) } : undefined;
+	const row = db.prepare(`${JOB_STEP_ARTIFACT_SELECT} WHERE id = ?`).get(id) as JobStepArtifactRow | undefined;
+	return row ? mapJobStepArtifactRow(row) : undefined;
+}
+
+// Ordered oldest-to-newest so the Job screen's diagnostic screenshot (the last entry) is
+// whichever Step the Runner most recently reported/exited on.
+export function listJobStepArtifactsForJob(db: Database.Database, jobId: number): JobStepArtifact[] {
+	const rows = db.prepare(`${JOB_STEP_ARTIFACT_SELECT} WHERE job_id = ? ORDER BY id`).all(jobId) as JobStepArtifactRow[];
+	return rows.map(mapJobStepArtifactRow);
 }

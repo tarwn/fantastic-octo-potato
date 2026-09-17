@@ -9,7 +9,7 @@ type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : n
 
 // Wire shape: dates cross the API as ISO-8601 text (JSON has no date type); parsed into
 // Date below so nothing outside this module handles a raw date string.
-type JobResponse = DistributiveOmit<Job, "createdAt" | "startedAt" | "heartbeatOn" | "completedAt"> & {
+export type JobResponse = DistributiveOmit<Job, "createdAt" | "startedAt" | "heartbeatOn" | "completedAt"> & {
 	createdAt: string;
 	startedAt: string | null;
 	heartbeatOn: string | null;
@@ -20,10 +20,13 @@ type JobTranscriptEntryResponse = DistributiveOmit<JobTranscriptEntry, "createdA
 	createdAt: string;
 };
 
+type JobStepArtifactResponse = Omit<JobDetail["artifacts"][number], "createdAt"> & { createdAt: string };
+
 type JobDetailResponse = JobResponse & {
 	transcript: JobTranscriptEntryResponse[];
 	results: JobDetail["results"];
 	ingredients: JobDetail["ingredients"];
+	artifacts: JobStepArtifactResponse[];
 };
 
 export interface StartTrainingRunRequested {
@@ -37,7 +40,7 @@ export interface StartTrainingRunRequested {
 // The two branch bodies are intentionally identical: narrowing `job` is the only effect that
 // matters here, so don't collapse this back into a single `return` — that reintroduces the
 // widened, uncorrelated type the branch exists to avoid.
-function parseJob(job: JobResponse): Job {
+export function parseJob(job: JobResponse): Job {
 	const dates = {
 		createdAt: new Date(job.createdAt),
 		startedAt: job.startedAt === null ? null : new Date(job.startedAt),
@@ -64,7 +67,8 @@ function parseJobDetail(job: JobDetailResponse): JobDetail {
 		...parseJob(job),
 		transcript: job.transcript.map(parseTranscriptEntry),
 		results: job.results,
-		ingredients: job.ingredients
+		ingredients: job.ingredients,
+		artifacts: job.artifacts.map((artifact) => ({ ...artifact, createdAt: new Date(artifact.createdAt) }))
 	};
 }
 

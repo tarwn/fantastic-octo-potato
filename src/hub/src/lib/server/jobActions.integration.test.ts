@@ -132,7 +132,7 @@ describe("jobActions", () => {
 
 			expect(result).toEqual({
 				status: 200,
-				body: { data: { ...job, transcript: [], results: [], ingredients: [] } }
+				body: { data: { ...job, transcript: [], results: [], ingredients: [], artifacts: [] } }
 			});
 		});
 

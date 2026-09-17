@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 
 	import RunnersPanel from "./_components/RunnersPanel.svelte";
+	import StartRecipeJobModal from "./_components/StartRecipeJobModal.svelte";
 	import StartTrainingModal from "./_components/StartTrainingModal.svelte";
 
 	import { page } from "$app/state";
@@ -11,6 +12,7 @@
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
 	let loadError = $state<string | null>(null);
 	let trainingModalOpen = $state(false);
+	let recipeModalMode = $state<"Trial" | "Execute" | null>(null);
 	let lastRefreshedOn = $state(new Date());
 
 	async function load() {
@@ -36,6 +38,10 @@
 	function closeTrainingModal() {
 		trainingModalOpen = false;
 	}
+
+	function closeRecipeModal() {
+		recipeModalMode = null;
+	}
 </script>
 
 <svelte:head>
@@ -50,7 +56,11 @@
 	{:else if registeredApplication}
 		<div class="page-header">
 			<h1>{registeredApplication.customerName} — {registeredApplication.applicationName}</h1>
-			<button type="button" class="btn btn-primary" onclick={beginTrainingRun}>Begin a Training Run</button>
+			<div class="page-actions">
+				<button type="button" class="btn btn-secondary" onclick={() => (recipeModalMode = "Trial")}>Start Trial</button>
+				<button type="button" class="btn btn-secondary" onclick={() => (recipeModalMode = "Execute")}>Start Job</button>
+				<button type="button" class="btn btn-primary" onclick={beginTrainingRun}>Begin a Training Run</button>
+			</div>
 		</div>
 		<RunnersPanel
 			runners={registeredApplication.runners}
@@ -62,6 +72,12 @@
 			open={trainingModalOpen}
 			onClose={closeTrainingModal}
 			registeredApplicationId={registeredApplication.id}
+		/>
+		<StartRecipeJobModal
+			open={recipeModalMode !== null}
+			onClose={closeRecipeModal}
+			registeredApplicationId={registeredApplication.id}
+			mode={recipeModalMode ?? "Trial"}
 		/>
 	{/if}
 </div>
@@ -88,6 +104,13 @@
 		margin-bottom: $space-m;
 	}
 
+	.page-actions {
+		display: flex;
+		align-items: center;
+		gap: $space-s;
+		flex: none;
+	}
+
 	h1 {
 		margin: 0;
 		font-size: $text-h1-size;
@@ -99,6 +122,13 @@
 	.btn-primary {
 		@include button-base;
 		@include button-variant-primary;
+
+		flex: none;
+	}
+
+	.btn-secondary {
+		@include button-base;
+		@include button-variant-secondary;
 
 		flex: none;
 	}

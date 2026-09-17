@@ -11,6 +11,7 @@ import {
 	insertJob,
 	JOB_CREATED_SEQUENCE,
 	listJobs,
+	listJobStepArtifactsForJob,
 	listSafeJobIngredients,
 	listSafeJobResults,
 	listTranscriptEntries,
@@ -105,7 +106,12 @@ export function getJobDetail(db: Database.Database, rawId: string): JobActionRes
 				...job,
 				transcript: listTranscriptEntries(db, job.id),
 				results: listSafeJobResults(db, job.id),
-				ingredients: listSafeJobIngredients(db, job.id)
+				ingredients: listSafeJobIngredients(db, job.id),
+				artifacts: listJobStepArtifactsForJob(db, job.id).map((artifact) => ({
+					id: artifact.id,
+					stepId: artifact.stepId,
+					createdAt: artifact.createdAt
+				}))
 			}
 		}
 	};
