@@ -1,58 +1,86 @@
 <script lang="ts">
-	import type { TranscriptDay } from "./jobTypes";
-
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
-	import type { StatusVariant } from "$lib/components/statusVariants";
+	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
+	import { TranscriptKind } from "$lib/jobTranscriptKind";
+	import { SensitivityType } from "$lib/sensitivityType";
+	import type { JobTranscriptEntry, TranscriptFieldRef } from "$lib/types/job";
 
-	let { meta, days }: { meta: string; days: TranscriptDay[] } = $props();
+	let { entries }: { entries: JobTranscriptEntry[] } = $props();
 
-	const emphasizedRailVariants: StatusVariant[] = ["running", "intervention", "success"];
+	interface TranscriptDay {
+		dateLabel: string;
+		entries: JobTranscriptEntry[];
+	}
 
-	function railClass(variant: StatusVariant | undefined): string {
-		return variant && emphasizedRailVariants.includes(variant) ? `transcript-rail-${variant}` : "transcript-rail";
+	function groupByDay(entries: JobTranscriptEntry[]): TranscriptDay[] {
+		const days: TranscriptDay[] = [];
+		for (const entry of entries) {
+			const dateLabel = entry.createdAt.toDateString();
+			const lastDay = days[days.length - 1];
+			if (lastDay && lastDay.dateLabel === dateLabel) {
+				lastDay.entries.push(entry);
+			}
+			else {
+				days.push({ dateLabel, entries: [entry] });
+			}
+		}
+		return days;
+	}
+
+	const days = $derived(groupByDay(entries));
+
+	function kindName(kind: TranscriptKind): string {
+		return TranscriptKind[kind];
 	}
 </script>
+
+{#snippet transcriptStepField(label: string, field: TranscriptFieldRef)}
+	<div class="transcript-step-field">
+		<span class="transcript-step-field-label">{label}: {field.fieldName}</span>
+		{#if field.sensitivityType !== SensitivityType.None}
+			<RedactedValue value={field.safeValue} />
+		{:else}
+			<span class="transcript-step-field-value">{field.safeValue}</span>
+		{/if}
+	</div>
+{/snippet}
 
 <div class="panel">
 	<div class="panel-header">
 		<h2>Transcript</h2>
-		<span class="panel-meta">{meta}</span>
+		<span class="panel-meta">{entries.length} entries</span>
 	</div>
+	{#if entries.length === 0}
+		<p class="panel-message">No transcript entries yet.</p>
+	{/if}
 	{#each days as day (day.dateLabel)}
 		<div class="transcript-date">{day.dateLabel}</div>
 		<div class="transcript transcript-rows">
-			{#each day.entries as entry (entry.time + entry.text)}
-				<div
-					class={[`transcript-row transcript-row-${entry.kind}`, entry.screenshot && "transcript-row-interactive"]
-						.filter(Boolean)
-						.join(" ")}
-				>
-					{#if entry.statusChange}
-						<span class={railClass(entry.statusChange.variant)}></span>
+			{#each day.entries as entry (entry.sequence)}
+				<div class="transcript-row">
+					{#if entry.jobStatusId !== null}
+						<span class={`transcript-rail transcript-rail-${JOB_STATUS_VARIANTS[entry.jobStatusId]}`}></span>
 					{:else}
-						<span></span>
+						<span class="transcript-rail"></span>
 					{/if}
-					<span class="transcript-time">{entry.time}</span>
-					<span class="transcript-kind">{entry.kind.toUpperCase()}</span>
+					<span class="transcript-time">{entry.createdAt.toLocaleTimeString()}</span>
+					<span class={`transcript-kind-${kindName(entry.kind).toLowerCase()}`}>{kindName(entry.kind).toUpperCase()}</span>
 					<span class="transcript-text">
-						{entry.text}
-						{#if entry.redacted}
-							<RedactedValue value={entry.redacted} />
-						{/if}
-						{#if entry.pii}
-							<span class="redacted-tag">PII</span>
+						{#if entry.kind === TranscriptKind.Step}
+							<span class="transcript-step-message">{entry.text.message}</span>
+							{#each entry.text.inputs as field (field.fieldName)}
+								{@render transcriptStepField("input", field)}
+							{/each}
+							{#each entry.text.outputs as field (field.fieldName)}
+								{@render transcriptStepField("output", field)}
+							{/each}
+						{:else}
+							{entry.text}
 						{/if}
 					</span>
-					{#if entry.statusChange}
-						<StatusBadge text={entry.statusChange.label} variant={entry.statusChange.variant} />
-					{:else if entry.screenshot}
-						<button type="button" class="btn-icon" title="View screenshot" aria-label="View screenshot">
-							<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-								<rect x="1.6" y="3.2" width="12.8" height="9.6" rx="1"></rect>
-								<circle cx="8" cy="8" r="2.2"></circle>
-							</svg>
-						</button>
+					{#if entry.jobStatusId !== null}
+						<StatusBadge text={JOB_STATUS_LABELS[entry.jobStatusId]} variant={JOB_STATUS_VARIANTS[entry.jobStatusId]} />
 					{:else}
 						<span></span>
 					{/if}
@@ -78,6 +106,12 @@
 		@include panel-header-meta;
 	}
 
+	.panel-message {
+		@include panel-body;
+
+		margin: 0;
+	}
+
 	.transcript-date {
 		@include transcript-date-row;
 	}
@@ -94,16 +128,24 @@
 		@include transcript-rail;
 	}
 
+	.transcript-rail-pending {
+		@include transcript-rail($status-pending-color);
+	}
+
 	.transcript-rail-running {
 		@include transcript-rail($status-running-color);
 	}
 
-	.transcript-rail-intervention {
-		@include transcript-rail($status-intervention-color);
-	}
-
 	.transcript-rail-success {
 		@include transcript-rail($status-success-color);
+	}
+
+	.transcript-rail-failed {
+		@include transcript-rail($status-failed-color);
+	}
+
+	.transcript-rail-cancelled {
+		@include transcript-rail($status-cancelled-color);
 	}
 
 	.transcript-time {
@@ -112,84 +154,51 @@
 
 	.transcript-row {
 		@include transcript-row;
-
-		&-status .transcript-kind {
-			@include transcript-cell-kind($transcript-kind-status-color);
-		}
-
-		&-step .transcript-kind {
-			@include transcript-cell-kind($transcript-kind-step-color);
-		}
-
-		&-recover {
-			.transcript-kind {
-				@include transcript-cell-kind($transcript-kind-recover-color);
-			}
-
-			.transcript-text {
-				color: $transcript-kind-recover-text-color;
-			}
-		}
-
-		&-info {
-			.transcript-kind {
-				@include transcript-cell-kind($transcript-kind-info-color);
-			}
-
-			.transcript-text {
-				color: $transcript-kind-info-color;
-			}
-		}
-
-		&-halt {
-			@include transcript-row-emphasis($transcript-kind-halt-surface, $transcript-kind-halt-border-color);
-
-			.transcript-kind {
-				@include transcript-cell-kind($transcript-kind-halt-color);
-			}
-
-			.transcript-text {
-				color: $transcript-kind-halt-text-color;
-			}
-		}
-
-		&-plan,
-		&-observe {
-			.transcript-kind {
-				@include transcript-cell-kind($transcript-kind-plan-color);
-			}
-
-			.transcript-text {
-				color: $transcript-kind-plan-text-color;
-			}
-		}
-
-		&-terminal {
-			@include transcript-row-emphasis($transcript-kind-terminal-surface, $transcript-kind-terminal-border-color);
-
-			.transcript-kind {
-				@include transcript-cell-kind($status-success-color);
-			}
-
-			.transcript-text {
-				color: $status-success-color;
-			}
-		}
 	}
 
-	.transcript-row-interactive {
-		@include transcript-row-interactive;
+	.transcript-kind-status {
+		@include transcript-cell-kind($transcript-kind-status-color);
+	}
+
+	.transcript-kind-step {
+		@include transcript-cell-kind($transcript-kind-step-color);
+	}
+
+	.transcript-kind-recover {
+		@include transcript-cell-kind($transcript-kind-recover-color);
+	}
+
+	.transcript-kind-halt {
+		@include transcript-cell-kind($transcript-kind-halt-color);
+	}
+
+	.transcript-kind-observe {
+		@include transcript-cell-kind($transcript-kind-observe-color);
+	}
+
+	.transcript-kind-plan {
+		@include transcript-cell-kind($transcript-kind-plan-color);
+	}
+
+	.transcript-kind-info {
+		@include transcript-cell-kind($transcript-kind-info-color);
 	}
 
 	.transcript-text {
 		@include transcript-cell-text;
 	}
 
-	.redacted-tag {
-		@include redacted-tag;
+	.transcript-step-message {
+		display: block;
 	}
 
-	.btn-icon {
-		@include button-icon-outlined;
+	.transcript-step-field {
+		display: flex;
+		align-items: center;
+		gap: $space-xs;
+	}
+
+	.transcript-step-field-label {
+		color: $text-color-muted;
 	}
 </style>

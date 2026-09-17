@@ -69,11 +69,6 @@
   color: $text-color-default;
 }
 
-@mixin panel-row-value-pending {
-  font-family: $font-family-mono;
-  color: $text-color-faint;
-}
-
 // a panel divided into equal fixed cells by hairlines — the identity strip.
 // the last cell is the status cell; tint it with status-cell().
 @mixin panel-strip($columns) {

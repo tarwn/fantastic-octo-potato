@@ -16,3 +16,14 @@ Reference: (Coming Soon)
     * success returns the full saved model after the changes are applied, with a `201`/`200` status — the frontend never has to re-fetch after a mutation.
     * errors, such as 404, return `{ error: ... }`
 * Validation happens before applying data to backend data stores
+* Status codes — pick one from this table rather than choosing ad hoc:
+
+| Code | Meaning | Example |
+|---|---|---|
+| 200 | Success (GET, or POST/PUT that doesn't create) | `poll`/`steps` returning a Job's current state |
+| 201 | Success, resource created (POST) | Creating a Job or Runner |
+| 400 | Validation failed on the request body/params | Missing `goal`, invalid `startingUrl` |
+| 401 | Missing/invalid bearer auth | Runner endpoints without a matching `Authorization` header |
+| 403 | Authenticated, but not the owner of the resource | A Runner calling `steps` on a Job assigned to a different `runner_id` |
+| 404 | Resource does not exist | Unknown Job/Runner/Registered Application id |
+| 409 | Request conflicts with the resource's current state | Cancelling an already-terminal Job |

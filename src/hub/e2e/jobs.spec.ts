@@ -1,8 +1,22 @@
 import { expect, test } from "@playwright/test";
 
-test("jobs list page renders with no jobs", async ({ page }) => {
+test("jobs list page links to a Job created via the API", async ({ page, request }) => {
+	const registeredApplications = await (await request.get("/api/hub/registered-applications")).json();
+	const registeredApplication = registeredApplications.data.find(
+		(item: { applicationName: string }) => item.applicationName === "Widgets"
+	);
+	const createResponse = await request.post(`/api/hub/registered-applications/${registeredApplication.id}/jobs`, {
+		data: { goal: "List page smoke test goal", startingUrl: "https://example.com/list-smoke", maxSteps: 3 }
+	});
+	const job = (await createResponse.json()).data;
+
 	await page.goto("/jobs");
 
-	await expect(page.getByRole("heading", { name: "Jobs" })).toBeVisible();
-	await expect(page.getByText(/no jobs/i)).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+	await expect(page.getByText(`job-ca${registeredApplication.id}-${job.id}`)).toBeVisible();
+	await expect(page.getByText("Acme — Widgets").first()).toBeVisible();
+
+	// Cancel it so it doesn't linger Pending and get claimed ahead of other tests' Jobs
+	// on this shared seeded xref/Runner (see playwright.config.ts's workers: 1 note).
+	await request.post(`/api/hub/jobs/${job.id}/cancel`);
 });

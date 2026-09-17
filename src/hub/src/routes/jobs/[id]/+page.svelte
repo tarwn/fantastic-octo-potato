@@ -1,69 +1,124 @@
 <script lang="ts">
+	import { onMount } from "svelte";
+
 	import GoalsPanel from "./_components/GoalsPanel.svelte";
 	import JobStrip from "./_components/JobStrip.svelte";
 	import ResultsPanel from "./_components/ResultsPanel.svelte";
 	import StageSummary from "./_components/StageSummary.svelte";
 	import TranscriptPanel from "./_components/TranscriptPanel.svelte";
-	import type { PageProps } from "./$types";
 
-	let { data }: PageProps = $props();
-	const job = $derived(data.job);
+	import { page } from "$app/state";
+	import { cancelJob, fetchJob } from "$lib/api/jobsApi";
+	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
+	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
+	import { formatJobDisplayId } from "$lib/jobDisplayId";
+	import { isTerminalJobStatus } from "$lib/jobStatus";
+	import { TranscriptKind } from "$lib/jobTranscriptKind";
+	import { JOB_TYPE_LABELS, JobType } from "$lib/jobType";
+	import type { JobDetail } from "$lib/types/job";
+	import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
+
+	const REFRESH_INTERVAL_SECONDS = 5;
+
+	let job = $state<JobDetail | null>(null);
+	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
+	let loadError = $state<string | null>(null);
+	let cancelError = $state<string | null>(null);
+	let lastRefreshedOn = $state(new Date());
+
+	const jobId = $derived(Number(page.params.id));
+
+	async function load() {
+		try {
+			const loadedJob = await fetchJob(jobId);
+			job = loadedJob;
+			registeredApplication = await fetchRegisteredApplication(loadedJob.customerApplicationXrefId);
+		}
+		catch (err) {
+			loadError = err instanceof Error ? err.message : "Failed to load Job";
+		}
+	}
+
+	onMount(load);
+
+	async function refresh() {
+		await load();
+		lastRefreshedOn = new Date();
+	}
+
+	async function handleCancel() {
+		if (!job) return;
+
+		cancelError = null;
+		try {
+			await cancelJob(job.id);
+			await refresh();
+		}
+		catch (err) {
+			cancelError = err instanceof Error ? err.message : "Failed to cancel Job";
+		}
+	}
 
 	function exportJson() {
+		if (!job) return;
+
 		const blob = new Blob([JSON.stringify(job, null, 2)], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement("a");
 		link.href = url;
-		link.download = `${job.id}.json`;
+		link.download = `${formatJobDisplayId(job.customerApplicationXrefId, job.id)}.json`;
 		link.click();
 		URL.revokeObjectURL(url);
 	}
 </script>
 
 <svelte:head>
-	<title>{job.title} · Hub</title>
+	<title>{job ? formatJobDisplayId(job.customerApplicationXrefId, job.id) : "Job"} · Hub</title>
 </svelte:head>
 
 <div class="job-page">
-	{#if job.interventionMessage}
-		<div class="job-page-intervention">
-			<span class="job-page-intervention-tag">Intervention</span>
-			<span class="job-page-intervention-message">{job.interventionMessage}</span>
-			<button type="button" class="btn btn-caution">Take control</button>
+	{#if loadError}
+		<p class="job-page-message">{loadError}</p>
+	{:else if job && registeredApplication && job.jobType === JobType.Training}
+		<div class="job-page-content">
+			<div class="job-page-eyebrow">
+				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>
+				<span class="job-page-divider">|</span>
+				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
+			</div>
+			<div class="job-page-header">
+				<h1>{job.details.goal}</h1>
+				<div class="job-page-actions">
+					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
+					{#if !isTerminalJobStatus(job.jobStatusId)}
+						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
+					{/if}
+					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
+				</div>
+			</div>
+			{#if cancelError}
+				<p class="job-page-message">{cancelError}</p>
+			{/if}
+
+			<JobStrip
+				customerName={registeredApplication.customerName}
+				applicationName={registeredApplication.applicationName}
+				runnerId={job.runnerId}
+				jobStatusId={job.jobStatusId}
+			/>
+			<StageSummary {job} stepsTaken={job.transcript.filter((entry) => entry.kind === TranscriptKind.Step).length} />
+
+			<div class="job-page-panels">
+				<TranscriptPanel entries={job.transcript} />
+				<div class="job-page-side">
+					<ResultsPanel results={job.results} />
+					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
+				</div>
+			</div>
 		</div>
+	{:else if job}
+		<p class="job-page-message">Recipe Jobs are not yet supported by this view.</p>
 	{/if}
-	<div class="job-page-content">
-		<div class="job-page-eyebrow">
-			<span class="job-page-mode">{job.eyebrow}</span>
-			<span class="job-page-divider">|</span>
-			<span class="job-page-id">{job.id}</span>
-		</div>
-		<div class="job-page-header">
-			<h1>{job.title}</h1>
-			<div class="job-page-actions">
-				{#if job.mode === "execute"}
-					<button type="button" class="btn">Cancel job</button>
-				{/if}
-				<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
-				{#if job.mode === "training"}
-					<button type="button" class="btn btn-primary">Start Trial run</button>
-				{/if}
-			</div>
-		</div>
-
-		<JobStrip strip={job.strip} />
-		<StageSummary stage={job.stage} />
-
-		<div class="job-page-panels">
-			<TranscriptPanel meta={job.transcriptMeta} days={job.transcript} />
-			<div class="job-page-side">
-				<ResultsPanel meta={job.resultsMeta} results={job.results} />
-				{#if job.goals}
-					<GoalsPanel goals={job.goals} />
-				{/if}
-			</div>
-		</div>
-	</div>
 </div>
 
 <style lang="scss">
@@ -76,32 +131,10 @@
 		border-left: $border-hairline-width solid $border-color-panel;
 	}
 
-	.job-page-intervention {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: $space-l;
-		padding: 13px $space-l;
-		background-color: $status-intervention-surface;
-		border-bottom: $border-hairline-width solid $status-intervention-border;
-	}
+	.job-page-message {
+		@include panel-body;
 
-	.job-page-intervention-tag {
-		flex: none;
-		padding: 3px 7px;
-		border: $border-hairline-width solid $status-intervention-border;
-		font-family: $font-family-mono;
-		font-size: $text-micro-size;
-		font-weight: $text-micro-weight;
-		letter-spacing: $text-micro-letter-spacing;
-		color: $status-intervention-color;
-		text-transform: uppercase;
-	}
-
-	.job-page-intervention-message {
-		flex: 1;
-		font-size: $text-regular-size;
-		color: $color-rust-800;
+		margin: 0;
 	}
 
 	.job-page-content {
@@ -150,22 +183,15 @@
 
 	.job-page-actions {
 		display: flex;
-		gap: $space-s;
+		align-items: center;
+		gap: $space-m;
 	}
 
 	.btn {
 		@include button-base;
 		@include button-variant-secondary;
-	}
-
-	.btn-caution {
-		@include button-variant-caution;
 
 		flex: none;
-	}
-
-	.btn-primary {
-		@include button-variant-primary;
 	}
 
 	.job-page-panels {

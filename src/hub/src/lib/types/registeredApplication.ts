@@ -7,6 +7,7 @@ export interface RegisteredApplication {
 export interface RunnerSummary {
 	id: number;
 	lastHeartbeatOn: Date | null;
+	currentJobId: number | null;
 }
 
 export interface RegisteredApplicationDetail extends RegisteredApplication {

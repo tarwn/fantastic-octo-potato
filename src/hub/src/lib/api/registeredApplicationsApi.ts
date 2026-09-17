@@ -3,7 +3,7 @@ import type { RegisteredApplication, RegisteredApplicationDetail } from "$lib/ty
 // Wire shape: dates cross the API as ISO-8601 text (JSON has no date type); parsed into
 // Date below so nothing outside this module handles a raw date string.
 interface RegisteredApplicationDetailResponse extends Omit<RegisteredApplicationDetail, "runners"> {
-	runners: { id: number; lastHeartbeatOn: string | null }[];
+	runners: { id: number; lastHeartbeatOn: string | null; currentJobId: number | null }[];
 }
 
 export async function fetchRegisteredApplications(): Promise<RegisteredApplication[]> {

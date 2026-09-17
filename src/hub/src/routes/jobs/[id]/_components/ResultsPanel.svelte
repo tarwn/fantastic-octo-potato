@@ -1,33 +1,32 @@
 <script lang="ts">
-	import type { ResultField } from "./jobTypes";
-
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
+	import { SensitivityType } from "$lib/sensitivityType";
+	import type { JobResult } from "$lib/types/job";
 
-	let { meta, results }: { meta: string; results: ResultField[] } = $props();
+	let { results }: { results: JobResult[] } = $props();
 </script>
 
 <div class="panel">
 	<div class="panel-header">
 		<h2>Results</h2>
-		<span class="panel-meta">{meta}</span>
+		<span class="panel-meta">{results.length} collected</span>
 	</div>
-	<div class="panel-rows">
-		{#each results as field (field.label)}
-			<div class="panel-row">
-				<span class="panel-label">
-					{field.label}
-					{#if field.sensitive}<span class="redacted-tag">PII</span>{/if}
-				</span>
-				{#if field.pending}
-					<span class="panel-value panel-value-pending">pending</span>
-				{:else if field.redacted}
-					<RedactedValue value={field.value} />
-				{:else}
-					<span class="panel-value">{field.value}</span>
-				{/if}
-			</div>
-		{/each}
-	</div>
+	{#if results.length === 0}
+		<p class="panel-message">No results yet.</p>
+	{:else}
+		<div class="panel-rows">
+			{#each results as result (result.fieldName)}
+				<div class="panel-row">
+					<span class="panel-label">{result.fieldName}</span>
+					{#if result.sensitivityType !== SensitivityType.None}
+						<RedactedValue value={result.safeValue} />
+					{:else}
+						<span class="panel-value">{result.safeValue}</span>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <style lang="scss">
@@ -45,6 +44,12 @@
 		@include panel-header-meta;
 	}
 
+	.panel-message {
+		@include panel-body;
+
+		margin: 0;
+	}
+
 	.panel-rows {
 		@include panel-rows;
 	}
@@ -59,13 +64,5 @@
 
 	.panel-value {
 		@include panel-row-value;
-
-		&-pending {
-			@include panel-row-value-pending;
-		}
-	}
-
-	.redacted-tag {
-		@include redacted-tag;
 	}
 </style>

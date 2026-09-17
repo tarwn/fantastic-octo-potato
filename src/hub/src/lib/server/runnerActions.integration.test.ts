@@ -2,8 +2,13 @@ import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
+import { JobStatus } from "./db/jobStatus";
+import { TranscriptKind } from "./db/jobTranscriptKind";
+import { JobType } from "./db/jobType";
+import { getJobById, insertJob, listTranscriptEntries } from "./repositories/jobRepository";
 import { getRunnerById } from "./repositories/runnerRepository";
 import { runnerInit, runnerPoll } from "./runnerActions";
+import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
 
 const SHARED_SECRET = "test-secret";
 
@@ -15,6 +20,31 @@ function seedRunner(db: Database.Database): number {
 		INSERT INTO runner (id, customer_application_xref_id) VALUES (1, 1);
 	`);
 	return 1;
+}
+
+function seedRunnerOnXref(db: Database.Database, xrefId: number): number {
+	const { lastInsertRowid } = db.prepare("INSERT INTO runner (customer_application_xref_id) VALUES (?)").run(xrefId);
+	return Number(lastInsertRowid);
+}
+
+function seedXref(db: Database.Database, id: number): void {
+	db.exec(`
+		INSERT INTO customer (id, name) VALUES (${id}, 'Acme ${id}');
+		INSERT INTO application (id, name) VALUES (${id}, 'Widgets ${id}');
+		INSERT INTO customer_application_xref (id, customer_id, application_id) VALUES (${id}, ${id}, ${id});
+	`);
+}
+
+function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10): number {
+	return insertJob(db, {
+		jobType: JobType.Training,
+		customerApplicationXrefId: xrefId,
+		goal: "Extract invoice total",
+		startingUrl: "https://example.com/start",
+		allowlist: "https://example.com",
+		maxSteps,
+		createdAt: new Date("2026-09-15T00:00:00.000Z")
+	}).id;
 }
 
 describe("runnerActions", () => {
@@ -67,7 +97,7 @@ describe("runnerActions", () => {
 			expect(result).toEqual({ status: 404, body: { error: "Runner 999 not found" } });
 		});
 
-		it("records a heartbeat and reports no work available on success", () => {
+		it("records a heartbeat and reports no work available when there's no matching-xref Pending job", () => {
 			const runnerId = seedRunner(getDb());
 
 			const result = runnerPoll(getDb(), String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
@@ -75,5 +105,62 @@ describe("runnerActions", () => {
 			expect(result).toEqual({ status: 200, body: { data: { hasWork: false } } });
 			expect(getRunnerById(getDb(), runnerId)?.lastHeartbeatOn).toBeInstanceOf(Date);
 		});
+
+		it("claims the oldest matching-xref Pending job, handing back the first scripted step", () => {
+			const db = getDb();
+			const runnerId = seedRunner(db);
+			const jobId = insertPendingJob(db, 1);
+
+			const result = runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+			expect(result).toEqual({
+				status: 200,
+				body: {
+					data: {
+						hasWork: true,
+						job: {
+							id: jobId,
+							goal: "Extract invoice total",
+							startingUrl: "https://example.com/start",
+							allowlist: "https://example.com",
+							maxSteps: 10,
+							nextStep: { sequence: 1, kind: SCRIPTED_TRAINING_STEPS[0].kind, text: SCRIPTED_TRAINING_STEPS[0].text }
+						}
+					}
+				}
+			});
+			expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.Running);
+		});
+
+		it("records a status transcript entry announcing the claim", () => {
+			const db = getDb();
+			const runnerId = seedRunner(db);
+			const jobId = insertPendingJob(db, 1);
+
+			runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+			expect(listTranscriptEntries(db, jobId)).toEqual([
+				expect.objectContaining({
+					sequence: -1,
+					kind: TranscriptKind.Status,
+					text: `Picked up by Runner ${runnerId}`,
+					jobStatusId: JobStatus.Running
+				})
+			]);
+		});
+
+		it("never returns a Pending job belonging to a different xref", () => {
+			const db = getDb();
+			seedRunner(db);
+			insertPendingJob(db, 1);
+			seedXref(db, 2);
+			const otherXrefRunnerId = seedRunnerOnXref(db, 2);
+			const otherXrefJobId = insertPendingJob(db, 2);
+
+			const result = runnerPoll(db, String(otherXrefRunnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+			expect((result.body as { data: { job: { id: number } } }).data.job.id).toBe(otherXrefJobId);
+		});
 	});
+
 });
