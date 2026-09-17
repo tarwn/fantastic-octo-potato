@@ -2,9 +2,15 @@
 
 Reference: [init/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/init/+server.ts), [poll/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/poll/+server.ts), [steps/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/jobs/[jobId]/steps/+server.ts), [runnerActions.ts](../../../../src/hub/src/lib/server/runnerActions.ts), [runnerConfig.ts](../../../../src/hub/src/lib/server/runnerConfig.ts)
 
-Also see: [Runner Config & Startup](../../runner-web/runner-config.md) (the runner-web side), [Job Queue](../job-queue.md) (the claim-atomicity/ownership rules these endpoints wrap).
+Also see: [Runner Config & Startup](../../runner-web/runner-config.md) (the runner-web side), [Job Queue](../job-queue.md) (the claim-atomicity/ownership rules these endpoints wrap), [Recipe Automatic Loop](../../runner-web/recipe-automatic-loop.md) (why the Runner needs the whole-Recipe payload/report shapes below).
 
 Notable:
 * Auth is one shared secret for every Runner (`requireRunnerSharedSecret()`) — no per-runner credentials yet ([DEFER 2](../../../defers/0002-shared-runner-bearer-secret.md)); a mismatched/missing bearer is always `401`.
-* `poll`'s claim (`{ hasWork: true, job: { ..., nextStep } }`) always hands back scripted step 1 — the Runner needs something to perform before its first `steps` call.
 * `steps` is the entire report/next-step/terminal loop — there is no separate "complete" call. `403` if the calling Runner isn't the Job's assigned `runner_id`; an already-terminal Job returns its current status unmutated, never revived.
+* `poll`'s claim shape depends on job type: a `training_job` gets `{ hasWork: true, job: { ..., nextStep } }` (scripted step 1).
+* A `recipe_job` claim instead gets the full `buildRecipeJobPayload()` payload: `{ id, mode, recipeId, recipeVersion, recipe, ingredients, controls, stepTimeoutMs, comms }`. `recipe` is the persisted `RecipeDefinition` (steps-dsl.md/recipe.md shapes); `ingredients` are coerced to the Recipe's declared input types.
+* `controls.allowedOrigins` comes from the Job's stored allowlist; `comms` gives the relative `statusUrl`/`artifactsUrl` paths for this Job.
+* A Recipe Job reports `{ kind: "dslStep", stepId, outcome: "succeeded" | "failed", parentStepId?, extractions: [{ fieldName, value }] }` to `steps`, in place of Training's `{ kind: "step", sequence, ... }` — Recipe Steps are identified by their DSL string id, not a sequence number.
+* `extractions` carries the raw value on the wire (needed for `upsertJobResult`'s masked-value computation), but the transcript row built from it keeps only the field name and outcome, never the raw value (R013).
+* A Recipe Job also uploads a per-Step or terminal screenshot via `POST .../jobs/[jobId]/artifacts` (`comms.artifactsUrl`): `{ stepId, imageBase64 }`, already credential-masked by the Runner. This endpoint is Recipe Job-only (`400` for a Training Job).
+* Hub writes the uploaded screenshot bytes to disk via `artifactStorage.ts` and records a `job_step_artifact` row (`job_id`, `stepId`, `file_path`, `created_at`).

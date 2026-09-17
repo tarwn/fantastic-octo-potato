@@ -1,0 +1,16 @@
+# Recipe Automatic Loop
+
+How runner-web drives a Recipe (`recipe_job`) Job's DSL Steps to a terminal outcome, and why it decides progression itself instead of Hub.
+
+Reference: [automaticLoop.ts](../../../src/runner-web/orchestrator/automaticLoop.ts) (`runRecipeJobLoop`, `runProgram`)
+
+Also see: [Job Queue](../hub/job-queue.md) (the Hub-side authority split this supersedes for `recipe_job`), [Runner API](../hub/backend/runner-api.md) (the poll payload/report wire shapes), [Runner HTTP Handling](./runner-http-handling.md), [steps-dsl.md](../../todos/supporting-docs/steps-dsl.md) (DSL vocabulary).
+
+Notable:
+* This loop is why `recipe_job` is Runner-authoritative for progression, unlike Training (see [Job Queue](../hub/job-queue.md)): Hub hands back the entire Recipe/ingredients/controls/`stepTimeoutMs`/`comms` payload once per poll ([Runner API](../hub/backend/runner-api.md)), and the Runner never calls back to ask what's next — it only reports what already happened (`dslStep` transcript rows, status updates, artifact uploads).
+* `runProgram` tracks the current position with a top-level index plus an optional `resume` pointer into a `group`/`if`'s children, and resolves `goto` targets through a location index built once per run (`buildLocationIndex`) — this is how the loop reconstructs continuation after a jump without re-walking from the top.
+* After every non-recovery Step (success or failure), the loop scans `recipe.recoveries` in order and runs the first one whose `when` condition is true, bounded to `MAX_RECOVERY_ATTEMPTS` (3) applications per recovery — a recovery whose own condition stays true after running would otherwise reapply itself forever. A recovery's own Step failure escalates straight to intervention rather than nesting another recovery scan.
+* Terminal outcome mapping is exact, not a fallthrough guess: allowlist violation or any unexpected/technical error → `Completed-Error`, exits immediately; a Step failure with no matching recoverable scenario → `Intervention-Requested`; a `fail` action → `Completed-Failed` with its code/message, exits immediately; reaching `finish` with its checkpoint condition true → `Completed-Success`.
+* `Intervention-Requested` only waits and times out (`waitForIntervention` polls Hub's job-status endpoint until the Hub-provided intervention timeout elapses, then reports `Completed-Failed`) — there is no "Take Control" human-input path yet; that's out of scope until a later spec.
+* A masked screenshot is captured and uploaded (`captureAndUploadArtifact`/`takeMaskedScreenshot`) after every reported Step and once more on terminal exit (`stepId: "terminal"`); a failed upload is logged and swallowed, never fails the Job — the transcript row is the durable record, the screenshot is best-effort context.
+* The browser/context/page lifecycle is scoped to exactly one Job (`launchBrowserSession`/`closeBrowserSession` in a `finally`), so cleanup runs on every terminal exit path — success, failure, error, or intervention timeout — before the Runner returns to polling.

@@ -6,4 +6,4 @@ This is the plan for [0007-recipe-execution/spec.md](./spec.md).
 - [x] 4. Runner-web: Playwright driver and DSL action/condition executors
 - [x] 5. Runner-web: shared Automatic Loop, recovery, intervention, cleanup
 - [x] 6. Hub UI: Start Trial/Start Job modals, Job screen, export
-- [ ] 7. ADRs, defers, and context docs
+- [x] 7. ADRs, defers, and context docs
