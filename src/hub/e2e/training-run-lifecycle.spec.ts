@@ -32,7 +32,7 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 
 	const stepResponse = await request.post(`/api/runner/runners/${runnerId}/jobs/${jobId}/steps`, {
 		headers: { authorization: "Bearer change-me" },
-		data: { sequence: 1, kind: "step", text: "Open the starting URL" }
+		data: { sequence: 1, kind: "step", message: "Open the starting URL", inputs: [], outputs: [] }
 	});
 	expect(stepResponse.status()).toBe(200);
 
