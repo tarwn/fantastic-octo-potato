@@ -10,6 +10,7 @@ Notable:
     * `HUB_URL` — base URL of the Hub instance to connect to.
     * `RUNNER_ID` — the id of the seeded `runner` row this process authenticates as.
     * `RUNNER_SHARED_SECRET` — bearer secret sent as `Authorization: Bearer <value>` on every Hub call; must match Hub's `RUNNER_SHARED_SECRET`.
+* A Recipe's `{ref:"credential", name:"username"}` values resolve only on the Runner, via `RUNNER_CREDENTIAL_<NAME>` env vars (`credentials.ts`, `resolveCredential()`) — the same `requireEnv`/"let it crash" pattern as the required keys above. Never sent by Hub.
 * No dependency is used for env loading — Node's built-in `--env-file=src/runner-web/.env` flag populates `process.env` before `index.ts` runs. `dev:runner-web` in `package.json` passes this flag.
 * `index.ts` runs the sequence: `loadConfig()` → `initRunner(config)` (`runnerClient.ts`) → `startPollLoop(config, pollIntervalSeconds)` (`pollLoop.ts`).
     * `initRunner` `POST`s to `/api/runner/runners/{runnerId}/init` with the bearer header; on success it returns `{ pollIntervalSeconds, interventionTimeoutSeconds }` from Hub, which are logged. `interventionTimeoutSeconds` is logged only — nothing consumes it yet.
