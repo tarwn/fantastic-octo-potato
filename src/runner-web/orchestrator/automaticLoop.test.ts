@@ -1,19 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { executeAction } from "../browser/actions.ts";
+import { launchBrowserSession } from "../browser/browserSession.ts";
+import type { FieldDeclaration, RecipeDefinition, Recovery, Step } from "../dsl/types.ts";
 import { type ClaimedRecipeJob, fetchJobStatus, JobStatus, reportDslStep, reportStatus, uploadArtifact } from "../runnerClient.ts";
 
-import { executeAction } from "./actions.ts";
 import { runRecipeJobLoop } from "./automaticLoop.ts";
-import { launchBrowserSession } from "./browserSession.ts";
-import type { FieldDeclaration, RecipeDefinition, Recovery, Step } from "./types.ts";
 
-vi.mock("./actions.ts", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./actions.ts")>();
+vi.mock("../browser/actions.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../browser/actions.ts")>();
 	return { ...actual, executeAction: vi.fn(actual.executeAction) };
 });
 
-vi.mock("./browserSession.ts", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./browserSession.ts")>();
+vi.mock("../browser/browserSession.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../browser/browserSession.ts")>();
 	return { ...actual, launchBrowserSession: vi.fn(actual.launchBrowserSession) };
 });
 
@@ -177,7 +177,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 		};
 		const job = buildJob({ recipe });
 		// The only Step's executeAction call is overridden to simulate an uncaught technical error
-		// escaping dsl/actions.ts — no real page navigation is needed to exercise this path.
+		// escaping browser/actions.ts — no real page navigation is needed to exercise this path.
 		vi.mocked(executeAction).mockRejectedValueOnce(new Error("boom"));
 
 		await runRecipeJobLoop(config, job, 300);

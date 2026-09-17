@@ -1,10 +1,11 @@
 import type { Page } from "playwright";
 
-import { DslActionError } from "./errors.ts";
-import type { ExecutionContext } from "./executionContext.ts";
-import { isAssigned } from "./outputsState.ts";
+import { DslActionError } from "../dsl/errors.ts";
+import type { ExecutionContext } from "../dsl/executionContext.ts";
+import { isAssigned } from "../dsl/outputsState.ts";
+import type { AtomicCondition, Condition } from "../dsl/types.ts";
+
 import { resolveElementTarget } from "./targetResolver.ts";
-import type { AtomicCondition, Condition } from "./types.ts";
 
 // "exists" is true for any number of matches — presence alone is enough, so it never needs an
 // ambiguity check. The other state tests (visible/enabled/disabled) do need exactly one match to

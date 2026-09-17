@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { ExecutionContext } from "../dsl/executionContext.ts";
+import { createOutputsState, getOutput } from "../dsl/outputsState.ts";
+import type { ChildStep } from "../dsl/types.ts";
+
 import { closeFixtureBrowser, type FixtureBrowser, openFixturePage } from "./_test/testPage.ts";
 import { executeAction } from "./actions.ts";
-import type { ExecutionContext } from "./executionContext.ts";
-import { createOutputsState, getOutput } from "./outputsState.ts";
-import type { ChildStep } from "./types.ts";
 
 let fixture: FixtureBrowser;
 

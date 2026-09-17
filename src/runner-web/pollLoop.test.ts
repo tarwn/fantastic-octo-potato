@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { runRecipeJobLoop } from "./dsl/automaticLoop.ts";
+import { runRecipeJobLoop } from "./orchestrator/automaticLoop.ts";
 import type { RunnerConfig } from "./config.ts";
 import { log } from "./logger.ts";
 import { startPollLoop } from "./pollLoop.ts";
@@ -18,7 +18,7 @@ vi.mock("./runnerClient.ts", () => ({
 		}
 	}
 }));
-vi.mock("./dsl/automaticLoop.ts", () => ({ runRecipeJobLoop: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("./orchestrator/automaticLoop.ts", () => ({ runRecipeJobLoop: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("./logger.ts", () => ({ log: vi.fn() }));
 
 const config: RunnerConfig = {

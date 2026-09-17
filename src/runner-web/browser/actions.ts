@@ -1,12 +1,13 @@
 import type { ElementHandle, Locator, Page } from "playwright";
 
+import { DslActionError } from "../dsl/errors.ts";
+import type { ExecutionContext } from "../dsl/executionContext.ts";
+import { setOutput } from "../dsl/outputsState.ts";
+import type { ChildStep, ScalarValue } from "../dsl/types.ts";
+import { resolveStringValue, resolveValue } from "../dsl/valueResolver.ts";
+
 import { evaluateCondition } from "./conditions.ts";
-import { DslActionError } from "./errors.ts";
-import type { ExecutionContext } from "./executionContext.ts";
-import { setOutput } from "./outputsState.ts";
 import { isPointTarget, resolveElementAtPoint, resolveElementTarget, resolveViewportPoint } from "./targetResolver.ts";
-import type { ChildStep, ScalarValue } from "./types.ts";
-import { resolveStringValue, resolveValue } from "./valueResolver.ts";
 
 // A step reports exactly one of these; `kind: "businessFailure"` distinguishes the `fail` action's
 // deliberate stop-the-Job outcome from an ordinary technical/resolution failure that a calling

@@ -1,6 +1,6 @@
 import type { ElementHandle, Locator, Page } from "playwright";
 
-import type { Target, TargetElement, TargetPoint } from "./types.ts";
+import type { Target, TargetElement, TargetPoint } from "../dsl/types.ts";
 
 // Actions that operate on a single element need exactly one match — missing and ambiguous (2+
 // matches) are distinct, reported outcomes, never a silent first-match pick.

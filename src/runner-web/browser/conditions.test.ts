@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { DslActionError } from "../dsl/errors.ts";
+import type { ExecutionContext } from "../dsl/executionContext.ts";
+import { createOutputsState, setOutput } from "../dsl/outputsState.ts";
+
 import { closeFixtureBrowser, type FixtureBrowser, openFixturePage } from "./_test/testPage.ts";
 import { evaluateCondition } from "./conditions.ts";
-import { DslActionError } from "./errors.ts";
-import type { ExecutionContext } from "./executionContext.ts";
-import { createOutputsState, setOutput } from "./outputsState.ts";
 
 let fixture: FixtureBrowser;
 

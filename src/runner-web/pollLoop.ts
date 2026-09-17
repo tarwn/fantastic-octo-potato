@@ -1,4 +1,4 @@
-import { runRecipeJobLoop } from "./dsl/automaticLoop.ts";
+import { runRecipeJobLoop } from "./orchestrator/automaticLoop.ts";
 import type { RunnerConfig } from "./config.ts";
 import { log } from "./logger.ts";
 import { type ClaimedJob, isRecipeJob, type JobStep, pollRunner, reportStep, RunnerHttpError } from "./runnerClient.ts";
