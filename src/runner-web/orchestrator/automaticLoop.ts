@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 
+import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl } from "../allowList.ts";
 import { type ActionOutcome, executeAction } from "../browser/actions.ts";
 import { closeBrowserSession, launchBrowserSession } from "../browser/browserSession.ts";
 import { evaluateCondition } from "../browser/conditions.ts";
@@ -8,17 +9,21 @@ import type { RunnerConfig } from "../config.ts";
 import { resolveCredential } from "../credentials.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
 import { createOutputsState } from "../dsl/outputsState.ts";
-import type { ChildStep, RecipeDefinition, Recovery, ScalarValue, Step } from "../dsl/types.ts";
+import type { ChildStep, RecipeDefinition, Recovery, ScalarValue } from "../dsl/types.ts";
 import { log } from "../logger.ts";
 import {
 	type ClaimedRecipeJob,
 	fetchJobStatus,
 	JobStatus,
 	reportDslStep,
+	reportInfo,
 	reportStatus,
 	TERMINAL_JOB_STATUSES,
 	uploadArtifact
 } from "../runnerClient.ts";
+
+import { collectCredentialNames } from "./program/credentialNames.ts";
+import { buildLocationIndex } from "./program/locationIndex.ts";
 
 const RECOVERY_POLL_INTERVAL_MS = 2000;
 
@@ -36,95 +41,9 @@ type SequenceOutcome =
 	| { type: "intervention" }
 	| { type: "error"; message: string };
 
-type Location =
-	| { level: "top"; topIndex: number }
-	| { level: "child"; topIndex: number; array: ChildStep[]; childIndex: number };
-
-// Indexes every Step id (top-level and one level of group/if children) to where it lives, so
-// `goto` can jump anywhere and reconstruct the right continuation without re-evaluating an
-// enclosing `if`'s guard.
-function buildLocationIndex(steps: Step[]): Map<string, Location> {
-	const index = new Map<string, Location>();
-	steps.forEach((step, topIndex) => {
-		index.set(step.id, { level: "top", topIndex });
-		if (step.action === "group") {
-			const children = step.args[0];
-			children.forEach((child, childIndex) => index.set(child.id, { level: "child", topIndex, array: children, childIndex }));
-		}
-		else if (step.action === "if") {
-			const [cases, elseSteps] = step.args;
-			for (const ifCase of cases) {
-				ifCase.steps.forEach((child, childIndex) => index.set(child.id, { level: "child", topIndex, array: ifCase.steps, childIndex }));
-			}
-			elseSteps.forEach((child, childIndex) => index.set(child.id, { level: "child", topIndex, array: elseSteps, childIndex }));
-		}
-	});
-	return index;
-}
-
 interface Position {
 	topIndex: number;
 	resume?: { array: ChildStep[]; childIndex: number };
-}
-
-function isValueRef(value: unknown): value is { ref: string; name: string } {
-	return typeof value === "object" && value !== null && "ref" in value;
-}
-
-// Walks the whole program (including recoveries) for every `{ref:"credential"}` reference, so
-// their resolved values can be masked out of screenshots even though nothing on the wire ever
-// tells the Runner which credential names a Recipe uses ahead of time.
-function collectCredentialNames(recipe: RecipeDefinition): Set<string> {
-	const names = new Set<string>();
-	function visitValue(value: unknown): void {
-		if (isValueRef(value) && value.ref === "credential") {
-			names.add(value.name);
-		}
-	}
-	function visitChild(step: ChildStep): void {
-		switch (step.action) {
-			case "open":
-				visitValue(step.args[0]);
-				break;
-			case "fill":
-				visitValue(step.args[1]);
-				break;
-			case "select":
-				for (const option of step.args[1]) {
-					visitValue(option.value);
-				}
-				break;
-			case "assign":
-				visitValue(step.args[1]);
-				break;
-			default:
-				break;
-		}
-	}
-	function visitChildren(children: ChildStep[]): void {
-		for (const child of children) {
-			visitChild(child);
-		}
-	}
-	for (const step of recipe.steps) {
-		if (step.action === "group") {
-			visitChildren(step.args[0]);
-		}
-		else if (step.action === "if") {
-			const [cases, elseSteps] = step.args;
-			for (const ifCase of cases) {
-				visitChildren(ifCase.steps);
-			}
-			visitChildren(elseSteps);
-		}
-		else {
-			visitChild(step);
-		}
-	}
-	for (const recovery of recipe.recoveries) {
-		visitChildren(recovery.steps);
-	}
-	return names;
 }
 
 function collectSecretValues(recipe: RecipeDefinition, ingredients: Record<string, string | number | boolean>, resolveCredentialFn: (name: string) => string): string[] {
@@ -140,33 +59,6 @@ function collectSecretValues(recipe: RecipeDefinition, ingredients: Record<strin
 	return secrets.filter((value) => value.trim() !== "");
 }
 
-const SCHEME_ONLY_PATTERN = /^[a-z][a-z0-9+.-]*:$/i;
-
-// Compares by parsed origin, not raw string prefix — a plain prefix match would also let
-// "https://example.com.attacker.com" or "https://example.com@attacker.com" through for an
-// allowlist entry of "https://example.com". A bare scheme entry (e.g. "data:") is a special case
-// for opaque-origin schemes that have no real origin to compare, matched by scheme instead.
-function isAllowedUrl(url: string, allowedOrigins: string[]): boolean {
-	let parsed: URL;
-	try {
-		parsed = new URL(url);
-	}
-	catch {
-		return false;
-	}
-	return allowedOrigins.some((allowed) => {
-		if (SCHEME_ONLY_PATTERN.test(allowed)) {
-			return parsed.protocol === allowed;
-		}
-		try {
-			return parsed.origin === new URL(allowed).origin;
-		}
-		catch {
-			return false;
-		}
-	});
-}
-
 interface LoopDeps {
 	config: RunnerConfig;
 	job: ClaimedRecipeJob;
@@ -174,6 +66,7 @@ interface LoopDeps {
 	page: Page;
 	secrets: string[];
 	recoveryAttempts: Map<string, number>;
+	blockedEvents: BlockedRequestEvent[];
 }
 
 // A bound on how many times any single recoverable scenario can run within one Job — a Recipe
@@ -193,6 +86,24 @@ async function captureAndUploadArtifact(deps: LoopDeps, stepId: string): Promise
 	}
 }
 
+// Drains every request the allowlist route handler blocked since the last drain, reporting each
+// blocked subresource as its own INFO transcript row (non-fatal — the Step it happened during may
+// still have succeeded; a later Step may fail because of it instead). A blocked *navigation* is
+// reported by the caller as the Step's own outcome instead of an INFO row, since it always ends the
+// Job — this only hands back that navigation's URL, if any, for the caller to act on.
+async function reportBlockedRequests(deps: LoopDeps, stepId: string): Promise<string | undefined> {
+	const events = deps.blockedEvents.splice(0, deps.blockedEvents.length);
+	let navigationUrl: string | undefined;
+	for (const event of events) {
+		if (event.isNavigation) {
+			navigationUrl ??= event.url;
+			continue;
+		}
+		await reportInfo(deps.config, deps.job.id, `Step ${stepId}: blocked a disallowed-origin request to ${event.url}`);
+	}
+	return navigationUrl;
+}
+
 // Runs one non-structural Step, reports its transcript row + screenshot, then resolves whether
 // the interpreter loop should advance, jump, stop, or ask for help. `insideRecovery` disables the
 // post-step recoverable-scenario scan while a recovery's own Steps are running, so a recovery
@@ -203,11 +114,16 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 		actionResult = await executeAction(deps.page, step, deps.ctx);
 	}
 	catch (err: unknown) {
+		await reportBlockedRequests(deps, step.id);
 		return { type: "error", message: `Unexpected error executing step ${step.id}: ${err instanceof Error ? err.message : String(err)}` };
 	}
 
-	if (!isAllowedUrl(deps.page.url(), deps.job.controls.allowedOrigins)) {
-		return { type: "error", message: `Step ${step.id} navigated to a disallowed origin: ${deps.page.url()}` };
+	// The route handler catches disallowed requests that hit the network stack before they're sent;
+	// `isAllowedUrl(page.url(), ...)` is the backstop for navigations Playwright's interception can't
+	// see at all (data:/about:/blob:), so both are checked here.
+	const blockedNavigationUrl = await reportBlockedRequests(deps, step.id);
+	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), deps.job.controls.allowedOrigins)) {
+		return { type: "error", message: `Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}` };
 	}
 
 	if (actionResult.kind === "businessFailure") {
@@ -402,9 +318,12 @@ async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: n
 // unrecoverable Step failure) the Intervention wait — cleaning up the browser session on every
 // terminal exit path before returning control to the poll loop.
 export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJob, interventionTimeoutSeconds: number): Promise<void> {
+	const blockedEvents: BlockedRequestEvent[] = [];
+	const routeHandler = createAllowListRouteHandler(job.controls.allowedOrigins, (event) => blockedEvents.push(event));
+
 	let session;
 	try {
-		session = await launchBrowserSession();
+		session = await launchBrowserSession(routeHandler);
 	}
 	catch (err: unknown) {
 		log(`job ${job.id}: failed to launch a browser session, abandoning back to polling: ${err instanceof Error ? err.message : String(err)}`);
@@ -426,7 +345,8 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 		ctx,
 		page: session.page,
 		secrets: collectSecretValues(job.recipe, job.ingredients, resolveCredential),
-		recoveryAttempts: new Map()
+		recoveryAttempts: new Map(),
+		blockedEvents
 	};
 
 	try {

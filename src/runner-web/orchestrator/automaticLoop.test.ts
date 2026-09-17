@@ -1,9 +1,11 @@
+import type { Request, Route } from "playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { executeAction } from "../browser/actions.ts";
+import type { RouteHandler } from "../browser/browserSession.ts";
 import { launchBrowserSession } from "../browser/browserSession.ts";
 import type { FieldDeclaration, RecipeDefinition, Recovery, Step } from "../dsl/types.ts";
-import { type ClaimedRecipeJob, fetchJobStatus, JobStatus, reportDslStep, reportStatus, uploadArtifact } from "../runnerClient.ts";
+import { type ClaimedRecipeJob, fetchJobStatus, JobStatus, reportDslStep, reportInfo, reportStatus, uploadArtifact } from "../runnerClient.ts";
 
 import { runRecipeJobLoop } from "./automaticLoop.ts";
 
@@ -23,10 +25,27 @@ vi.mock("../runnerClient.ts", async (importOriginal) => {
 		...actual,
 		reportDslStep: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
 		reportStatus: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
+		reportInfo: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
 		uploadArtifact: vi.fn().mockResolvedValue({ id: 1 }),
 		fetchJobStatus: vi.fn()
 	};
 });
+
+// Simulates the allowlist route handler intercepting a request mid-Step: `launchBrowserSession` is
+// only ever called once per Job, right before the loop starts, so by the time any Step's mocked
+// `executeAction` runs, the handler it was given is already on the spy's recorded call args.
+async function simulateBlockedRequest(url: string, isNavigation: boolean): Promise<void> {
+	const handler = vi.mocked(launchBrowserSession).mock.calls[0][0] as RouteHandler;
+	const route = { abort: vi.fn().mockResolvedValue(undefined), continue: vi.fn().mockResolvedValue(undefined) } as unknown as Route;
+	const request = { url: () => url, isNavigationRequest: () => isNavigation } as unknown as Request;
+	await handler(route, request);
+}
+
+// `vi.clearAllMocks()` (afterEach below) resets call history but not a mock's `mockImplementation`
+// override — reading `executeAction`'s implementation back off the mock would pick up whatever the
+// previous test last set it to. Capturing the real, unmocked function once here is what individual
+// tests wrap instead.
+const realExecuteAction = (await vi.importActual<typeof import("../browser/actions.ts")>("../browser/actions.ts")).executeAction;
 
 const config = { hubUrl: "http://localhost:4173", runnerId: "1", runnerSharedSecret: "the-secret" };
 
@@ -165,6 +184,57 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		expect(reportDslStep).not.toHaveBeenCalled();
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
+	}, 20000);
+
+	it("reports Completed-Error when the allowlist route handler blocks a navigation request, without reporting the triggering Step", async () => {
+		const recipe: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: {},
+			outputs: {},
+			steps: [openStep("<button id=\"go\">Go</button>"), { id: "click_go", action: "click", args: [{ by: "css", value: "#go" }] }],
+			recoveries: []
+		};
+		const job = buildJob({ recipe });
+
+		vi.mocked(executeAction).mockImplementation(async (page, step, ctx) => {
+			if (step.id === "click_go") {
+				await simulateBlockedRequest("https://blocked.example.net/redirected", true);
+			}
+			return realExecuteAction(page, step, ctx);
+		});
+
+		await runRecipeJobLoop(config, job, 300);
+
+		expect(reportDslStep).not.toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "click_go" }));
+		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
+	}, 20000);
+
+	it("reports a blocked subresource request as an INFO row without failing the Step it happened during", async () => {
+		const recipe: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: {},
+			outputs: {},
+			steps: [
+				openStep("<button id=\"go\">Go</button>"),
+				{ id: "click_go", action: "click", args: [{ by: "css", value: "#go" }] },
+				{ id: "done", action: "finish", args: [null] }
+			],
+			recoveries: []
+		};
+		const job = buildJob({ recipe });
+
+		vi.mocked(executeAction).mockImplementation(async (page, step, ctx) => {
+			if (step.id === "click_go") {
+				await simulateBlockedRequest("https://blocked.example.net/tracker.js", false);
+			}
+			return realExecuteAction(page, step, ctx);
+		});
+
+		await runRecipeJobLoop(config, job, 300);
+
+		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go: blocked a disallowed-origin request to https://blocked.example.net/tracker.js");
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [] });
+		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
 	}, 20000);
 
 	it("reports Completed-Error on an unexpected technical error the DSL driver lets propagate", async () => {

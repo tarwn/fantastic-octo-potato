@@ -87,6 +87,11 @@ export interface ReportStatusRequest {
 	message: string;
 }
 
+export interface ReportInfoRequest {
+	kind: "info";
+	message: string;
+}
+
 export interface ReportStepResult {
 	jobStatusId: number;
 	nextStep?: JobStep;
@@ -136,7 +141,7 @@ export async function pollRunner(config: RunnerConfig): Promise<PollResult> {
 async function postJobStep(
 	config: RunnerConfig,
 	jobId: number,
-	request: ReportStepRequest | ReportDslStepRequest | ReportStatusRequest
+	request: ReportStepRequest | ReportDslStepRequest | ReportStatusRequest | ReportInfoRequest
 ): Promise<ReportStepResult> {
 	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/steps`, {
 		method: "POST",
@@ -168,6 +173,12 @@ export async function reportDslStep(config: RunnerConfig, jobId: number, request
 // — the same "status" report kind Hub's reportJobStep already accepts.
 export async function reportStatus(config: RunnerConfig, jobId: number, status: JobStatus, message: string): Promise<ReportStepResult> {
 	return postJobStep(config, jobId, { kind: "status", status, message });
+}
+
+// A non-fatal transcript note — e.g. a blocked subresource request that didn't fail the current
+// Step outright, but may explain why a later Step can't find what it's looking for.
+export async function reportInfo(config: RunnerConfig, jobId: number, message: string): Promise<ReportStepResult> {
+	return postJobStep(config, jobId, { kind: "info", message });
 }
 
 export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string, stepId: string, imageBase64: string): Promise<{ id: number }> {
