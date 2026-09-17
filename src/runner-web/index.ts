@@ -9,7 +9,7 @@ try {
 	const config = loadConfig();
 	const { pollIntervalSeconds, interventionTimeoutSeconds } = await initRunner(config);
 	log(`init ok: pollIntervalSeconds=${pollIntervalSeconds} interventionTimeoutSeconds=${interventionTimeoutSeconds}`);
-	startPollLoop(config, pollIntervalSeconds);
+	startPollLoop(config, pollIntervalSeconds, interventionTimeoutSeconds);
 }
 catch (err) {
 	log(`init failed: ${err instanceof Error ? err.message : String(err)}`);

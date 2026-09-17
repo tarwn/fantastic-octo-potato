@@ -1,8 +1,47 @@
+import type { RecipeDefinition } from "./dsl/types.ts";
 import type { RunnerConfig } from "./config.ts";
 
 export interface InitResult {
 	pollIntervalSeconds: number;
 	interventionTimeoutSeconds: number;
+}
+
+// Mirrors src/hub/src/lib/server/db/jobStatus.ts's hardcoded ids — kept in sync manually, same as
+// the DSL type mirroring described in dsl/types.ts.
+export enum JobStatus {
+	Pending = 1,
+	Running = 2,
+	CompletedSuccess = 3,
+	CompletedFailed = 4,
+	CompletedCancelled = 5,
+	InterventionRequested = 6,
+	CompletedError = 7
+}
+
+export const TERMINAL_JOB_STATUSES: readonly JobStatus[] = [
+	JobStatus.CompletedSuccess,
+	JobStatus.CompletedFailed,
+	JobStatus.CompletedCancelled,
+	JobStatus.CompletedError
+];
+
+// Mirrors buildRecipeJobPayload's wire shape in src/hub/src/lib/server/runnerActions.ts.
+export interface ClaimedRecipeJob {
+	id: number;
+	mode: string;
+	recipeId: number;
+	recipeVersion: number;
+	recipe: RecipeDefinition;
+	ingredients: Record<string, string | number | boolean>;
+	controls: { allowedOrigins: string[] };
+	stepTimeoutMs: number;
+	comms: { statusUrl: string; artifactsUrl: string };
+}
+
+// A Recipe Job payload always carries a `recipe` field; Training's ClaimedJob never does — that's
+// the wire discriminant Hub already uses server-side (job.jobType === JobType.Recipe).
+export function isRecipeJob(job: ClaimedJob | ClaimedRecipeJob): job is ClaimedRecipeJob {
+	return "recipe" in job;
 }
 
 // resultField/resultValue are always sent as a pair (see Hub's toWireStep in runnerActions.ts) —
@@ -23,7 +62,7 @@ export interface ClaimedJob {
 
 export interface PollResult {
 	hasWork: boolean;
-	job?: ClaimedJob;
+	job?: ClaimedJob | ClaimedRecipeJob;
 }
 
 export interface ReportStepRequest {
@@ -32,6 +71,20 @@ export interface ReportStepRequest {
 	message: string;
 	inputs: string[];
 	outputs: Array<{ fieldName: string; value: string }>;
+}
+
+export interface ReportDslStepRequest {
+	kind: "dslStep";
+	stepId: string;
+	outcome: "succeeded" | "failed";
+	parentStepId?: string;
+	extractions: Array<{ fieldName: string; value: string }>;
+}
+
+export interface ReportStatusRequest {
+	kind: "status";
+	status: JobStatus;
+	message: string;
 }
 
 export interface ReportStepResult {
@@ -80,7 +133,11 @@ export async function pollRunner(config: RunnerConfig): Promise<PollResult> {
 	return body.data;
 }
 
-export async function reportStep(config: RunnerConfig, jobId: number, request: ReportStepRequest): Promise<ReportStepResult> {
+async function postJobStep(
+	config: RunnerConfig,
+	jobId: number,
+	request: ReportStepRequest | ReportDslStepRequest | ReportStatusRequest
+): Promise<ReportStepResult> {
 	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/steps`, {
 		method: "POST",
 		headers: { authorization: `Bearer ${config.runnerSharedSecret}`, "content-type": "application/json" },
@@ -94,4 +151,52 @@ export async function reportStep(config: RunnerConfig, jobId: number, request: R
 
 	const body = (await response.json()) as { data: ReportStepResult };
 	return body.data;
+}
+
+export async function reportStep(config: RunnerConfig, jobId: number, request: ReportStepRequest): Promise<ReportStepResult> {
+	return postJobStep(config, jobId, request);
+}
+
+// Reports one DSL Step's (or child Step's) outcome; extractions carry the raw resolved value to
+// Hub's masked-upsert path by design (see runnerActions.ts's handleDslStepReport) — callers must
+// never log those raw values themselves.
+export async function reportDslStep(config: RunnerConfig, jobId: number, request: Omit<ReportDslStepRequest, "kind">): Promise<ReportStepResult> {
+	return postJobStep(config, jobId, { kind: "dslStep", ...request });
+}
+
+// Directly changes a Job's status (e.g. Intervention-Requested, Completed-Error/-Failed/-Success)
+// — the same "status" report kind Hub's reportJobStep already accepts.
+export async function reportStatus(config: RunnerConfig, jobId: number, status: JobStatus, message: string): Promise<ReportStepResult> {
+	return postJobStep(config, jobId, { kind: "status", status, message });
+}
+
+export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string, stepId: string, imageBase64: string): Promise<{ id: number }> {
+	const response = await fetch(`${config.hubUrl}${artifactsUrl}`, {
+		method: "POST",
+		headers: { authorization: `Bearer ${config.runnerSharedSecret}`, "content-type": "application/json" },
+		body: JSON.stringify({ stepId, imageBase64 })
+	});
+
+	if (!response.ok) {
+		const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+		throw new RunnerHttpError(response.status, `uploadArtifact failed: ${response.status} ${body?.error ?? response.statusText}`);
+	}
+
+	const body = (await response.json()) as { data: { id: number } };
+	return body.data;
+}
+
+// Polls the Hub-side Job detail (no runner bearer-auth required, same endpoint the Hub UI uses)
+// for its current status — used during the Intervention-Requested wait to detect an externally
+// changed terminal status.
+export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): Promise<JobStatus> {
+	const response = await fetch(`${config.hubUrl}${statusUrl}`);
+
+	if (!response.ok) {
+		const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+		throw new Error(`fetchJobStatus failed: ${response.status} ${body?.error ?? response.statusText}`);
+	}
+
+	const body = (await response.json()) as { data: { jobStatusId: JobStatus } };
+	return body.data.jobStatusId;
 }

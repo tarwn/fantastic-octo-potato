@@ -1,6 +1,7 @@
+import { runRecipeJobLoop } from "./dsl/automaticLoop.ts";
 import type { RunnerConfig } from "./config.ts";
 import { log } from "./logger.ts";
-import { type ClaimedJob, type JobStep, pollRunner, reportStep, RunnerHttpError } from "./runnerClient.ts";
+import { type ClaimedJob, isRecipeJob, type JobStep, pollRunner, reportStep, RunnerHttpError } from "./runnerClient.ts";
 
 // A no-op browser/LLM stand-in still takes a beat per step — without it, a short scripted
 // sequence reports its whole run before anything polling the Job (e.g. the Hub UI, or this
@@ -46,7 +47,7 @@ async function runJobLoop(config: RunnerConfig, job: ClaimedJob): Promise<void> 
 	log(`job ${job.id}: reached a terminal status, resuming polling`);
 }
 
-export function startPollLoop(config: RunnerConfig, pollIntervalSeconds: number): NodeJS.Timeout {
+export function startPollLoop(config: RunnerConfig, pollIntervalSeconds: number, interventionTimeoutSeconds: number): NodeJS.Timeout {
 	let jobLoopRunning = false;
 
 	return setInterval(() => {
@@ -60,7 +61,12 @@ export function startPollLoop(config: RunnerConfig, pollIntervalSeconds: number)
 				if (result.hasWork && result.job) {
 					jobLoopRunning = true;
 					try {
-						await runJobLoop(config, result.job);
+						if (isRecipeJob(result.job)) {
+							await runRecipeJobLoop(config, result.job, interventionTimeoutSeconds);
+						}
+						else {
+							await runJobLoop(config, result.job);
+						}
 					}
 					finally {
 						jobLoopRunning = false;
