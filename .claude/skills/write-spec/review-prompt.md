@@ -3,7 +3,7 @@ Review the provided spec file against the provided idea against 4 questions belo
 # Questions
 
 1. Are any of the implementation steps out of scope for the initial ask? 
-    - A derived "to do X I must first do Y) requirement is ok
+    - A derived "to do X I must first do Y" requirement is ok
     - A pre-emptive abstraction is not ok unless it follows our guidelines on YAGNI and refactoring
 2. Are any steps too small?
     - A good task is a complete chunk, typically vertical, that builds toward the whole feature
@@ -16,6 +16,10 @@ Review the provided spec file against the provided idea against 4 questions belo
     - Were there any elements of the idea carried into the spec that could be incorrect (user error in the initial entry)?
 4. Is the approach or resulting set of changes over-complicated?
     - Is there an alternative path to consider that is simpler and meets the goals and overall guiding principles?
+
+Specific points to focus on:
+1. Is there any unaddressed risk of sensitive data from the runner being exposed in the database or to the UI? This data should only be present in specific `rawX` fields that are only read and transmitted in very narrow use cases
+2. Has anything been partially added, deferring extra states or structure because it is "out of scope", but is present in ARCHITECTURE.md? These should either be includede or raised to the user to challnge and update ARCHITECTURE.md, as that is our shorft-term goal.
 
 
 # Feedback
