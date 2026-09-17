@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 test("registered applications list links to the seeded registered application", async ({ page }) => {
 	await page.goto("/registered-applications");
 
-	await expect(page.getByRole("link", { name: /Widgets/ })).toBeVisible();
+	await expect(page.getByRole("link", { name: /BambooInvoice/ })).toBeVisible();
 });
 
 test("registered application page lists its runner, heartbeat, and a start-training action", async ({
 	page
 }) => {
 	await page.goto("/registered-applications");
-	await page.getByRole("link", { name: /Widgets/ }).click();
+	await page.getByRole("link", { name: /BambooInvoice/ }).click();
 
 	await expect(page.getByText(/Runner \d+/)).toBeVisible();
 	await expect(page.getByText(/last heartbeat/i)).toBeVisible();
@@ -19,7 +19,7 @@ test("registered application page lists its runner, heartbeat, and a start-train
 
 test("registered application page shows a runner as idle before init and alive after", async ({ page, request }) => {
 	const list = await (await request.get("/api/hub/registered-applications")).json();
-	const registeredApplication = list.data.find((item: { applicationName: string }) => item.applicationName === "Widgets");
+	const registeredApplication = list.data.find((item: { applicationName: string }) => item.applicationName === "BambooInvoice");
 	const detail = await (await request.get(`/api/hub/registered-applications/${registeredApplication.id}`)).json();
 	const runnerId = detail.data.runners[0].id;
 

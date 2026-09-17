@@ -6,7 +6,9 @@ import { TranscriptKind } from "../db/jobTranscriptKind.ts";
 import { JobType } from "../db/jobType.ts";
 import { SensitivityType } from "../db/sensitivityType.ts";
 
-export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
+// Intervention-Requested is a halted, non-terminal state (ARCHITECTURE.md's Core Loop) — it waits
+// for a human or an intervention timeout, it doesn't end the Job.
+export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled, JobStatus.CompletedError];
 
 // Status-change transcript rows share job_transcript_entry's (job_id, sequence) column with
 // step reports, so they're pinned outside a step report's 1..maxSteps range: negative before
@@ -48,6 +50,9 @@ export interface TrainingJob {
 
 export interface RecipeJob {
 	recipeId: number | null;
+	mode: "Trial" | "Execute";
+	allowlist: string;
+	stepTimeoutMs: number;
 }
 
 interface JobBase {
@@ -79,6 +84,9 @@ export type InsertJobParams =
 			jobType: JobType.Recipe;
 			customerApplicationXrefId: number;
 			recipeId: number | null;
+			mode: "Trial" | "Execute";
+			allowlist: string;
+			stepTimeoutMs: number;
 			createdAt: Date;
 	  };
 
@@ -140,6 +148,9 @@ interface JobRow {
 	trainingMaxSteps: number | null;
 	recipeId: number | null;
 	recipeJobId: number | null;
+	recipeMode: string | null;
+	recipeAllowlist: string | null;
+	recipeStepTimeoutMs: number | null;
 }
 
 interface JobTranscriptEntryRow {
@@ -172,7 +183,8 @@ const JOB_SELECT = `
 	       job.started_at AS startedAt, job.heartbeat_on AS heartbeatOn, job.completed_at AS completedAt,
 	       training_job.goal AS trainingGoal, training_job.starting_url AS trainingStartingUrl,
 	       training_job.allowlist AS trainingAllowlist, training_job.max_steps AS trainingMaxSteps,
-	       recipe_job.recipe_id AS recipeId, recipe_job.job_id AS recipeJobId
+	       recipe_job.recipe_id AS recipeId, recipe_job.job_id AS recipeJobId, recipe_job.mode AS recipeMode,
+	       recipe_job.allowlist AS recipeAllowlist, recipe_job.step_timeout_ms AS recipeStepTimeoutMs
 	FROM job
 	LEFT JOIN training_job ON training_job.job_id = job.id
 	LEFT JOIN recipe_job ON recipe_job.job_id = job.id
@@ -207,10 +219,17 @@ function mapJobRow(row: JobRow): Job {
 	}
 
 	if (row.jobTypeId === JobType.Recipe) {
-		if (row.recipeJobId === null) {
+		if (row.recipeJobId === null || row.recipeMode === null || row.recipeAllowlist === null || row.recipeStepTimeoutMs === null) {
 			throw new Error(`Job ${row.id} is job_type Recipe but has no recipe_job row`);
 		}
-		return { ...base, jobType: JobType.Recipe, details: { recipeId: row.recipeId } };
+		if (row.recipeMode !== "Trial" && row.recipeMode !== "Execute") {
+			throw new Error(`Job ${row.id} has an invalid recipe_job mode: ${row.recipeMode}`);
+		}
+		return {
+			...base,
+			jobType: JobType.Recipe,
+			details: { recipeId: row.recipeId, mode: row.recipeMode, allowlist: row.recipeAllowlist, stepTimeoutMs: row.recipeStepTimeoutMs }
+		};
 	}
 
 	throw new Error(`Invalid job type: ${row.jobTypeId}`);
@@ -280,8 +299,18 @@ export function insertJob(db: Database.Database, params: InsertJobParams): Job {
 			};
 		}
 
-		db.prepare("INSERT INTO recipe_job (job_id, recipe_id) VALUES (?, ?)").run(jobId, params.recipeId);
-		return { ...base, jobType: JobType.Recipe, details: { recipeId: params.recipeId } };
+		db.prepare("INSERT INTO recipe_job (job_id, recipe_id, mode, allowlist, step_timeout_ms) VALUES (?, ?, ?, ?, ?)").run(
+			jobId,
+			params.recipeId,
+			params.mode,
+			params.allowlist,
+			params.stepTimeoutMs
+		);
+		return {
+			...base,
+			jobType: JobType.Recipe,
+			details: { recipeId: params.recipeId, mode: params.mode, allowlist: params.allowlist, stepTimeoutMs: params.stepTimeoutMs }
+		};
 	})();
 }
 
@@ -394,11 +423,30 @@ export function appendAutoSequencedTranscriptEntry(
 	kind: Exclude<TranscriptKind, TranscriptKind.Step>,
 	message: string,
 	createdAt: Date,
+	statusChange?: JobStatus | null
+): void;
+export function appendAutoSequencedTranscriptEntry(
+	db: Database.Database,
+	jobId: number,
+	kind: TranscriptKind.Step,
+	details: StepTranscriptText,
+	createdAt: Date
+): void;
+export function appendAutoSequencedTranscriptEntry(
+	db: Database.Database,
+	jobId: number,
+	kind: TranscriptKind,
+	messageOrDetails: string | StepTranscriptText,
+	createdAt: Date,
 	statusChange: JobStatus | null = null
 ): void {
 	db.transaction(() => {
 		const sequence = nextTranscriptSequence(db, jobId);
-		appendTranscriptEntry(db, jobId, sequence, kind, message, createdAt, statusChange);
+		if (kind === TranscriptKind.Step) {
+			appendTranscriptEntry(db, jobId, sequence, kind, messageOrDetails as StepTranscriptText, createdAt);
+			return;
+		}
+		appendTranscriptEntry(db, jobId, sequence, kind, messageOrDetails as string, createdAt, statusChange);
 		if (statusChange !== null) {
 			updateJobStatus(db, jobId, statusChange, createdAt);
 		}
@@ -450,8 +498,8 @@ export function getSafeJobIngredientByFieldName(db: Database.Database, jobId: nu
 	return row ? mapSafeIngredientRow(row) : undefined;
 }
 
-// Unused for now (no export/reporting feature exists yet) — exists to make the safe/raw
-// boundary real and enforced by type, not because something consumes it yet.
+// Runner dispatch (runnerActions.ts's Recipe Job poll branch) needs the raw values to build the
+// `ingredients` payload — the Runner fills real form fields with them, unlike every Hub-facing read.
 export function listSensitiveJobIngredients(db: Database.Database, jobId: number): SensitiveIngredient[] {
 	const rows = db
 		.prepare(
@@ -497,4 +545,38 @@ export function listSensitiveJobResults(db: Database.Database, jobId: number): S
 		)
 		.all(jobId) as JobResultRow[];
 	return rows.map(mapSensitiveResultRow);
+}
+
+export interface JobStepArtifact {
+	id: number;
+	jobId: number;
+	stepId: string;
+	filePath: string;
+	createdAt: Date;
+}
+
+interface JobStepArtifactRow {
+	id: number;
+	jobId: number;
+	stepId: string;
+	filePath: string;
+	createdAt: string;
+}
+
+// filePath is whatever artifactStorage.ts already wrote the image bytes to — this only persists
+// the pointer, mirroring the design where storage/DB-metadata are separate concerns.
+export function insertJobStepArtifact(db: Database.Database, jobId: number, stepId: string, filePath: string, createdAt: Date): JobStepArtifact {
+	const { lastInsertRowid } = db
+		.prepare("INSERT INTO job_step_artifact (job_id, step_id, file_path, created_at) VALUES (?, ?, ?, ?)")
+		.run(jobId, stepId, filePath, toDbDate(createdAt));
+	return { id: Number(lastInsertRowid), jobId, stepId, filePath, createdAt };
+}
+
+export function getJobStepArtifactById(db: Database.Database, id: number): JobStepArtifact | undefined {
+	const row = db
+		.prepare(
+			"SELECT id, job_id AS jobId, step_id AS stepId, file_path AS filePath, created_at AS createdAt FROM job_step_artifact WHERE id = ?"
+		)
+		.get(id) as JobStepArtifactRow | undefined;
+	return row ? { id: row.id, jobId: row.jobId, stepId: row.stepId, filePath: row.filePath, createdAt: fromDbDate(row.createdAt) } : undefined;
 }

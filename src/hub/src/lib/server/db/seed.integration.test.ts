@@ -43,7 +43,21 @@ describe("seed", () => {
 			)
 			.get();
 
-		expect(row).toEqual({ customerName: "Acme", applicationName: "Widgets" });
+		expect(row).toEqual({ customerName: "Acme", applicationName: "BambooInvoice" });
+	});
+
+	it("seeds two published Recipes (happy path and failing) reachable from the same xref/Runner", () => {
+		seed(getDb());
+
+		const rows = getDb().prepare("SELECT name, recipe_status_id AS recipeStatusId FROM recipe ORDER BY id").all() as {
+			name: string;
+			recipeStatusId: number;
+		}[];
+
+		expect(rows).toEqual([
+			{ name: "Read seeded invoice", recipeStatusId: 2 },
+			{ name: "Broken invoice lookup", recipeStatusId: 2 }
+		]);
 	});
 
 	it("seeds the runner with no heartbeat, since it has never actually reported in", () => {
@@ -66,7 +80,7 @@ describe("seed", () => {
 
 		expect(() => seedWithBrokenRunnerInsert(getDb())).toThrow("simulated failure");
 
-		for (const table of ["customer", "application", "customer_application_xref", "runner"]) {
+		for (const table of ["customer", "application", "customer_application_xref", "runner", "recipe"]) {
 			const { count } = getDb().prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as { count: number };
 			expect(count).toBe(0);
 		}

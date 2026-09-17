@@ -25,6 +25,10 @@
 				return "failed — reached max steps";
 			case JobStatus.CompletedCancelled:
 				return "cancelled";
+			case JobStatus.InterventionRequested:
+				return "needs intervention";
+			case JobStatus.CompletedError:
+				return "error";
 		}
 	}
 

@@ -7,6 +7,7 @@ import { getRegisteredApplicationById } from "./repositories/customerApplication
 import {
 	appendTranscriptEntry,
 	getJobById,
+	getJobStepArtifactById,
 	insertJob,
 	JOB_CREATED_SEQUENCE,
 	listJobs,
@@ -17,6 +18,7 @@ import {
 	terminalTranscriptSequence,
 	updateJobStatus
 } from "./repositories/jobRepository";
+import { readJobStepArtifact } from "./artifactStorage";
 
 export interface JobActionResult {
 	status: number;
@@ -136,4 +138,21 @@ export function cancelJob(db: Database.Database, rawId: string): JobActionResult
 	);
 
 	return { status: 200, body: { data: getJobById(db, job.id) } };
+}
+
+// Serves the image the Runner already masked before upload — same "the endpoint only ever
+// hands back the safe representation" spirit as job_result, but here there's no separate raw copy at all.
+export function getJobStepArtifactImage(db: Database.Database, rawJobId: string, rawArtifactId: string): { image: Buffer } | undefined {
+	const jobId = Number(rawJobId);
+	const artifactId = Number(rawArtifactId);
+	if (Number.isNaN(jobId) || Number.isNaN(artifactId)) {
+		return undefined;
+	}
+
+	const artifact = getJobStepArtifactById(db, artifactId);
+	if (!artifact || artifact.jobId !== jobId) {
+		return undefined;
+	}
+
+	return { image: readJobStepArtifact(artifact.filePath) };
 }

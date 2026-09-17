@@ -12,6 +12,9 @@ export interface TrainingJob {
 
 export interface RecipeJob {
 	recipeId: number | null;
+	mode: "Trial" | "Execute";
+	allowlist: string;
+	stepTimeoutMs: number;
 }
 
 interface JobBase {

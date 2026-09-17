@@ -132,7 +132,15 @@ describe("recipeRepository", () => {
 		seedXref(getDb());
 		const draft = createValidDraft(getDb());
 		publishRecipe(getDb(), draft.id, new Date("2026-09-16T01:00:00.000Z"));
-		insertJob(getDb(), { jobType: JobType.Recipe, customerApplicationXrefId: 1, recipeId: draft.id, createdAt: new Date("2026-09-16T02:00:00.000Z") });
+		insertJob(getDb(), {
+			jobType: JobType.Recipe,
+			customerApplicationXrefId: 1,
+			recipeId: draft.id,
+			mode: "Execute",
+			allowlist: "https://example.com",
+			stepTimeoutMs: 15_000,
+			createdAt: new Date("2026-09-16T02:00:00.000Z")
+		});
 
 		const recipe = getRecipeById(getDb(), draft.id);
 

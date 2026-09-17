@@ -4,13 +4,17 @@ import { JobStatus } from "./db/jobStatus";
 import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
 import { SensitivityType } from "./db/sensitivityType";
+import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
 import {
 	appendAutoSequencedTranscriptEntry,
 	appendTranscriptEntry,
 	claimNextJobForRunner,
 	getJobById,
 	getSafeJobIngredientByFieldName,
+	insertJobStepArtifact,
+	type Job,
 	JOB_CLAIMED_SEQUENCE,
+	listSensitiveJobIngredients,
 	maskValue,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
@@ -19,8 +23,12 @@ import {
 	updateJobStatus,
 	upsertJobResult
 } from "./repositories/jobRepository";
+import { getRecipeById } from "./repositories/recipeRepository";
 import { getRunnerById, updateRunnerHeartbeat } from "./repositories/runnerRepository";
+import { writeJobStepArtifact } from "./artifactStorage";
 import { SCRIPTED_TRAINING_STEPS, type ScriptedTrainingStep } from "./scriptedTrainingSteps";
+
+import type { FieldType } from "$lib/types/recipeDefinition";
 
 export interface RunnerActionResult {
 	status: number;
@@ -33,6 +41,10 @@ export type ReportStepBody =
 	| { kind: "status"; status: JobStatus; message: string }
 	| { kind: "info"; message: string }
 	| { kind: "step"; sequence: number; message: string; inputs: string[]; outputs: Array<{ fieldName: string; value: string }> }
+	// Recipe Jobs report DSL Steps by string id, not a Training-style sequence. extractions still
+	// carries the raw value on the wire (upsertJobResult needs it to compute a safe value) — it's
+	// the transcript row built from this that only ever keeps the destination field name.
+	| { kind: "dslStep"; stepId: string; outcome: "succeeded" | "failed"; parentStepId?: string; extractions: Array<{ fieldName: string; value: string }> }
 	| { kind: "recover"; message: string }
 	| { kind: "observe"; message: string }
 	| { kind: "plan"; message: string };
@@ -113,6 +125,37 @@ function parseReportStepBody(body: unknown): ParseResult {
 				value: { kind: "step", sequence: body.sequence as number, message, inputs: body.inputs, outputs: body.outputs }
 			};
 		}
+		case "dslStep": {
+			if (typeof body.stepId !== "string" || body.stepId.trim() === "") {
+				return { ok: false, error: "stepId is required" };
+			}
+			if (body.outcome !== "succeeded" && body.outcome !== "failed") {
+				return { ok: false, error: "outcome must be 'succeeded' or 'failed'" };
+			}
+			if (body.parentStepId !== undefined && typeof body.parentStepId !== "string") {
+				return { ok: false, error: "parentStepId must be a string" };
+			}
+			const extractions = body.extractions ?? [];
+			if (
+				!Array.isArray(extractions) ||
+				!extractions.every(
+					(value): value is { fieldName: string; value: string } =>
+						isRecord(value) && typeof value.fieldName === "string" && typeof value.value === "string"
+				)
+			) {
+				return { ok: false, error: "extractions must be an array of { fieldName, value }" };
+			}
+			return {
+				ok: true,
+				value: {
+					kind: "dslStep",
+					stepId: body.stepId,
+					outcome: body.outcome,
+					...(body.parentStepId !== undefined ? { parentStepId: body.parentStepId } : {}),
+					extractions
+				}
+			};
+		}
 		default:
 			return { ok: false, error: `Unrecognized kind: ${body.kind}` };
 	}
@@ -126,6 +169,59 @@ function toWireStep(sequence: number, step: ScriptedTrainingStep) {
 		kind: step.kind,
 		text: step.text,
 		...(step.resultField !== undefined ? { resultField: step.resultField, resultValue: step.resultValue } : {})
+	};
+}
+
+// Job ingredients are stored as TEXT (raw_value); the Recipe's declared input type says how the
+// Runner should actually see the value on the wire. A stored ingredient that doesn't parse as the
+// type its own Recipe declares is corrupt data, not a wire-format edge case — crash instead of
+// silently sending the Runner a misleading `null` (Number("bogus") is NaN, which JSON.stringify
+// turns into null).
+function coerceInputValue(fieldName: string, type: FieldType, rawValue: string): string | number | boolean {
+	if (type === "number") {
+		const parsed = Number(rawValue);
+		if (Number.isNaN(parsed)) {
+			throw new Error(`Ingredient ${fieldName} is declared type number but stored value "${rawValue}" is not a valid number`);
+		}
+		return parsed;
+	}
+	if (type === "boolean") {
+		return rawValue === "true";
+	}
+	return rawValue;
+}
+
+// Builds the full runner dispatch payload from the persisted Recipe — replaces the Training
+// stand-in's SCRIPTED_TRAINING_STEPS for a Recipe Job.
+function buildRecipeJobPayload(db: Database.Database, job: Extract<Job, { jobType: JobType.Recipe }>, runnerId: number) {
+	if (job.details.recipeId === null) {
+		throw new Error(`Job ${job.id} is a Recipe Job with no recipe_id set`);
+	}
+	const recipe = getRecipeById(db, job.details.recipeId);
+	if (!recipe) {
+		throw new Error(`Job ${job.id} references Recipe ${job.details.recipeId}, which no longer exists`);
+	}
+
+	const ingredients: Record<string, string | number | boolean> = {};
+	for (const ingredient of listSensitiveJobIngredients(db, job.id)) {
+		const inputDeclaration = recipe.definition.inputs[ingredient.fieldName];
+		if (inputDeclaration) {
+			ingredients[ingredient.fieldName] = coerceInputValue(ingredient.fieldName, inputDeclaration.type, ingredient.rawValue);
+		}
+	}
+
+	return {
+		id: job.id,
+		mode: job.details.mode,
+		recipeId: recipe.id,
+		recipeVersion: recipe.version,
+		recipe: recipe.definition,
+		ingredients,
+		controls: { allowedOrigins: [job.details.allowlist] },
+		stepTimeoutMs: job.details.stepTimeoutMs,
+		// Relative paths only — nothing consumes these yet (Step 4/5 build the Runner-side driver
+		// that will call them); an absolute base URL isn't available from this pure-logic layer.
+		comms: { statusUrl: `/api/hub/jobs/${job.id}`, artifactsUrl: `/api/runner/runners/${runnerId}/jobs/${job.id}/artifacts` }
 	};
 }
 
@@ -182,11 +278,16 @@ export function runnerPoll(
 	if (!job) {
 		return { status: 200, body: { data: { hasWork: false } } };
 	}
-	if (job.jobType !== JobType.Training) {
-		throw new Error(`Job ${job.id} is not a Training Job — only Training Jobs are claimable`);
-	}
 
 	appendTranscriptEntry(db, job.id, JOB_CLAIMED_SEQUENCE, TranscriptKind.Status, `Picked up by Runner ${runner.id}`, now, JobStatus.Running);
+
+	const jobId = job.id;
+	if (job.jobType === JobType.Recipe) {
+		return { status: 200, body: { data: { hasWork: true, job: buildRecipeJobPayload(db, job, runner.id) } } };
+	}
+	if (job.jobType !== JobType.Training) {
+		throw new Error(`Job ${jobId} has an unrecognized job type`);
+	}
 
 	// The claim hands back scripted step 1 too, so the Runner has something to perform before its first `steps` call.
 	const firstStep = SCRIPTED_TRAINING_STEPS[0];
@@ -211,6 +312,88 @@ export function runnerPoll(
 function findJob(db: Database.Database, rawJobId: string) {
 	const id = Number(rawJobId);
 	return Number.isNaN(id) ? undefined : getJobById(db, id);
+}
+
+// Transcript rows never carry the raw extracted value — only the destination field name and
+// outcome (folded into `message`) plus the already-masked safeValue, same as Training's step rows.
+function handleDslStepReport(
+	db: Database.Database,
+	job: Extract<Job, { jobType: JobType.Recipe }>,
+	runnerId: number,
+	step: Extract<ReportStepBody, { kind: "dslStep" }>,
+	now: Date
+): RunnerActionResult {
+	if (job.details.recipeId === null) {
+		throw new Error(`Job ${job.id} is a Recipe Job with no recipe_id set`);
+	}
+	const recipe = getRecipeById(db, job.details.recipeId);
+	if (!recipe) {
+		throw new Error(`Job ${job.id} references Recipe ${job.details.recipeId}, which no longer exists`);
+	}
+
+	const outputs: TranscriptFieldRef[] = [];
+	for (const extraction of step.extractions) {
+		const outputDeclaration = recipe.definition.outputs[extraction.fieldName];
+		if (!outputDeclaration) {
+			return { status: 400, body: { error: `Unknown output: ${extraction.fieldName}` } };
+		}
+		const sensitivityType = outputDeclaration.sensitive ? SensitivityType.Other : SensitivityType.None;
+		upsertJobResult(db, job.id, extraction.fieldName, extraction.value, sensitivityType, now);
+		outputs.push({ fieldName: extraction.fieldName, safeValue: maskValue(extraction.value, sensitivityType), sensitivityType });
+	}
+
+	const message = `${step.parentStepId ? `${step.parentStepId} > ` : ""}${step.stepId}: ${step.outcome}`;
+	appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Step, { message, inputs: [], outputs }, now);
+	updateJobHeartbeat(db, job.id, now);
+	updateRunnerHeartbeat(db, runnerId, now);
+
+	return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
+}
+
+// Persists the Runner-masked screenshot bytes via artifactStorage, then records where they
+// landed — the DB never stores the image itself, mirroring the design's storage/metadata split.
+export function uploadJobStepArtifact(
+	db: Database.Database,
+	rawRunnerId: string,
+	rawJobId: string,
+	authHeader: string | null,
+	sharedSecret: string,
+	body: unknown
+): RunnerActionResult {
+	if (!requireRunnerBearerAuth(authHeader, sharedSecret)) {
+		return { status: 401, body: { error: "Unauthorized" } };
+	}
+
+	const runner = findRunner(db, rawRunnerId);
+	if (!runner) {
+		return { status: 404, body: { error: `Runner ${rawRunnerId} not found` } };
+	}
+
+	const job = findJob(db, rawJobId);
+	if (!job) {
+		return { status: 404, body: { error: `Job ${rawJobId} not found` } };
+	}
+	if (job.runnerId !== runner.id) {
+		return { status: 403, body: { error: `Runner ${rawRunnerId} is not assigned to Job ${rawJobId}` } };
+	}
+	if (job.jobType !== JobType.Recipe) {
+		return { status: 400, body: { error: "Screenshot artifacts are Recipe Job-only" } };
+	}
+
+	if (!isRecord(body) || typeof body.stepId !== "string" || body.stepId.trim() === "" || typeof body.imageBase64 !== "string") {
+		return { status: 400, body: { error: "stepId and imageBase64 are required" } };
+	}
+
+	const registeredApplication = getRegisteredApplicationById(db, job.customerApplicationXrefId);
+	if (!registeredApplication) {
+		throw new Error(`Job ${job.id}'s customer_application_xref ${job.customerApplicationXrefId} does not exist`);
+	}
+
+	const image = Buffer.from(body.imageBase64, "base64");
+	const filePath = writeJobStepArtifact(registeredApplication.customerId, job.id, body.stepId, image);
+	const artifact = insertJobStepArtifact(db, job.id, body.stepId, filePath, new Date());
+
+	return { status: 201, body: { data: { id: artifact.id } } };
 }
 
 // Reports the outcome of step `sequence` and, in the same call, returns the next scripted step or the terminal status; an already-terminal Job is returned as-is, unmutated.
@@ -239,9 +422,6 @@ export function reportJobStep(
 	if (job.runnerId !== runner.id) {
 		return { status: 403, body: { error: `Runner ${rawRunnerId} is not assigned to Job ${rawJobId}` } };
 	}
-	if (job.jobType !== JobType.Training) {
-		throw new Error(`Job ${rawJobId} is not a Training Job — only Training Jobs report steps`);
-	}
 
 	const parsed = parseReportStepBody(body);
 	if (!parsed.ok) {
@@ -261,11 +441,22 @@ export function reportJobStep(
 		return { status: 200, body: { data: { jobStatusId: parsed.value.status } } };
 	}
 
+	if (parsed.value.kind === "dslStep") {
+		if (job.jobType !== JobType.Recipe) {
+			return { status: 400, body: { error: "dslStep reporting is Recipe Job-only" } };
+		}
+		return handleDslStepReport(db, job, runner.id, parsed.value, now);
+	}
+
 	if (parsed.value.kind !== "step") {
 		appendAutoSequencedTranscriptEntry(db, job.id, NON_STEP_TRANSCRIPT_KIND[parsed.value.kind], parsed.value.message, now);
 		updateJobHeartbeat(db, job.id, now);
 		updateRunnerHeartbeat(db, runner.id, now);
 		return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
+	}
+
+	if (job.jobType !== JobType.Training) {
+		return { status: 400, body: { error: "step reporting is Training Job-only" } };
 	}
 
 	const step = parsed.value;

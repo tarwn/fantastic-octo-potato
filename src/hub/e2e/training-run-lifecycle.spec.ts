@@ -5,7 +5,7 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 	request
 }) => {
 	await page.goto("/registered-applications");
-	await page.getByRole("link", { name: /Widgets/ }).click();
+	await page.getByRole("link", { name: /BambooInvoice/ }).click();
 	await page.getByRole("button", { name: "Begin a Training Run" }).click();
 
 	const dialog = page.getByRole("dialog");
@@ -20,7 +20,7 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 
 	const registeredApplications = await (await request.get("/api/hub/registered-applications")).json();
 	const registeredApplication = registeredApplications.data.find(
-		(item: { applicationName: string }) => item.applicationName === "Widgets"
+		(item: { applicationName: string }) => item.applicationName === "BambooInvoice"
 	);
 	const detail = await (await request.get(`/api/hub/registered-applications/${registeredApplication.id}`)).json();
 	const runnerId = detail.data.runners[0].id;

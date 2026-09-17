@@ -7,7 +7,7 @@ test("GET /api/hub/registered-applications returns a data envelope listing the s
 
 	expect(response.status()).toBe(200);
 	const body = await response.json();
-	expect(body.data).toContainEqual(expect.objectContaining({ customerName: "Acme", applicationName: "Widgets" }));
+	expect(body.data).toContainEqual(expect.objectContaining({ customerName: "Acme", applicationName: "BambooInvoice" }));
 });
 
 test("GET /api/hub/registered-applications/[id] returns the registered application and its runners", async ({
@@ -15,7 +15,7 @@ test("GET /api/hub/registered-applications/[id] returns the registered applicati
 }) => {
 	const list = await (await request.get("/api/hub/registered-applications")).json();
 	const registeredApplication = list.data.find(
-		(item: { applicationName: string }) => item.applicationName === "Widgets"
+		(item: { applicationName: string }) => item.applicationName === "BambooInvoice"
 	);
 
 	const response = await request.get(`/api/hub/registered-applications/${registeredApplication.id}`);
@@ -25,7 +25,7 @@ test("GET /api/hub/registered-applications/[id] returns the registered applicati
 	expect(body.data).toEqual({
 		id: registeredApplication.id,
 		customerName: "Acme",
-		applicationName: "Widgets",
+		applicationName: "BambooInvoice",
 		runners: expect.arrayContaining([expect.objectContaining({ lastHeartbeatOn: null })])
 	});
 });

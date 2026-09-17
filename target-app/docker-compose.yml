@@ -9,6 +9,11 @@ services:
       MYSQL_DATABASE: bambooinvoice
       MYSQL_USER: bamboo
       MYSQL_PASSWORD: bamboo_dev_password
+    # BambooInvoice's CodeIgniter-era queries aren't ONLY_FULL_GROUP_BY-safe (non-aggregated
+    # SELECT columns not in GROUP BY); MySQL 5.7 enables it by default and the app 500s. Drop
+    # only that mode, keeping the rest of 5.7's default sql_mode (strict mode, zero-date/division
+    # checks, etc.) intact.
+    command: --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
     volumes:
       - target-app-mysql-data:/var/lib/mysql
       - ./db-init:/docker-entrypoint-initdb.d:ro

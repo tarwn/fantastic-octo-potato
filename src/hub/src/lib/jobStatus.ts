@@ -9,7 +9,9 @@ export enum JobStatus {
 	Running = 2,
 	CompletedSuccess = 3,
 	CompletedFailed = 4,
-	CompletedCancelled = 5
+	CompletedCancelled = 5,
+	InterventionRequested = 6,
+	CompletedError = 7
 }
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -17,7 +19,9 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
 	[JobStatus.Running]: "Running",
 	[JobStatus.CompletedSuccess]: "Completed-Success",
 	[JobStatus.CompletedFailed]: "Completed-Failed",
-	[JobStatus.CompletedCancelled]: "Completed-Cancelled"
+	[JobStatus.CompletedCancelled]: "Completed-Cancelled",
+	[JobStatus.InterventionRequested]: "Intervention-Requested",
+	[JobStatus.CompletedError]: "Completed-Error"
 };
 
 export const JOB_STATUS_VARIANTS: Record<JobStatus, StatusVariant> = {
@@ -25,10 +29,14 @@ export const JOB_STATUS_VARIANTS: Record<JobStatus, StatusVariant> = {
 	[JobStatus.Running]: "running",
 	[JobStatus.CompletedSuccess]: "success",
 	[JobStatus.CompletedFailed]: "failed",
-	[JobStatus.CompletedCancelled]: "cancelled"
+	[JobStatus.CompletedCancelled]: "cancelled",
+	[JobStatus.InterventionRequested]: "intervention",
+	[JobStatus.CompletedError]: "error"
 };
 
-const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled];
+// Intervention-Requested is a halted, non-terminal state (ARCHITECTURE.md's Core Loop) — it waits
+// for a human or an intervention timeout, it doesn't end the Job.
+const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled, JobStatus.CompletedError];
 
 export function isTerminalJobStatus(status: JobStatus): boolean {
 	return TERMINAL_JOB_STATUSES.includes(status);
