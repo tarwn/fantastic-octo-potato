@@ -4,7 +4,7 @@ export interface RunnerConfig {
 	runnerSharedSecret: string;
 }
 
-function requireEnv(name: string): string {
+export function requireEnv(name: string): string {
 	const value = process.env[name];
 	if (!value) {
 		throw new Error(`${name} is not set. Copy src/runner-web/.env.example to src/runner-web/.env and set it.`);

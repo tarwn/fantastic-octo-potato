@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0 - 2026-09-17
+
+Recipe Execution / Real Browser Trial-Execute Loop (spec 0007): runner-web drives a real Playwright Chromium browser against the target application to run a persisted Recipe's Steps DSL, replacing the scripted-step stand-in for Trial/Execute Jobs. Hub stores immutable Recipe definitions and dispatches the full runner payload (definition, ingredients, controls, timeouts); runner-web's shared Automatic Loop executes each Step, resolves recoverable scenarios, enforces the exact outcome mapping (`Completed-Success`/`Completed-Failed`/`Intervention-Requested`/`Completed-Error`), and captures masked per-Step screenshots. Hub's Start Trial/Start Job modals validate Ingredients against the Recipe's declared inputs and flag irreversible Steps, and the Job screen shows real transcript/outputs/screenshot with JSON export — all proven end-to-end against the local BambooInvoice target app.
+
 ## 0.6.0 - 2026-09-16
 
 Runner Main Loop and Hub Job Queue (spec 0006): Hub persists real Training Jobs (`job`/`job_status`/`job_transcript_entry`/`job_result`), the Start Training modal creates one and atomically hands it to a matching Runner on poll, runner-web runs a job-aware main loop that reports each scripted step and reacts to Hub's next-step/terminal-status response, and the Jobs list/detail UI (with a shared `RefreshIndicator` component) and Runner activity now read real data instead of `mockJobs.ts` — proven end-to-end by a new multi-service Playwright guard covering claim, transcript growth, completion, ownership, and cancellation.

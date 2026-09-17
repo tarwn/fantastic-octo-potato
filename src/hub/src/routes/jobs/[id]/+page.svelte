@@ -4,6 +4,7 @@
 	import GoalsPanel from "./_components/GoalsPanel.svelte";
 	import JobStrip from "./_components/JobStrip.svelte";
 	import ResultsPanel from "./_components/ResultsPanel.svelte";
+	import ScreenshotPanel from "./_components/ScreenshotPanel.svelte";
 	import StageSummary from "./_components/StageSummary.svelte";
 	import TranscriptPanel from "./_components/TranscriptPanel.svelte";
 
@@ -116,8 +117,36 @@
 				</div>
 			</div>
 		</div>
-	{:else if job}
-		<p class="job-page-message">Recipe Jobs are not yet supported by this view.</p>
+	{:else if job && registeredApplication && job.jobType === JobType.Recipe}
+		<div class="job-page-content">
+			<div class="job-page-eyebrow">
+				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>
+				<span class="job-page-divider">|</span>
+				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
+			</div>
+			<div class="job-page-header">
+				<h1>{job.details.mode} Job</h1>
+				<div class="job-page-actions">
+					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
+					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
+				</div>
+			</div>
+
+			<JobStrip
+				customerName={registeredApplication.customerName}
+				applicationName={registeredApplication.applicationName}
+				runnerId={job.runnerId}
+				jobStatusId={job.jobStatusId}
+			/>
+
+			<div class="job-page-panels">
+				<TranscriptPanel entries={job.transcript} />
+				<div class="job-page-side">
+					<ResultsPanel results={job.results} />
+					<ScreenshotPanel jobId={job.id} artifacts={job.artifacts} />
+				</div>
+			</div>
+		</div>
 	{/if}
 </div>
 

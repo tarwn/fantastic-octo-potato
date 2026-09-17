@@ -13,7 +13,7 @@ const WORKSPACE_ROOT = path.resolve(import.meta.dirname, "..");
 const DB_PATH = path.join(WORKSPACE_ROOT, "src", "hub", ".data", "hub.e2e.db");
 const RUNNER_SHARED_SECRET = "test-e2e-shared-secret";
 
-// The baseline seeded Runner (seed.ts): Acme/Widgets, runner id 1.
+// The baseline seeded Runner (seed.ts): Acme/BambooInvoice, runner id 1.
 const PRIMARY_RUNNER_ID = "1";
 
 // Hub's wire contract carries jobStatusId (numeric), never a status label string — this test
@@ -78,7 +78,9 @@ function seedSecondRunner(): { runnerId: string } {
 }
 
 function spawnRunner(baseURL: string, runnerId: string, output: string[]): ChildProcess {
-	const runner = spawn(process.execPath, ["--watch", "src/runner-web/index.ts"], {
+	// --experimental-transform-types: see runner-startup.spec.ts — runner-web's TS source uses
+	// `enum`, which Node's native strip-only TS mode can't run without this flag.
+	const runner = spawn(process.execPath, ["--experimental-transform-types", "--watch", "src/runner-web/index.ts"], {
 		cwd: WORKSPACE_ROOT,
 		env: {
 			...process.env,
@@ -105,11 +107,11 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 	const { runnerId: SECOND_RUNNER_ID } = seedSecondRunner();
 
 	const registeredApplications = await (await request.get("/api/hub/registered-applications")).json();
-	const widgets = (registeredApplications.data as RegisteredApplicationSummary[]).find(
-		(app) => app.applicationName === "Widgets"
+	const bambooInvoice = (registeredApplications.data as RegisteredApplicationSummary[]).find(
+		(app) => app.applicationName === "BambooInvoice"
 	);
-	if (!widgets) {
-		throw new Error("seeded Widgets registered application not found");
+	if (!bambooInvoice) {
+		throw new Error("seeded BambooInvoice registered application not found");
 	}
 
 	const output: string[] = [];
@@ -117,7 +119,7 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 
 	try {
 		// Create a Training Job scoped to the seeded Registered Application; it starts Pending.
-		const createResponse = await request.post(`/api/hub/registered-applications/${widgets.id}/jobs`, {
+		const createResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
 			data: { goal: "Learn the thing", startingUrl: "https://teller.northwind.test/start", maxSteps: 5 }
 		});
 		expect(createResponse.status()).toBe(201);
@@ -194,7 +196,7 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 			.toBeGreaterThanOrEqual(1);
 
 		// Cancel a second Job while the same Runner is assigned to it.
-		const secondCreateResponse = await request.post(`/api/hub/registered-applications/${widgets.id}/jobs`, {
+		const secondCreateResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
 			data: { goal: "Learn the thing again", startingUrl: "https://teller.northwind.test/start", maxSteps: 5 }
 		});
 		const { data: secondCreated } = (await secondCreateResponse.json()) as { data: { id: number } };

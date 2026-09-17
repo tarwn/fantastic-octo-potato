@@ -12,6 +12,9 @@ export interface TrainingJob {
 
 export interface RecipeJob {
 	recipeId: number | null;
+	mode: "Trial" | "Execute";
+	allowlist: string;
+	stepTimeoutMs: number;
 }
 
 interface JobBase {
@@ -67,8 +70,15 @@ export interface JobResult {
 	sensitivityType: SensitivityType;
 }
 
+export interface JobStepArtifact {
+	id: number;
+	stepId: string;
+	createdAt: Date;
+}
+
 export type JobDetail = Job & {
 	transcript: JobTranscriptEntry[];
 	results: JobResult[];
 	ingredients: SafeIngredient[];
+	artifacts: JobStepArtifact[];
 };

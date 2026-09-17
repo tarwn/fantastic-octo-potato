@@ -96,6 +96,9 @@ describe("jobRepository", () => {
 				jobType: JobType.Recipe,
 				customerApplicationXrefId: 1,
 				recipeId: null,
+				mode: "Trial",
+				allowlist: "https://example.com",
+				stepTimeoutMs: 15_000,
 				createdAt: new Date("2026-09-15T00:00:00.000Z")
 			});
 
@@ -109,7 +112,7 @@ describe("jobRepository", () => {
 				startedAt: null,
 				heartbeatOn: null,
 				completedAt: null,
-				details: { recipeId: null }
+				details: { recipeId: null, mode: "Trial", allowlist: "https://example.com", stepTimeoutMs: 15_000 }
 			});
 			expect(getJobById(getDb(), job.id)).toEqual(job);
 			const trainingRows = getDb().prepare("SELECT job_id FROM training_job WHERE job_id = ?").all(job.id);

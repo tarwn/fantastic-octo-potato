@@ -14,6 +14,9 @@ Use `write-defer` when completing a task here that has an explicit, relevant def
 1. Hub LLM Integration
    1. Integration to LLM, use settings from .env, assume OpenAI API scheme, use details from Architecture.md
    2. Enable the modal for training runs
+   3. We need a system prompt to examine the user's goal and identify probable input values, provide names, and indicate if they're sensitive or not. If they're sensitive we need to consider when we mask it in the goal input (completion of the job?) and we need to add the inputs to the job with the generated name, value, and sensitivity setting
+   4. We need a system prompt and methods that will be used during training, per architecture, as we receive back a screenshot from each training step, using the users goal to direct the LLM on what we want, the minimal DSL to use to tell us what to do next. This needs a validation step when we get the output back to verify it's a valid step nstruction and potential follow-up to have it correct the syntax to match the DSL syntax we want
+   5. We need a second prompt and method that will provide a system prompt + instructions, the transcript, the original goal, and ask it to produce a cleaned up version of the steps, identify the inputs necessary and whether they're sensitive, identify the structure for the outputs and whether they're sensitive, plus a validation loop if the response isn't valid
 2. Runner: Working Training step loop against the browser with scripted Hub instructions: open entry URL, send safe screenshot/observations and targeting details, obtain/execute the next step, terminate, and clean up.
 3. More detail
    - Modal goal/target/policy/step limit govern the run. Explicit model-issued Finished ends training without a discovery checkpoint, preserving final supporting observation. Reaching the maximum number of steps stops processing and fails; blocked/dead-end runs have a real intervention request path.

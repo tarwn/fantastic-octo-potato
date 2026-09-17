@@ -11,5 +11,5 @@ test("customer page shows its name and its registered application", async ({ pag
 	await page.getByRole("link", { name: "Acme" }).click();
 
 	await expect(page.getByRole("heading", { name: "Acme" })).toBeVisible();
-	await expect(page.getByRole("link", { name: "Widgets" })).toBeVisible();
+	await expect(page.getByRole("link", { name: "BambooInvoice" })).toBeVisible();
 });

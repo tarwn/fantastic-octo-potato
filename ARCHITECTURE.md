@@ -300,7 +300,12 @@ In `Trial` mode, the goal is to validate the recipe from `Training` mode before 
 1. User opens the Hub's Registered Application screen
 2. In addition to "Start Trial" button, the draft recipe now has a "Publish" button too
     - When tapped, the Publish button toggles the Recipe from draft to published
-    - The next job created for this Customer x Application will automatically pick this latest published Recipe
+      - display a modal for the user
+      - User identifies if this is replacing a prior published recipe or a new one (dropdown)
+      - User enters/edits a name for the recipe (populated by default if a prior recipe is selected)
+      - User taps Publish, this recipe is linked to the prior recipe (if selected) and the prior recipe is archived (no longer available from Start Job menu)
+        - (FUTURE) a common parent id would allow the future/non-existent API to choose between using a specific recipe or the latest published version (same parent id, not archived)
+    - The next job created for this Customer x Application will include this latest published Recipe in the list
 
 ### Execute Mode
 

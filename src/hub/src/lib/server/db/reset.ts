@@ -5,6 +5,7 @@ const USER_DEFINED_TABLES = [
 	"job_ingredient",
 	"job_result",
 	"job_transcript_entry",
+	"job_step_artifact",
 	"training_job",
 	"recipe_job",
 	"job",

@@ -19,7 +19,7 @@ test("GET /api/hub/customers/[id] returns the customer and its registered applic
 	expect(body.data).toEqual({
 		id: acme.id,
 		name: "Acme",
-		registeredApplications: expect.arrayContaining([expect.objectContaining({ applicationName: "Widgets" })])
+		registeredApplications: expect.arrayContaining([expect.objectContaining({ applicationName: "BambooInvoice" })])
 	});
 });
 

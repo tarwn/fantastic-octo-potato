@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("Job detail page shows strip, stage, transcript, results, and goals from real data", async ({ page, request }) => {
 	const registeredApplications = await (await request.get("/api/hub/registered-applications")).json();
 	const registeredApplication = registeredApplications.data.find(
-		(item: { applicationName: string }) => item.applicationName === "Widgets"
+		(item: { applicationName: string }) => item.applicationName === "BambooInvoice"
 	);
 	const createResponse = await request.post(`/api/hub/registered-applications/${registeredApplication.id}/jobs`, {
 		data: { goal: "Extract the closing balance", startingUrl: "https://example.com/detail-smoke", maxSteps: 5 }
@@ -16,7 +16,7 @@ test("Job detail page shows strip, stage, transcript, results, and goals from re
 	await expect(page.getByText(`job-ca${registeredApplication.id}-${job.id}`)).toBeVisible();
 	await expect(page.getByText("Pending", { exact: true }).first()).toBeVisible();
 	await expect(page.getByText("Acme", { exact: true })).toBeVisible();
-	await expect(page.getByText("Widgets", { exact: true })).toBeVisible();
+	await expect(page.getByText("BambooInvoice", { exact: true })).toBeVisible();
 	await expect(page.getByText("Step 0 of 5")).toBeVisible();
 
 	await expect(page.getByRole("heading", { name: "Transcript" })).toBeVisible();

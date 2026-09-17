@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { runRecipeJobLoop } from "./orchestrator/automaticLoop.ts";
 import type { RunnerConfig } from "./config.ts";
 import { log } from "./logger.ts";
 import { startPollLoop } from "./pollLoop.ts";
@@ -8,6 +9,7 @@ import { type ClaimedJob, pollRunner, reportStep, RunnerHttpError } from "./runn
 vi.mock("./runnerClient.ts", () => ({
 	pollRunner: vi.fn(),
 	reportStep: vi.fn(),
+	isRecipeJob: (job: unknown) => typeof job === "object" && job !== null && "recipe" in job,
 	RunnerHttpError: class RunnerHttpError extends Error {
 		status: number;
 		constructor(status: number, message: string) {
@@ -16,6 +18,7 @@ vi.mock("./runnerClient.ts", () => ({
 		}
 	}
 }));
+vi.mock("./orchestrator/automaticLoop.ts", () => ({ runRecipeJobLoop: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("./logger.ts", () => ({ log: vi.fn() }));
 
 const config: RunnerConfig = {
@@ -37,7 +40,7 @@ describe("startPollLoop", () => {
 	it("calls poll on the configured interval and logs each response", async () => {
 		vi.mocked(pollRunner).mockResolvedValue({ hasWork: false });
 
-		const timer = startPollLoop(config, 30);
+		const timer = startPollLoop(config, 30, 300);
 
 		await vi.advanceTimersByTimeAsync(30_000);
 		expect(pollRunner).toHaveBeenCalledTimes(1);
@@ -53,7 +56,7 @@ describe("startPollLoop", () => {
 	it("logs a failure and continues the loop when a poll call rejects", async () => {
 		vi.mocked(pollRunner).mockRejectedValue(new Error("network down"));
 
-		const timer = startPollLoop(config, 30);
+		const timer = startPollLoop(config, 30, 300);
 
 		await vi.advanceTimersByTimeAsync(30_000);
 		expect(log).toHaveBeenCalledWith("poll failed: network down");
@@ -78,7 +81,7 @@ describe("startPollLoop", () => {
 			})
 			.mockResolvedValueOnce({ jobStatusId: 3 });
 
-		const timer = startPollLoop(config, 30);
+		const timer = startPollLoop(config, 30, 300);
 		await vi.advanceTimersByTimeAsync(30_000);
 		await vi.advanceTimersByTimeAsync(2_000); // flush the step-action delays between the two reported steps
 
@@ -116,7 +119,7 @@ describe("startPollLoop", () => {
 		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
 		vi.mocked(reportStep).mockRejectedValueOnce(new RunnerHttpError(403, "reportStep failed: 403 not the owner"));
 
-		const timer = startPollLoop(config, 30);
+		const timer = startPollLoop(config, 30, 300);
 		await vi.advanceTimersByTimeAsync(30_000);
 		await vi.advanceTimersByTimeAsync(1_000); // flush the step-action delay before the rejected reportStep call
 
@@ -140,7 +143,7 @@ describe("startPollLoop", () => {
 		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
 		vi.mocked(reportStep).mockRejectedValueOnce(new Error("network down"));
 
-		const timer = startPollLoop(config, 30);
+		const timer = startPollLoop(config, 30, 300);
 		await vi.advanceTimersByTimeAsync(30_000);
 		await vi.advanceTimersByTimeAsync(1_000); // flush the step-action delay before the rejected reportStep call
 
@@ -165,7 +168,7 @@ describe("startPollLoop", () => {
 		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
 		vi.mocked(reportStep).mockReturnValueOnce(new Promise((resolve) => (resolveReportStep = resolve)));
 
-		const timer = startPollLoop(config, 30);
+		const timer = startPollLoop(config, 30, 300);
 		await vi.advanceTimersByTimeAsync(30_000);
 		await vi.advanceTimersByTimeAsync(1_000); // flush the step-action delay so reportStep's pending promise is in flight
 		expect(pollRunner).toHaveBeenCalledTimes(1);
@@ -178,6 +181,29 @@ describe("startPollLoop", () => {
 
 		await vi.advanceTimersByTimeAsync(30_000);
 		expect(pollRunner).toHaveBeenCalledTimes(2);
+
+		clearInterval(timer);
+	});
+
+	it("dispatches a claimed Recipe Job (carrying a `recipe` field) to the Automatic Loop, not the Training step loop", async () => {
+		const recipeJob = {
+			id: 11,
+			mode: "execute",
+			recipeId: 1,
+			recipeVersion: 1,
+			recipe: { schemaVersion: 1, inputs: {}, outputs: {}, steps: [], recoveries: [] },
+			ingredients: {},
+			controls: { allowedOrigins: ["https://example.com"] },
+			stepTimeoutMs: 5000,
+			comms: { statusUrl: "/api/hub/jobs/11", artifactsUrl: "/api/runner/runners/1/jobs/11/artifacts" }
+		};
+		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job: recipeJob }).mockResolvedValue({ hasWork: false });
+
+		const timer = startPollLoop(config, 30, 300);
+		await vi.advanceTimersByTimeAsync(30_000);
+
+		expect(runRecipeJobLoop).toHaveBeenCalledWith(config, recipeJob, 300);
+		expect(reportStep).not.toHaveBeenCalled();
 
 		clearInterval(timer);
 	});

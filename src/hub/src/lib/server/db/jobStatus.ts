@@ -5,5 +5,7 @@ export enum JobStatus {
 	Running = 2,
 	CompletedSuccess = 3,
 	CompletedFailed = 4,
-	CompletedCancelled = 5
+	CompletedCancelled = 5,
+	InterventionRequested = 6,
+	CompletedError = 7
 }
