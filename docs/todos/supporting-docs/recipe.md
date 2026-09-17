@@ -9,7 +9,8 @@ A fixed extraction program for one Customer × Application. Depends on the [POC 
 | id, version | Stable Recipe revision referenced by Jobs |
 | customerId, applicationId | Scope |
 | name, goal | Human description |
-| state | draft or published |
+| state | draft, published, or archived |
+| supersedesRecipeId? | Prior published Recipe this one replaces, if any (set at Publish; the prior Recipe becomes archived) |
 | createdAt, publishedAt? | Lifecycle dates |
 | sourceTrainingRunId | Training provenance |
 | definition | Reusable runner program below |
@@ -24,6 +25,8 @@ Only definition, required Recipe identity, Ingredients, and Job controls go to t
 The definition is `{schemaVersion,inputs,outputs,steps,recoveries}`. Recovery entries are `{id,description,when,steps}`; no maxUses, retry/skip policy fields, digests, or acknowledgment records. The Job supplies one default stepTimeoutMs. Hub scope/lifecycle/provenance fields are not part of the runner program.
 
 Jobs reference a Recipe revision. Database updates permit only lifecycle fields; executable definition stays immutable once used. Training creates a draft; Start Trial includes the human review required by the architecture. A successful Trial makes Publish available, and Publish is explicit. Eligibility is a query of Jobs for this revision with mode Trial and status Completed-Success; there is no stored successfulTrial copy to keep synchronized or retain after Job deletion.
+
+Publish optionally names a prior published Recipe it replaces: the new Recipe is linked via supersedesRecipeId, and the prior Recipe's state becomes archived (no longer offered from Start Job). Archived Recipes remain readable for Jobs that already reference them; only draft/published Recipes are offered for new Trial/Execute Jobs. (FUTURE, see [ARCHITECTURE.md](../../../ARCHITECTURE.md#trial-mode)) a common parent id across a supersession chain would let a future API pin a specific revision instead of always resolving to the latest published one.
 
 ## Inputs, Ingredients, and outputs
 
