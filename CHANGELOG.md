@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 - 2026-09-16
+
+Runner Main Loop and Hub Job Queue (spec 0006): Hub persists real Training Jobs (`job`/`job_status`/`job_transcript_entry`/`job_result`), the Start Training modal creates one and atomically hands it to a matching Runner on poll, runner-web runs a job-aware main loop that reports each scripted step and reacts to Hub's next-step/terminal-status response, and the Jobs list/detail UI (with a shared `RefreshIndicator` component) and Runner activity now read real data instead of `mockJobs.ts` — proven end-to-end by a new multi-service Playwright guard covering claim, transcript growth, completion, ownership, and cancellation.
+
 ## 0.5.0 - 2026-09-14
 
 Runner Polling (spec 0004): runner-web reads its Hub URL, runner id, and shared bearer secret from `.env`, connects to Hub's `/api/runner/*` init endpoint on startup, then loops on a poll endpoint at the interval Hub returns while Hub tracks each runner's heartbeat and shows it as "alive"/"idle" on the Registered Application page — proven end-to-end by a new multi-service Playwright guard.
