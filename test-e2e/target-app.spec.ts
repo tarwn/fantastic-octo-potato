@@ -1,24 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import path from "node:path";
 
-const TARGET_APP_DIR = path.resolve(import.meta.dirname, "..", "target-app");
 const TARGET_APP_URL = "http://localhost:8089";
 const SEEDED_LOGIN = { username: "admin@targetapp.local", password: "targetapp-seed-pw" };
 const SEEDED_CLIENT_NAME = "Contoso Consulting";
 
 test.describe("target application (spec 0005)", () => {
-	// Building the image and initializing MySQL from a cold cache can take several
-	// minutes; the default 30s test/hook timeout is nowhere near enough.
+	// globalSetup.ts builds/starts target-app once for the whole run; a cold-cache build can take
+	// several minutes, and the readiness poll below waits out any remaining startup time.
 	test.describe.configure({ timeout: 300_000 });
-
-	test.beforeAll(() => {
-		execFileSync(process.execPath, [path.join(TARGET_APP_DIR, "run-compose.mjs"), "up"], { stdio: "inherit" });
-	});
-
-	test.afterAll(() => {
-		execFileSync(process.execPath, [path.join(TARGET_APP_DIR, "run-compose.mjs"), "down"], { stdio: "inherit" });
-	});
 
 	test("starts populated with seed data and is reachable over HTTP", async ({ request }) => {
 		// The app container's own healthcheck already gates readiness on a successful HTTP

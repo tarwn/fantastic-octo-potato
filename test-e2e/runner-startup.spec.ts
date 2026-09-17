@@ -4,7 +4,6 @@ import path from "node:path";
 
 const WORKSPACE_ROOT = path.resolve(import.meta.dirname, "..");
 
-// Red until the runner's poll loop is implemented.
 const RUNNER_ID = "1";
 const RUNNER_SHARED_SECRET = "test-e2e-shared-secret";
 
@@ -14,7 +13,9 @@ test("runner-web initializes against hub and enters its poll loop", async ({ bas
 	}
 
 	const output: string[] = [];
-	const runner = spawn(process.execPath, ["--watch", "src/runner-web/index.ts"], {
+	// --experimental-transform-types: runner-web's TS source uses `enum` (e.g. runnerClient.ts's
+	// JobStatus), which Node's native strip-only TS mode can't run without this flag.
+	const runner = spawn(process.execPath, ["--experimental-transform-types", "--watch", "src/runner-web/index.ts"], {
 		cwd: WORKSPACE_ROOT,
 		env: {
 			...process.env,

@@ -19,7 +19,7 @@
     "db:migrate:new": "nx run hub:db-migrate-new",
     "db:reset": "nx run hub:db-reset",
     "dev:hub": "nx run hub:dev",
-    "dev:runner-web": "node --env-file=src/runner-web/.env --watch src/runner-web/index.ts",
+    "dev:runner-web": "node --experimental-transform-types --env-file=src/runner-web/.env --watch src/runner-web/index.ts",
     "dev:target-app:down": "node target-app/run-compose.mjs down",
     "dev:target-app:up": "node target-app/run-compose.mjs up",
     "guard": "nx run-many --target=guard",

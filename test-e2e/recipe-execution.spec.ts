@@ -1,19 +1,17 @@
 import { expect, test } from "@playwright/test";
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import path from "node:path";
 
-// Red until Step 6 (Hub UI) lands — see docs/specs/0007-recipe-execution/spec.md, Step 1.
-// Steps 2-5 (Recipe storage, real dispatch payload, Playwright driver, Automatic Loop) haven't
-// landed yet either, so every call below 404s/fails against the current scripted-step stand-in;
-// that's expected per the plan's sequencing note.
+// End-to-end guards for spec 0007's real Trial/Execute outcomes (R008's outcome mapping):
+// Start Job on the happy-path Recipe reaches Completed-Success, and on the failing Recipe
+// reaches Intervention-Requested then Completed-Failed after the intervention timeout.
 
 const WORKSPACE_ROOT = path.resolve(import.meta.dirname, "..");
-const TARGET_APP_DIR = path.resolve(WORKSPACE_ROOT, "target-app");
 const RUNNER_SHARED_SECRET = "test-e2e-shared-secret";
 
-// The baseline seeded Runner (seed.ts): Acme/Widgets, runner id 1. Step 3 must seed the two
-// Recipes below onto a Runner reachable from the same seeded Runner row so this test doesn't
-// need its own runner-registration flow (out of scope per spec 0007's traceability).
+// The baseline seeded Runner (seed.ts): Acme/BambooInvoice, runner id 1. The two seeded Recipes
+// below run on this same Runner row, so this test doesn't need its own runner-registration flow
+// (out of scope per spec 0007's traceability).
 const RUNNER_ID = "1";
 
 // Names Step 3 must give its two seeded Recipes (R005): one that completes end-to-end against
@@ -53,13 +51,20 @@ interface JobDetail {
 }
 
 function spawnRunner(baseURL: string, output: string[]): ChildProcess {
-	const runner = spawn(process.execPath, ["--watch", "src/runner-web/index.ts"], {
+	// --experimental-transform-types: see runner-startup.spec.ts — runner-web's TS source uses
+	// `enum`, which Node's native strip-only TS mode can't run without this flag.
+	const runner = spawn(process.execPath, ["--experimental-transform-types", "--watch", "src/runner-web/index.ts"], {
 		cwd: WORKSPACE_ROOT,
 		env: {
 			...process.env,
 			HUB_URL: baseURL,
 			RUNNER_ID,
-			RUNNER_SHARED_SECRET
+			RUNNER_SHARED_SECRET,
+			// Matches target-app's seeded login (docs/context/tools/target-app.md) — the seeded
+			// Recipes' `credential` references resolve these via RUNNER_CREDENTIAL_<NAME> env vars
+			// (credentials.ts), never sent by Hub.
+			RUNNER_CREDENTIAL_USERNAME: "admin@targetapp.local",
+			RUNNER_CREDENTIAL_PASSWORD: "targetapp-seed-pw"
 		}
 	});
 	runner.stdout.on("data", (chunk: Buffer) => output.push(chunk.toString()));
@@ -103,17 +108,9 @@ async function pollJobStatus(
 }
 
 test.describe("recipe execution against a real target application (spec 0007)", () => {
-	// Building the target-app image and initializing MySQL from a cold cache can take several
-	// minutes; the default 30s test/hook timeout is nowhere near enough.
+	// globalSetup.ts builds/starts target-app once for the whole run; real browser automation
+	// against it plus the intervention-timeout wait is nowhere near the default 30s test timeout.
 	test.describe.configure({ timeout: 300_000 });
-
-	test.beforeAll(() => {
-		execFileSync(process.execPath, [path.join(TARGET_APP_DIR, "run-compose.mjs"), "up"], { stdio: "inherit" });
-	});
-
-	test.afterAll(() => {
-		execFileSync(process.execPath, [path.join(TARGET_APP_DIR, "run-compose.mjs"), "down"], { stdio: "inherit" });
-	});
 
 	test("Start Job on the happy-path Recipe reaches Completed-Success with real extracted outputs", async ({
 		request,
