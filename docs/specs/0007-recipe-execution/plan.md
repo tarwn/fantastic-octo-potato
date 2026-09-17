@@ -1,6 +1,6 @@
 This is the plan for [0007-recipe-execution/spec.md](./spec.md).
 
-- [ ] 1. E2E guards for real Trial/Execute outcomes
+- [x] 1. E2E guards for real Trial/Execute outcomes
 - [ ] 2. Hub: Recipe entity and immutable definition storage
 - [ ] 3. Hub: seed Recipes and real runner dispatch payload
 - [ ] 4. Runner-web: Playwright driver and DSL action/condition executors
