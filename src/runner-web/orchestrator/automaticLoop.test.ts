@@ -164,9 +164,32 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 		// so the test doesn't need to wait out a real polling interval.
 		await runRecipeJobLoop(config, job, -1);
 
+		expect(reportInfo).toHaveBeenCalledWith(config, 42, expect.stringContaining("Step click_missing failed: TARGET_NOT_FOUND"));
 		expect(reportStatus).toHaveBeenNthCalledWith(1, config, 42, JobStatus.InterventionRequested, expect.any(String));
 		expect(reportStatus).toHaveBeenNthCalledWith(2, config, 42, JobStatus.CompletedFailed, expect.stringContaining("timed out"));
 		expect(fetchJobStatus).not.toHaveBeenCalled();
+	}, 20000);
+
+	it("redacts a known secret from a failed Step's reported error detail", async () => {
+		const recipe: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: { password: { ...STRING_FIELD, sensitive: true, required: true, nullable: false } },
+			outputs: {},
+			steps: [openStep("<button id=\"go\">Go</button>"), { id: "click_go", action: "click", args: [{ by: "css", value: "#go" }] }],
+			recoveries: []
+		};
+		const job = buildJob({ recipe, ingredients: { password: "hunter2" } });
+
+		vi.mocked(executeAction).mockImplementation(async (page, step, ctx) => {
+			if (step.id === "click_go") {
+				return { outcome: "failed", error: { code: "ACTION_FAILED", message: "login rejected for password hunter2" } };
+			}
+			return realExecuteAction(page, step, ctx);
+		});
+
+		await runRecipeJobLoop(config, job, -1);
+
+		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go failed: ACTION_FAILED: login rejected for password ••••••");
 	}, 20000);
 
 	it("reports Completed-Error on an allowlist violation, without reporting the triggering Step", async () => {

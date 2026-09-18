@@ -21,6 +21,7 @@ import {
 	TERMINAL_JOB_STATUSES,
 	uploadArtifact
 } from "../runnerClient.ts";
+import { redactKnownSecrets } from "../textRedaction.ts";
 
 import { collectCredentialNames } from "./program/credentialNames.ts";
 import { buildLocationIndex } from "./program/locationIndex.ts";
@@ -82,7 +83,8 @@ async function captureAndUploadArtifact(deps: LoopDeps, stepId: string): Promise
 	catch (err: unknown) {
 		// A failed artifact upload is not fatal to the Job's control flow — the transcript row
 		// itself is the durable record; the screenshot is best-effort context.
-		log(`job ${deps.job.id}: failed to capture/upload artifact for step ${stepId}: ${err instanceof Error ? err.message : String(err)}`);
+		const rawMessage = err instanceof Error ? err.message : String(err);
+		log(redactKnownSecrets(`job ${deps.job.id}: failed to capture/upload artifact for step ${stepId}: ${rawMessage}`, deps.secrets));
 	}
 }
 
@@ -99,7 +101,7 @@ async function reportBlockedRequests(deps: LoopDeps, stepId: string): Promise<st
 			navigationUrl ??= event.url;
 			continue;
 		}
-		await reportInfo(deps.config, deps.job.id, `Step ${stepId}: blocked a disallowed-origin request to ${event.url}`);
+		await reportInfo(deps.config, deps.job.id, redactKnownSecrets(`Step ${stepId}: blocked a disallowed-origin request to ${event.url}`, deps.secrets));
 	}
 	return navigationUrl;
 }
@@ -115,7 +117,8 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	}
 	catch (err: unknown) {
 		await reportBlockedRequests(deps, step.id);
-		return { type: "error", message: `Unexpected error executing step ${step.id}: ${err instanceof Error ? err.message : String(err)}` };
+		const rawMessage = err instanceof Error ? err.message : String(err);
+		return { type: "error", message: redactKnownSecrets(`Unexpected error executing step ${step.id}: ${rawMessage}`, deps.secrets) };
 	}
 
 	// The route handler catches disallowed requests that hit the network stack before they're sent;
@@ -123,7 +126,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	// see at all (data:/about:/blob:), so both are checked here.
 	const blockedNavigationUrl = await reportBlockedRequests(deps, step.id);
 	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [...deps.job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS])) {
-		return { type: "error", message: `Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}` };
+		return { type: "error", message: redactKnownSecrets(`Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}`, deps.secrets) };
 	}
 
 	if (actionResult.kind === "businessFailure") {
@@ -134,6 +137,9 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	const extractions = toWireExtractions(actionResult);
 
 	if (actionResult.outcome === "failed") {
+		if (actionResult.error) {
+			await reportInfo(deps.config, deps.job.id, redactKnownSecrets(`Step ${step.id} failed: ${actionResult.error.code}: ${actionResult.error.message}`, deps.secrets));
+		}
 		await reportChildOutcome(deps, step.id, "failed", parentStepId, extractions);
 		if (!insideRecovery) {
 			const recovered = await runRecoveryScan(deps, recipe);
@@ -320,14 +326,16 @@ async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: n
 export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJob, interventionTimeoutSeconds: number): Promise<void> {
 	const blockedEvents: BlockedRequestEvent[] = [];
 	const routeHandler = createAllowListRouteHandler([...job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS], (event) => blockedEvents.push(event));
+	const secrets = collectSecretValues(job.recipe, job.ingredients, resolveCredential);
 
 	let session;
 	try {
 		session = await launchBrowserSession(routeHandler);
 	}
 	catch (err: unknown) {
-		log(`job ${job.id}: failed to launch a browser session, abandoning back to polling: ${err instanceof Error ? err.message : String(err)}`);
-		await reportStatus(config, job.id, JobStatus.CompletedError, `Failed to launch a browser session: ${err instanceof Error ? err.message : String(err)}`).catch(() => undefined);
+		const rawMessage = err instanceof Error ? err.message : String(err);
+		log(redactKnownSecrets(`job ${job.id}: failed to launch a browser session, abandoning back to polling: ${rawMessage}`, secrets));
+		await reportStatus(config, job.id, JobStatus.CompletedError, redactKnownSecrets(`Failed to launch a browser session: ${rawMessage}`, secrets)).catch(() => undefined);
 		return;
 	}
 
@@ -344,7 +352,7 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 		job,
 		ctx,
 		page: session.page,
-		secrets: collectSecretValues(job.recipe, job.ingredients, resolveCredential),
+		secrets,
 		recoveryAttempts: new Map(),
 		blockedEvents
 	};
@@ -356,7 +364,7 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 			await reportStatus(config, job.id, JobStatus.CompletedError, outcome.message);
 		}
 		else if (outcome.type === "fail") {
-			await reportStatus(config, job.id, JobStatus.CompletedFailed, `${outcome.error.code}: ${outcome.error.message}`);
+			await reportStatus(config, job.id, JobStatus.CompletedFailed, redactKnownSecrets(`${outcome.error.code}: ${outcome.error.message}`, secrets));
 		}
 		else if (outcome.type === "finish") {
 			await reportStatus(config, job.id, JobStatus.CompletedSuccess, "Recipe finished");
@@ -367,7 +375,8 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 		}
 	}
 	catch (err: unknown) {
-		log(`job ${job.id}: recipe loop failed unexpectedly, abandoning back to polling: ${err instanceof Error ? err.message : String(err)}`);
+		const rawMessage = err instanceof Error ? err.message : String(err);
+		log(redactKnownSecrets(`job ${job.id}: recipe loop failed unexpectedly, abandoning back to polling: ${rawMessage}`, secrets));
 	}
 	finally {
 		await captureAndUploadArtifact(deps, "terminal");
