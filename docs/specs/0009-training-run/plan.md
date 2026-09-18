@@ -1,6 +1,6 @@
 This is the plan for [0009-training-run/spec.md](./spec.md).
 
-- [ ] 1. E2E guards for a full Training Run
+- [x] 1. E2E guards for a full Training Run
 - [ ] 2. Hub LLM client
 - [ ] 3. Goal → Ingredients
 - [ ] 4. Goal/transcript/screenshot → next Step

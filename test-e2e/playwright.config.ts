@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+import { DEFAULT_LLM_STUB_PORT } from "./llm-stub/port.mjs";
+
 const HUB_PORT = 4173;
 
 // Starts hub the same way src/hub/playwright.config.ts does; runner-web has no HTTP
@@ -26,7 +28,12 @@ export default defineConfig({
 			// so the recipe-execution intervention-timeout test doesn't wait on the real default.
 			RUNNER_SHARED_SECRET: "test-e2e-shared-secret",
 			RUNNER_POLL_INTERVAL_SECONDS: "1",
-			RUNNER_INTERVENTION_TIMEOUT_SECONDS: "5"
+			RUNNER_INTERVENTION_TIMEOUT_SECONDS: "5",
+			// Points Hub's LLM client (docs/specs/0009-training-run/spec.md Step 2) at the local
+			// stub server (llm-stub/, started by globalSetup.ts) instead of a real OpenAI endpoint.
+			OPENAI_BASE_URL: `http://localhost:${DEFAULT_LLM_STUB_PORT}/v1`,
+			OPENAI_API_KEY: "test-e2e-llm-key",
+			OPENAI_MODEL: "test-e2e-llm-model"
 		}
 	},
 	use: { baseURL: `http://localhost:${HUB_PORT}` },
