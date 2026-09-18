@@ -14,6 +14,7 @@
     "autofix:runner-web:lint": "nx run runner-web:lint-fix",
     "autofix:tools:lint": "nx run tools:lint-fix",
     "build:hub": "nx run hub:build",
+    "clean:runner-web": "node --experimental-transform-types src/runner-web/browser/killStrayBrowsers.ts",
     "db:migrate:up": "nx run hub:db-migrate-up",
     "db:migrate:down": "nx run hub:db-migrate-down",
     "db:migrate:new": "nx run hub:db-migrate-new",

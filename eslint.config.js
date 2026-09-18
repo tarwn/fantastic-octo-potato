@@ -122,5 +122,14 @@ export default tseslint.config(
 		rules: {
 			"no-console": "off"
 		}
+	},
+	{
+		// Manual dev CLI script invoked directly (node --experimental-transform-types
+		// src/runner-web/browser/killStrayBrowsers.ts) — its whole job is console output, same as the
+		// tools/guards/**/*.cjs scripts.
+		files: ["src/runner-web/browser/killStrayBrowsers.ts"],
+		rules: {
+			"no-console": "off"
+		}
 	}
 );
