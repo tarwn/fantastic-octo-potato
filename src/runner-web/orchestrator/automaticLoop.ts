@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 
-import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl } from "../allowList.ts";
+import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl, SAFE_ALLOWED_ORIGINS } from "../allowList.ts";
 import { type ActionOutcome, executeAction } from "../browser/actions.ts";
 import { closeBrowserSession, launchBrowserSession } from "../browser/browserSession.ts";
 import { evaluateCondition } from "../browser/conditions.ts";
@@ -122,7 +122,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	// `isAllowedUrl(page.url(), ...)` is the backstop for navigations Playwright's interception can't
 	// see at all (data:/about:/blob:), so both are checked here.
 	const blockedNavigationUrl = await reportBlockedRequests(deps, step.id);
-	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), deps.job.controls.allowedOrigins)) {
+	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [...deps.job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS])) {
 		return { type: "error", message: `Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}` };
 	}
 
@@ -319,7 +319,7 @@ async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: n
 // terminal exit path before returning control to the poll loop.
 export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJob, interventionTimeoutSeconds: number): Promise<void> {
 	const blockedEvents: BlockedRequestEvent[] = [];
-	const routeHandler = createAllowListRouteHandler(job.controls.allowedOrigins, (event) => blockedEvents.push(event));
+	const routeHandler = createAllowListRouteHandler([...job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS], (event) => blockedEvents.push(event));
 
 	let session;
 	try {

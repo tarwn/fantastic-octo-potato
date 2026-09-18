@@ -1,7 +1,7 @@
 import type { Request, Route } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 
-import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl } from "./allowList.ts";
+import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl, SAFE_ALLOWED_ORIGINS } from "./allowList.ts";
 
 describe("isAllowedUrl", () => {
 	it("allows a URL whose origin exactly matches an allowlist entry", () => {
@@ -28,6 +28,14 @@ describe("isAllowedUrl", () => {
 
 	it("ignores an unparsable allowlist entry rather than throwing", () => {
 		expect(isAllowedUrl("https://example.com/", ["not a url"])).toBe(false);
+	});
+
+	it("matches an opaque-origin allowlist entry (e.g. \"about:blank\") by exact href, not origin", () => {
+		expect(isAllowedUrl("about:blank", SAFE_ALLOWED_ORIGINS)).toBe(true);
+	});
+
+	it("doesn't let an \"about:blank\" allowlist entry allow other opaque-origin schemes", () => {
+		expect(isAllowedUrl("javascript:alert(1)", SAFE_ALLOWED_ORIGINS)).toBe(false);
 	});
 });
 
