@@ -35,4 +35,42 @@ describe("takeMaskedScreenshot", () => {
 		expect(result.equals(withoutMasking)).toBe(true);
 		expect(await fixture.page.locator("#__dsl_mask_overlay__").count()).toBe(0);
 	});
+
+	it("masks an element whose text matches a PII pattern even when it isn't a known secret", async () => {
+		await fixture.page.evaluate(() => {
+			const el = document.createElement("div");
+			el.id = "__pii_test_element__";
+			el.textContent = "jane.doe@example.com";
+			document.body.appendChild(el);
+		});
+		try {
+			const withoutMasking = await fixture.page.screenshot();
+			const masked = await takeMaskedScreenshot(fixture.page, []);
+
+			expect(masked.equals(withoutMasking)).toBe(false);
+			expect(await fixture.page.locator("#__dsl_mask_overlay__").count()).toBe(0);
+		}
+		finally {
+			await fixture.page.evaluate(() => document.getElementById("__pii_test_element__")?.remove());
+		}
+	});
+
+	it("leaves ordinary non-sensitive text unmasked", async () => {
+		await fixture.page.evaluate(() => {
+			const el = document.createElement("div");
+			el.id = "__ordinary_test_element__";
+			el.textContent = "Checking account";
+			document.body.appendChild(el);
+		});
+		try {
+			const withoutMasking = await fixture.page.screenshot();
+			const masked = await takeMaskedScreenshot(fixture.page, []);
+
+			expect(masked.equals(withoutMasking)).toBe(true);
+			expect(await fixture.page.locator("#__dsl_mask_overlay__").count()).toBe(0);
+		}
+		finally {
+			await fixture.page.evaluate(() => document.getElementById("__ordinary_test_element__")?.remove());
+		}
+	});
 });

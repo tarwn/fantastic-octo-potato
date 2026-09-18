@@ -75,6 +75,7 @@
     "vitest": "5.0.0"
   },
   "dependencies": {
+    "@redactpii/node": "1.0.17",
     "better-sqlite3": "13.0.3",
     "playwright": "1.63.0"
   }
