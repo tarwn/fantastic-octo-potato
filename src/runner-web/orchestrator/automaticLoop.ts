@@ -134,6 +134,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 		return { type: "fail", error: actionResult.error! };
 	}
 
+	growSecretsFromExtraction(deps, recipe, actionResult);
 	const extractions = toWireExtractions(actionResult);
 
 	if (actionResult.outcome === "failed") {
@@ -168,6 +169,23 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 		return { type: "finish" };
 	}
 	return { type: "advance" };
+}
+
+// Mirrors collectSecretValues' recipe.inputs[name].sensitive check, but for outputs: a
+// declared-sensitive output is only known once its Step extracts it mid-Job, so it's added to
+// deps.secrets here rather than up front, protecting every screenshot/message from that point on.
+function growSecretsFromExtraction(deps: LoopDeps, recipe: RecipeDefinition, actionResult: ActionOutcome): void {
+	if (!actionResult.extraction) {
+		return;
+	}
+	const declaration = recipe.outputs[actionResult.extraction.fieldName];
+	if (!declaration?.sensitive) {
+		return;
+	}
+	const value = scalarToWireValue(actionResult.extraction.value);
+	if (value.trim() !== "" && !deps.secrets.includes(value)) {
+		deps.secrets.push(value);
+	}
 }
 
 function toWireExtractions(actionResult: ActionOutcome): Array<{ fieldName: string; value: string }> {
