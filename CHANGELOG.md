@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 - 2026-09-17
+
+Runner Masking (spec 0008): known-secrets masking now grows mid-Job as declared-sensitive Recipe outputs are extracted, and the same redaction pass scrubs every Hub-bound `INFO`/status/error message and local log line, not just screenshots. Screenshots additionally get a second, independent masking pass using `@redactpii/node` to catch on-screen PII the Runner has no advance knowledge of (email, SSN, credit card, phone patterns). Every terminal Job exit path cleans up its browser session, and a new `npm run clean:runner-web` command clears stray Runner-launched browser processes left behind by an ungraceful stop.
+
 ## 0.7.0 - 2026-09-17
 
 Recipe Execution / Real Browser Trial-Execute Loop (spec 0007): runner-web drives a real Playwright Chromium browser against the target application to run a persisted Recipe's Steps DSL, replacing the scripted-step stand-in for Trial/Execute Jobs. Hub stores immutable Recipe definitions and dispatches the full runner payload (definition, ingredients, controls, timeouts); runner-web's shared Automatic Loop executes each Step, resolves recoverable scenarios, enforces the exact outcome mapping (`Completed-Success`/`Completed-Failed`/`Intervention-Requested`/`Completed-Error`), and captures masked per-Step screenshots. Hub's Start Trial/Start Job modals validate Ingredients against the Recipe's declared inputs and flag irreversible Steps, and the Job screen shows real transcript/outputs/screenshot with JSON export — all proven end-to-end against the local BambooInvoice target app.

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { executeAction } from "../browser/actions.ts";
 import type { RouteHandler } from "../browser/browserSession.ts";
 import { launchBrowserSession } from "../browser/browserSession.ts";
+import { takeMaskedScreenshot } from "../browser/screenshotMasking.ts";
 import type { FieldDeclaration, RecipeDefinition, Recovery, Step } from "../dsl/types.ts";
 import { type ClaimedRecipeJob, fetchJobStatus, JobStatus, reportDslStep, reportInfo, reportStatus, uploadArtifact } from "../runnerClient.ts";
 
@@ -17,6 +18,11 @@ vi.mock("../browser/actions.ts", async (importOriginal) => {
 vi.mock("../browser/browserSession.ts", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../browser/browserSession.ts")>();
 	return { ...actual, launchBrowserSession: vi.fn(actual.launchBrowserSession) };
+});
+
+vi.mock("../browser/screenshotMasking.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../browser/screenshotMasking.ts")>();
+	return { ...actual, takeMaskedScreenshot: vi.fn(actual.takeMaskedScreenshot) };
 });
 
 vi.mock("../runnerClient.ts", async (importOriginal) => {
@@ -46,6 +52,7 @@ async function simulateBlockedRequest(url: string, isNavigation: boolean): Promi
 // previous test last set it to. Capturing the real, unmocked function once here is what individual
 // tests wrap instead.
 const realExecuteAction = (await vi.importActual<typeof import("../browser/actions.ts")>("../browser/actions.ts")).executeAction;
+const realTakeMaskedScreenshot = (await vi.importActual<typeof import("../browser/screenshotMasking.ts")>("../browser/screenshotMasking.ts")).takeMaskedScreenshot;
 
 const config = { hubUrl: "http://localhost:4173", runnerId: "1", runnerSharedSecret: "the-secret" };
 
@@ -106,6 +113,38 @@ describe("runRecipeJobLoop: happy path", () => {
 		expect(uploadArtifact).toHaveBeenNthCalledWith(5, config, "/api/runner/runners/1/jobs/42/artifacts", "terminal", expect.any(String));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
 	}, 20000);
+
+	it("grows the known-secrets list with a declared-sensitive output's value once extracted mid-run, masking it in every screenshot from then on", async () => {
+		const recipe: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: {},
+			outputs: { secret: { ...STRING_FIELD, sensitive: true } },
+			steps: [
+				openStep("<div id=\"secretField\">mysecret</div><button id=\"go\">Go</button>"),
+				{ id: "read_secret", action: "read", args: [{ by: "css", value: "#secretField" }, "text", { ref: "output", name: "secret" }] },
+				{ id: "click_go", action: "click", args: [{ by: "css", value: "#go" }] },
+				{ id: "done", action: "finish", args: [null] }
+			],
+			recoveries: []
+		};
+		const job = buildJob({ recipe });
+
+		// `deps.secrets` is mutated in place, so snapshotting each call's array as it happens (rather
+		// than reading it back off `mock.calls` afterwards) is what lets earlier calls be distinguished
+		// from later ones.
+		const secretsSnapshots: string[][] = [];
+		vi.mocked(takeMaskedScreenshot).mockImplementation(async (page, secrets) => {
+			secretsSnapshots.push([...secrets]);
+			return realTakeMaskedScreenshot(page, secrets);
+		});
+
+		await runRecipeJobLoop(config, job, 300);
+
+		expect(secretsSnapshots[0]).not.toContain("mysecret"); // open_fixture, before extraction
+		expect(secretsSnapshots[1]).toContain("mysecret"); // read_secret's own screenshot, right after extraction
+		expect(secretsSnapshots[2]).toContain("mysecret"); // click_go
+		expect(secretsSnapshots[secretsSnapshots.length - 1]).toContain("mysecret"); // terminal
+	}, 20000);
 });
 
 describe("runRecipeJobLoop: recovery", () => {
@@ -164,9 +203,32 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 		// so the test doesn't need to wait out a real polling interval.
 		await runRecipeJobLoop(config, job, -1);
 
+		expect(reportInfo).toHaveBeenCalledWith(config, 42, expect.stringContaining("Step click_missing failed: TARGET_NOT_FOUND"));
 		expect(reportStatus).toHaveBeenNthCalledWith(1, config, 42, JobStatus.InterventionRequested, expect.any(String));
 		expect(reportStatus).toHaveBeenNthCalledWith(2, config, 42, JobStatus.CompletedFailed, expect.stringContaining("timed out"));
 		expect(fetchJobStatus).not.toHaveBeenCalled();
+	}, 20000);
+
+	it("redacts a known secret from a failed Step's reported error detail", async () => {
+		const recipe: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: { password: { ...STRING_FIELD, sensitive: true, required: true, nullable: false } },
+			outputs: {},
+			steps: [openStep("<button id=\"go\">Go</button>"), { id: "click_go", action: "click", args: [{ by: "css", value: "#go" }] }],
+			recoveries: []
+		};
+		const job = buildJob({ recipe, ingredients: { password: "hunter2" } });
+
+		vi.mocked(executeAction).mockImplementation(async (page, step, ctx) => {
+			if (step.id === "click_go") {
+				return { outcome: "failed", error: { code: "ACTION_FAILED", message: "login rejected for password hunter2" } };
+			}
+			return realExecuteAction(page, step, ctx);
+		});
+
+		await runRecipeJobLoop(config, job, -1);
+
+		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go failed: ACTION_FAILED: login rejected for password ••••••");
 	}, 20000);
 
 	it("reports Completed-Error on an allowlist violation, without reporting the triggering Step", async () => {

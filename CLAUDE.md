@@ -22,6 +22,7 @@ Be intentional and frugal with commands:
 - `npm run dev:hub` runs the backend and frontend for the hub SvelteKit app
 - `npm run dev:runner-web` runs the runner-web entry point
 - `npm run dev:target-app:up` starts the local target application (BambooInvoice) in containers; `npm run dev:target-app:down` stops it — see [docs/context/tools/target-app.md](./docs/context/tools/target-app.md)
+- `npm run clean:runner-web` kills any stray Runner-launched browser processes left behind by an ungraceful stop (crash, kill) — see [docs/context/runner-web/browser-cleanup.md](./docs/context/runner-web/browser-cleanup.md)
 
 ## AutoFix
 
