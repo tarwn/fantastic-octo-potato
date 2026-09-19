@@ -9,14 +9,52 @@ An application that can learn how to navigate an application interface to achiev
 **Prerequisites**
 
 - Node.js 24.x
+- Podman or Docker
+- _Assumes ports 5173 and 8089 will be free_
+
+**Setup**
+
 - Run `npm install`
-- Run `npm run prepare` to initialize husky and playwright (runs automatically on `npm install`)
+- Add Settings
+  - Hub: `cp src/hub/.env.example src/hub/.env`
+    - LLM: Edit `src/hub.env` and enter an API key, openai-compatible provider, and model name
+  - Runner: `cp src/runner-web/.env.example src/runner-web/.env`
+  - Target App: _n/a_
+- Prepare Database
+  - Hub: `npm run db:migrate:up`
 
 **Run the Apps**
 
-- Run the hub web ui: `npm run dev:hub`
-- Run the runner: `npm run dev:runner-web`
-- Run the sample app: TBD
+- Target App: `npm run dev:target-app:up`
+  - _automatically seeds the database_
+- Hub: `npm run dev:hub`
+  - _automatically seeds the database_
+- Runner: `npm run dev:runner-web`
+  - _Runner must be started after Hub_
+
+**Try It**
+
+- Go to `http://localhost:5173` (Hub)
+- Training Run (requires LLM)
+  - Navigate: "Customers" in header -> "Acme" link -> "BambooInvoice" link
+  - Tap "Begin a Training Run" to open the run modal:
+    - URL: http://localhost:8089
+    - Goal: "Find the total of the outstanding invoice for Contoso Consulting"
+    - Max Steps: 20
+    - tap "Start Training Run"
+  - _auto-navigates to the new Job page, runner picks up, watch the Transcript and Outputs fill in_
+- Execute a pre-trained Recipe (no LLM required)
+  - Navigate: "Customers" in header -> "Acme" link -> "BambooInvoice" link
+  - Tap "Start a Job" to open the dialog
+  - Select "Broken invoice lookup" or "Read seeded invoice"
+  - Enter invoice number "INV-1001" for a real invoice, any other value to test a not found scenario
+  - Tap "Start Job"
+  - _auto-navigates to the new Job page, runner picks up, watch the Transcript and Outputs fill in_
+
+Masking:
+- Values on Job screen and JSON Export of job are masked if sensitive.
+- Screenshots for Training or failed Jobs are masked where sensitive data is detected.
+- Raw, unmasked values are in the database and lightly partitioned from masked values, waiting for an integration to be shipped to
 
 # Making Changes
 
@@ -34,7 +72,7 @@ This project primarily uses a series of agentic tasks for development.
     5. loop to 2, clear session if you want
 3. Profit
 
-## More detail
+## More background
 
 * Architecture Decision Records:
     - [General](./docs/adrs/general/_index.md)
