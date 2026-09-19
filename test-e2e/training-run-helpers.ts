@@ -205,6 +205,10 @@ export function compiledRecipeResponse(): { content: string } {
 		content: JSON.stringify({
 			schemaVersion: 1,
 			inputs: {
+				// createTrainingRunJob.ts always seeds a "startingUrl" Ingredient itself (startingUrlInput.ts)
+				// — never asked of the goal-ingredients LLM step, but still one of the compiled schema's
+				// expected input names (recipeCompilationPrompt.ts: "exactly one entry per name given in inputs").
+				startingUrl: { type: "string", description: "Where the Recipe starts", required: true, nullable: false, sensitive: false },
 				invoiceNumber: { type: "string", description: "Invoice number to look up", required: true, nullable: false, sensitive: false }
 			},
 			outputs: {

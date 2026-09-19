@@ -45,7 +45,13 @@ function checkStepShape(
 	errors: string[],
 	mainStepIds: Set<string>,
 	checkValueRef: (value: unknown) => void,
-	requireFinishCheckpoint: boolean
+	requireFinishCheckpoint: boolean,
+	// A Destination (read/assign's target) *creates* an output rather than referencing one — Training's
+	// discovery loop invents new output names as it goes (nextStepPrompt.ts: "Reference or create an
+	// output destination"), so this never requires the name to already be known the way checkValueRef
+	// does. A full Recipe still wants it checked against its pre-declared outputs, so
+	// validateRecipeDefinition passes its own checkValueRef here too.
+	checkDestination: (value: unknown) => void
 ): void {
 	function checkTarget(target: unknown): void {
 		if (!isRecord(target)) {
@@ -124,14 +130,14 @@ function checkStepShape(
 				if (!READ_TYPES.has(args[1] as string)) {
 					errors.push(`Step ${id}: invalid read type: ${String(args[1])}`);
 				}
-				checkValueRef(args[2]);
+				checkDestination(args[2]);
 				break;
 			case "check":
 			case "verify":
 				checkCondition(args[0]);
 				break;
 			case "assign":
-				checkValueRef(args[0]);
+				checkDestination(args[0]);
 				checkValueRef(args[1]);
 				break;
 			case "goto":
@@ -193,7 +199,10 @@ export function validateAtomicStep(
 			errors.push(`Unknown credential reference: ${String(ref.name)}`);
 		}
 	};
-	checkStepShape(step, true, errors, new Set(), checkValueRef, false);
+	// A destination's output name is never checked against knownOutputNames — it's what *creates*
+	// that name for later Steps to reference, not a reference to one that must already exist.
+	const checkDestination = (): void => undefined;
+	checkStepShape(step, true, errors, new Set(), checkValueRef, false, checkDestination);
 	return errors;
 }
 
@@ -247,7 +256,7 @@ export function validateRecipeDefinition(definition: RecipeDefinition, knownCred
 	}
 
 	function checkStep(step: unknown, isChild: boolean): void {
-		checkStepShape(step, isChild, errors, mainStepIds, checkValueRef, true);
+		checkStepShape(step, isChild, errors, mainStepIds, checkValueRef, true, checkValueRef);
 	}
 
 	collectIds(definition.steps, false);

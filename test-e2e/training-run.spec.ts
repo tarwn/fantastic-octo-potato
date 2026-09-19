@@ -55,12 +55,15 @@ test.describe("training run against a real target application (spec 0009)", () =
 			await expect(page).toHaveURL(/\/jobs\/\d+/);
 			const jobId = Number(/\/jobs\/(\d+)/.exec(page.url())?.[1]);
 
-			// Transcript entries accumulate on the Job screen as the Runner executes real Steps.
+			// Transcript entries accumulate on the Job screen as the Runner executes real Steps — the
+			// transcript only ever carries a Step's id/outcome (jobs/types.ts's dslStep report shape
+			// has no `intent` field), never its `intent` text, unlike the later Recipe Review page
+			// (RecipeReview.svelte), which does render each compiled Step's intent.
 			await expect
 				.poll(
 					async () => {
 						await page.reload();
-						return page.getByText("Copy the client name").isVisible();
+						return page.getByText("copy_client: succeeded").isVisible();
 					},
 					{ timeout: 60_000 }
 				)

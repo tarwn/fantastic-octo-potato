@@ -8,7 +8,7 @@ test("start training modal shows goal, URL, and max-steps fields with validation
 	await page.getByRole("button", { name: "Begin a Training Run" }).click();
 
 	const dialog = page.getByRole("dialog");
-	await expect(dialog.getByLabel(/goal/i)).toBeVisible();
+	await expect(dialog.getByLabel(/primary goal/i)).toBeVisible();
 	await expect(dialog.getByLabel(/starting url/i)).toBeVisible();
 	await expect(dialog.getByLabel(/maximum steps/i)).toBeVisible();
 

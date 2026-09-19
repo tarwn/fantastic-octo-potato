@@ -132,6 +132,14 @@ describe("validateRecipeDefinition", () => {
 
 		expect(errors).toEqual([]);
 	});
+
+	it("rejects a read Step whose destination is not one of the full Recipe's declared outputs, unlike a Training atomic Step", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([{ id: "s1", action: "read", args: [{ by: "css", value: "h3" }, "text", { ref: "output", name: "notDeclared" }] }])
+		);
+
+		expect(errors).toContain("Unknown output reference: notDeclared");
+	});
 });
 
 describe("validateAtomicStep", () => {
@@ -183,6 +191,36 @@ describe("validateAtomicStep", () => {
 		const errors = validateAtomicStep({ id: "s1", action: "goto", args: ["somewhere"] }, new Set(), new Set());
 
 		expect(errors).toContain("Step s1: unknown goto target: somewhere");
+	});
+
+	it("accepts a read Step whose destination names a brand-new output, since a destination creates it rather than referencing one", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "read", args: [{ by: "css", value: "h3" }, "text", { ref: "output", name: "clientName" }] },
+			new Set(),
+			new Set()
+		);
+
+		expect(errors).toEqual([]);
+	});
+
+	it("accepts an assign Step whose destination names a brand-new output", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "assign", args: [{ ref: "output", name: "clientName" }, "value"] },
+			new Set(),
+			new Set()
+		);
+
+		expect(errors).toEqual([]);
+	});
+
+	it("still rejects a bad reference in an assign Step's value even though its destination is exempt", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "assign", args: [{ ref: "output", name: "clientName" }, { ref: "output", name: "doesNotExist" }] },
+			new Set(),
+			new Set()
+		);
+
+		expect(errors).toContain("Unknown output reference: doesNotExist");
 	});
 
 	it("accepts a reference to a known credential", () => {
