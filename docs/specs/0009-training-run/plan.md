@@ -5,7 +5,7 @@ This is the plan for [0009-training-run/spec.md](./spec.md).
 - [x] 3. Goal → Ingredients
 - [x] 4. Goal/transcript/screenshot → next Step
 - [x] _. Refactor server, a lot
-- [ ] 5. Runner Training loop
+- [x] 5. Runner Training loop
 - [ ] 6. Recipe compilation
 - [ ] 7. UI: draft Recipe visibility
 - [ ] 8. Docs

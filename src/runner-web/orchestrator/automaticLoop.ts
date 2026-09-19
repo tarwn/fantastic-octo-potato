@@ -4,12 +4,11 @@ import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl, SA
 import { type ActionOutcome, executeAction } from "../browser/actions.ts";
 import { closeBrowserSession, launchBrowserSession } from "../browser/browserSession.ts";
 import { evaluateCondition } from "../browser/conditions.ts";
-import { takeMaskedScreenshot } from "../browser/screenshotMasking.ts";
 import type { RunnerConfig } from "../config.ts";
 import { resolveCredential } from "../credentials.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
 import { createOutputsState } from "../dsl/outputsState.ts";
-import type { ChildStep, RecipeDefinition, Recovery, ScalarValue } from "../dsl/types.ts";
+import type { ChildStep, RecipeDefinition, Recovery } from "../dsl/types.ts";
 import { log } from "../logger.ts";
 import {
 	type ClaimedRecipeJob,
@@ -18,13 +17,13 @@ import {
 	reportDslStep,
 	reportInfo,
 	reportStatus,
-	TERMINAL_JOB_STATUSES,
-	uploadArtifact
+	TERMINAL_JOB_STATUSES
 } from "../runnerClient.ts";
 import { redactKnownSecrets } from "../textRedaction.ts";
 
 import { collectCredentialNames } from "./program/credentialNames.ts";
 import { buildLocationIndex } from "./program/locationIndex.ts";
+import { captureAndUploadArtifact, reportBlockedRequests, scalarToWireValue, type StepReportingDeps } from "./stepReporting.ts";
 
 const RECOVERY_POLL_INTERVAL_MS = 2000;
 
@@ -75,35 +74,11 @@ interface LoopDeps {
 // ineffective recovery) would otherwise keep re-applying it after every subsequent Step forever.
 const MAX_RECOVERY_ATTEMPTS = 3;
 
-async function captureAndUploadArtifact(deps: LoopDeps, stepId: string): Promise<void> {
-	try {
-		const screenshot = await takeMaskedScreenshot(deps.page, deps.secrets);
-		await uploadArtifact(deps.config, deps.job.comms.artifactsUrl, stepId, screenshot.toString("base64"));
-	}
-	catch (err: unknown) {
-		// A failed artifact upload is not fatal to the Job's control flow — the transcript row
-		// itself is the durable record; the screenshot is best-effort context.
-		const rawMessage = err instanceof Error ? err.message : String(err);
-		log(redactKnownSecrets(`job ${deps.job.id}: failed to capture/upload artifact for step ${stepId}: ${rawMessage}`, deps.secrets));
-	}
-}
-
-// Drains every request the allowlist route handler blocked since the last drain, reporting each
-// blocked subresource as its own INFO transcript row (non-fatal — the Step it happened during may
-// still have succeeded; a later Step may fail because of it instead). A blocked *navigation* is
-// reported by the caller as the Step's own outcome instead of an INFO row, since it always ends the
-// Job — this only hands back that navigation's URL, if any, for the caller to act on.
-async function reportBlockedRequests(deps: LoopDeps, stepId: string): Promise<string | undefined> {
-	const events = deps.blockedEvents.splice(0, deps.blockedEvents.length);
-	let navigationUrl: string | undefined;
-	for (const event of events) {
-		if (event.isNavigation) {
-			navigationUrl ??= event.url;
-			continue;
-		}
-		await reportInfo(deps.config, deps.job.id, redactKnownSecrets(`Step ${stepId}: blocked a disallowed-origin request to ${event.url}`, deps.secrets));
-	}
-	return navigationUrl;
+// Adapts a Recipe loop's LoopDeps to the shape stepReporting.ts's shared helpers need — reused as-is
+// by trainingLoop.ts's own LoopDeps, since both carry a ClaimedJob-like `job` plus the same
+// config/page/secrets/blockedEvents.
+function stepReportingDeps(deps: LoopDeps): StepReportingDeps {
+	return { config: deps.config, jobId: deps.job.id, artifactsUrl: deps.job.comms.artifactsUrl, page: deps.page, secrets: deps.secrets, blockedEvents: deps.blockedEvents };
 }
 
 // Runs one non-structural Step, reports its transcript row + screenshot, then resolves whether
@@ -116,7 +91,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 		actionResult = await executeAction(deps.page, step, deps.ctx);
 	}
 	catch (err: unknown) {
-		await reportBlockedRequests(deps, step.id);
+		await reportBlockedRequests(stepReportingDeps(deps), step.id);
 		const rawMessage = err instanceof Error ? err.message : String(err);
 		return { type: "error", message: redactKnownSecrets(`Unexpected error executing step ${step.id}: ${rawMessage}`, deps.secrets) };
 	}
@@ -124,7 +99,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	// The route handler catches disallowed requests that hit the network stack before they're sent;
 	// `isAllowedUrl(page.url(), ...)` is the backstop for navigations Playwright's interception can't
 	// see at all (data:/about:/blob:), so both are checked here.
-	const blockedNavigationUrl = await reportBlockedRequests(deps, step.id);
+	const blockedNavigationUrl = await reportBlockedRequests(stepReportingDeps(deps), step.id);
 	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [...deps.job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS])) {
 		return { type: "error", message: redactKnownSecrets(`Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}`, deps.secrets) };
 	}
@@ -195,10 +170,6 @@ function toWireExtractions(actionResult: ActionOutcome): Array<{ fieldName: stri
 	return [{ fieldName: actionResult.extraction.fieldName, value: scalarToWireValue(actionResult.extraction.value) }];
 }
 
-function scalarToWireValue(value: ScalarValue): string {
-	return value === null ? "null" : String(value);
-}
-
 async function reportChildOutcome(deps: LoopDeps, stepId: string, outcome: "succeeded" | "failed", parentStepId: string | undefined, extractions: Array<{ fieldName: string; value: string }>): Promise<void> {
 	await reportDslStep(deps.config, deps.job.id, {
 		stepId,
@@ -206,7 +177,7 @@ async function reportChildOutcome(deps: LoopDeps, stepId: string, outcome: "succ
 		...(parentStepId !== undefined ? { parentStepId } : {}),
 		extractions
 	});
-	await captureAndUploadArtifact(deps, stepId);
+	await captureAndUploadArtifact(stepReportingDeps(deps), stepId);
 }
 
 async function runChildSequence(deps: LoopDeps, recipe: RecipeDefinition, children: ChildStep[], startIndex: number, parentStepId: string | undefined, insideRecovery: boolean): Promise<SequenceOutcome> {
@@ -397,7 +368,7 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 		log(redactKnownSecrets(`job ${job.id}: recipe loop failed unexpectedly, abandoning back to polling: ${rawMessage}`, secrets));
 	}
 	finally {
-		await captureAndUploadArtifact(deps, "terminal");
+		await captureAndUploadArtifact(stepReportingDeps(deps), "terminal");
 		await closeBrowserSession(session);
 		log(`job ${job.id}: recipe loop finished, resuming polling`);
 	}

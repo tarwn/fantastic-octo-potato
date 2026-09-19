@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 
 import { claimJobForRunner, reportJobStep as reportJobStepInner, uploadJobStepArtifact as uploadJobStepArtifactInner } from "../jobs/jobActions";
 import { JobType } from "../storage/db/jobType";
+import { SensitivityType } from "../storage/db/sensitivityType";
 import { getJobById, type Job, listSensitiveJobIngredients, listTrainingRunJobSteps } from "../storage/repositories/jobRepository";
 import { getRecipeById } from "../storage/repositories/recipeRepository";
 import { updateRunnerHeartbeat } from "../storage/repositories/runnerRepository";
@@ -97,6 +98,19 @@ function buildTrainingRunJobPayload(db: Database.Database, job: Extract<Job, { j
 	if (!firstStep) {
 		throw new Error(`Training Run Job ${job.id} has no persisted first Step`);
 	}
+
+	// Training has no upfront Recipe to declare an input's sensitivity the way buildRecipeJobPayload's
+	// recipe.inputs[name].sensitive does — sensitiveIngredientNames carries the same information so
+	// the Runner knows which of these raw values to mask in its own screenshots/logs.
+	const ingredients: Record<string, string> = {};
+	const sensitiveIngredientNames: string[] = [];
+	for (const ingredient of listSensitiveJobIngredients(db, job.id)) {
+		ingredients[ingredient.fieldName] = ingredient.rawValue;
+		if (ingredient.sensitivityType !== SensitivityType.None) {
+			sensitiveIngredientNames.push(ingredient.fieldName);
+		}
+	}
+
 	return {
 		id: job.id,
 		goal: job.details.goal,
@@ -106,6 +120,8 @@ function buildTrainingRunJobPayload(db: Database.Database, job: Extract<Job, { j
 		maxSteps: job.details.maxSteps,
 		stepTimeoutMs: job.details.stepTimeoutMs,
 		syntheticDataConfirmed: job.details.syntheticDataConfirmed,
+		ingredients,
+		sensitiveIngredientNames,
 		nextStep: firstStep.definition
 	};
 }

@@ -1,12 +1,13 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { buildOpenStartingUrlStep } from "../jobs/startingUrlInput";
+import { buildOpenStartingUrlStep, STARTING_URL_INGREDIENT_NAME } from "../jobs/startingUrlInput";
 import { useIntegrationTestDb } from "../storage/db/_test/integrationTestDb";
 import { JobStatus } from "../storage/db/jobStatus";
 import { TranscriptKind } from "../storage/db/jobTranscriptKind";
 import { JobType } from "../storage/db/jobType";
-import { getJobById, insertJob, insertTrainingRunJobStep, listTranscriptEntries } from "../storage/repositories/jobRepository";
+import { SensitivityType } from "../storage/db/sensitivityType";
+import { getJobById, insertJob, insertTrainingRunJobStep, listTranscriptEntries, upsertJobIngredient } from "../storage/repositories/jobRepository";
 import { getRunnerById } from "../storage/repositories/runnerRepository";
 
 import { runnerInit, runnerPoll } from "./runnerActions";
@@ -49,6 +50,7 @@ function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10):
 		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
 	});
+	upsertJobIngredient(db, job.id, STARTING_URL_INGREDIENT_NAME, "https://example.com/start", SensitivityType.None, job.createdAt);
 	insertTrainingRunJobStep(db, job.id, buildOpenStartingUrlStep(), job.createdAt);
 	return job.id;
 }
@@ -133,6 +135,8 @@ describe("runnerActions", () => {
 							maxSteps: 10,
 							stepTimeoutMs: 15000,
 							syntheticDataConfirmed: false,
+							ingredients: { startingUrl: "https://example.com/start" },
+							sensitiveIngredientNames: [],
 							nextStep: {
 								id: "open_starting_url",
 								action: "open",

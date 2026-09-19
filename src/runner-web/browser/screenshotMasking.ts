@@ -12,9 +12,12 @@ interface ScannedElement {
 // heuristic outside the named pattern set (email/phone/credit-card/SSN); see ADR 0001.
 const piiDetector = new Redactor({ rules: { EMAIL: true, PHONE: true, CREDIT_CARD: true, SSN: true, NAME: false } });
 
-function isSensitive(element: { text: string; controlValue: string }, secrets: string[]): boolean {
+function isSensitive(element: { text: string; controlValue: string }, secrets: string[], skipPiiPass: boolean): boolean {
 	const textContainsSecret = element.text !== "" && secrets.some((value) => value !== "" && element.text.includes(value));
 	const controlIsSecret = element.controlValue !== "" && secrets.includes(element.controlValue);
+	if (skipPiiPass) {
+		return textContainsSecret || controlIsSecret;
+	}
 	const textHasPii = element.text !== "" && piiDetector.hasPII(element.text);
 	const controlHasPii = element.controlValue !== "" && piiDetector.hasPII(element.controlValue);
 	return textContainsSecret || controlIsSecret || textHasPii || controlHasPii;
@@ -24,7 +27,9 @@ function isSensitive(element: { text: string; controlValue: string }, secrets: s
 // third-party-detected PII pattern before taking the screenshot, then removes them — avoids
 // pulling in an image-compositing dependency. The sensitivity check runs in Node (not inside
 // page.evaluate) so the PII-detection library never has to run in the browser's page context.
-export async function takeMaskedScreenshot(page: Page, secrets: string[]): Promise<Buffer> {
+// `skipPiiPass` (set from Training's operator-confirmed "this data is synthetic" flag) only ever
+// disables the third-party PII-detection pass — the known-secrets scrub above always still applies.
+export async function takeMaskedScreenshot(page: Page, secrets: string[], skipPiiPass = false): Promise<Buffer> {
 	// Filtered in-browser (not just mapped) so non-visual elements and empty leaf nodes never cross
 	// the Playwright protocol boundary as part of the per-screenshot scan payload.
 	const NON_VISUAL_TAGS = new Set(["SCRIPT", "STYLE", "HEAD", "META", "LINK", "TITLE"]);
@@ -46,7 +51,7 @@ export async function takeMaskedScreenshot(page: Page, secrets: string[]): Promi
 		return results;
 	}, [...NON_VISUAL_TAGS]);
 
-	const rectsToMask = elements.filter((element) => isSensitive(element, secrets)).map((element) => element.rect);
+	const rectsToMask = elements.filter((element) => isSensitive(element, secrets, skipPiiPass)).map((element) => element.rect);
 	if (rectsToMask.length === 0) {
 		return page.screenshot();
 	}
