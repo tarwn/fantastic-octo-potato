@@ -197,7 +197,7 @@ export function validateAtomicStep(
 	return errors;
 }
 
-export function validateRecipeDefinition(definition: RecipeDefinition): string[] {
+export function validateRecipeDefinition(definition: RecipeDefinition, knownCredentialNames: ReadonlySet<string> = new Set()): string[] {
 	const errors: string[] = [];
 	const seenIds = new Set<string>();
 	const mainStepIds = new Set<string>();
@@ -240,6 +240,9 @@ export function validateRecipeDefinition(definition: RecipeDefinition): string[]
 		}
 		if (ref.ref === "output" && !(String(ref.name) in definition.outputs)) {
 			errors.push(`Unknown output reference: ${String(ref.name)}`);
+		}
+		if (ref.ref === "credential" && !knownCredentialNames.has(String(ref.name))) {
+			errors.push(`Unknown credential reference: ${String(ref.name)}`);
 		}
 	}
 

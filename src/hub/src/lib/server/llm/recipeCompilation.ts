@@ -35,6 +35,10 @@ export interface RecipeCompilationContext {
 	// A Result's sensitivity is not yet classified anywhere (jobActions.ts records it as None
 	// pending this step) — the LLM classifies it here as part of the output's field declaration.
 	results: RecipeCompilationResult[];
+	// The Training run's own known-credential set (training_job.credential_names) — the only source
+	// of truth for what a `{ref:"credential"}` in an executedStep may legitimately name, since a
+	// credential's value never resolves anywhere but the Runner.
+	credentialNames: string[];
 }
 
 // Thrown only once every attempt has produced a response that fails validation (either its own
@@ -62,7 +66,7 @@ export async function compileRecipe(context: RecipeCompilationContext): Promise<
 		try {
 			const schema = parseCompiledSchema(raw, context);
 			const definition = assembleDefinition(schema, context);
-			const errors = validateRecipeDefinition(definition);
+			const errors = validateRecipeDefinition(definition, new Set(context.credentialNames));
 			if (errors.length > 0) {
 				throw new Error(`Compiled Recipe definition is invalid: ${errors.join("; ")} (raw: ${raw})`);
 			}

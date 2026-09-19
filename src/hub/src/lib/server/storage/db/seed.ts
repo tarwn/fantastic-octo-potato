@@ -127,7 +127,8 @@ export function seed(db: Database.Database): void {
 			goal: "Log in and copy the seeded invoice's client name",
 			definition: happyPathDefinition(),
 			sourceTrainingRunId: null,
-			createdAt: now
+			createdAt: now,
+			knownCredentialNames: ["username", "password"]
 		});
 		publishRecipe(db, happyPath.id, now);
 
@@ -137,7 +138,8 @@ export function seed(db: Database.Database): void {
 			goal: "Demonstrate an unrecoverable Step reaching Intervention-Requested",
 			definition: failingDefinition(),
 			sourceTrainingRunId: null,
-			createdAt: now
+			createdAt: now,
+			knownCredentialNames: ["username", "password"]
 		});
 		publishRecipe(db, failing.id, now);
 	})();

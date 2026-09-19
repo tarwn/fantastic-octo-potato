@@ -163,7 +163,8 @@ export async function reportDslStep(
 				transcriptSummary,
 				executedSteps: listTrainingRunJobSteps(db, job.id).map((trainingStep) => trainingStep.definition),
 				ingredients: listSafeJobIngredients(db, job.id),
-				results: listSafeJobResults(db, job.id)
+				results: listSafeJobResults(db, job.id),
+				credentialNames: knownCredentialNames
 			});
 			createDraftRecipe(db, {
 				customerApplicationXrefId: job.customerApplicationXrefId,
@@ -171,7 +172,8 @@ export async function reportDslStep(
 				goal: job.details.goal,
 				definition,
 				sourceTrainingRunId: String(job.id),
-				createdAt: now
+				createdAt: now,
+				knownCredentialNames
 			});
 		}
 		catch (err) {

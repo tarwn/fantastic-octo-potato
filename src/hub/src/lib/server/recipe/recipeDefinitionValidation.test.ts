@@ -115,6 +115,23 @@ describe("validateRecipeDefinition", () => {
 
 		expect(errors).toContain("Step s1: finish requires a non-null checkpoint condition");
 	});
+
+	it("rejects a reference to an unknown credential, since the model must never guess a name", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([{ id: "s1", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "guessed" }] }])
+		);
+
+		expect(errors).toContain("Unknown credential reference: guessed");
+	});
+
+	it("accepts a reference to a known credential", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([{ id: "s1", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "loginUser" }] }]),
+			new Set(["loginUser"])
+		);
+
+		expect(errors).toEqual([]);
+	});
 });
 
 describe("validateAtomicStep", () => {

@@ -26,6 +26,9 @@ export interface CreateDraftRecipeParams {
 	definition: RecipeDefinition;
 	sourceTrainingRunId: string | null;
 	createdAt: Date;
+	// The source Training run's known-credential set, re-checked here since this is the last gate
+	// before persistence — defaults to none for callers with no Training run behind the definition.
+	knownCredentialNames?: string[];
 }
 
 interface RecipeRow {
@@ -66,7 +69,7 @@ function mapRecipeRow(row: RecipeRow): Recipe {
 // An invalid definition (duplicate ids, unknown references/jump targets, invalid enum/action
 // values, or nesting deeper than one level) is rejected here — before it is ever persisted or dispatched.
 export function createDraftRecipe(db: Database.Database, params: CreateDraftRecipeParams): Recipe {
-	const errors = validateRecipeDefinition(params.definition);
+	const errors = validateRecipeDefinition(params.definition, new Set(params.knownCredentialNames ?? []));
 	if (errors.length > 0) {
 		throw new Error(`Invalid Recipe definition: ${errors.join("; ")}`);
 	}

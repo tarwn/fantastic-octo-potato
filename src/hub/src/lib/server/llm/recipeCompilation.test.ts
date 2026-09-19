@@ -28,6 +28,7 @@ function baseContext(overrides: Partial<RecipeCompilationContext> = {}): RecipeC
 		],
 		ingredients: [{ fieldName: "startingUrl", safeValue: "https://example.com/start", sensitivityType: SensitivityType.None }],
 		results: [{ fieldName: "total", safeValue: "100" }],
+		credentialNames: [],
 		...overrides
 	};
 }
@@ -117,6 +118,50 @@ describe("compileRecipe", () => {
 		expect(error).toBeInstanceOf(RecipeCompilationInvalidResponseError);
 		expect((error as Error).message).toMatch(/… \(truncated\)$/);
 		expect((error as Error).message.length).toBeLessThan(1100);
+	});
+
+	it("accepts an executed Step referencing a credential name the Training run reported", async () => {
+		mockedSendChatCompletion.mockResolvedValue(JSON.stringify(VALID_RESPONSE));
+		const { compileRecipe } = await import("./recipeCompilation");
+
+		const result = await compileRecipe(
+			baseContext({
+				executedSteps: [
+					{ id: "open_starting_url", action: "open", args: [{ ref: "input", name: "startingUrl" }] },
+					{ id: "fill_user", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "loginUser" }] },
+					{
+						id: "read_total",
+						action: "read",
+						args: [{ by: "text", value: "Total" }, "text", { ref: "output", name: "total" }]
+					},
+					{ id: "s3", action: "finish", args: [null] }
+				],
+				credentialNames: ["loginUser"]
+			})
+		);
+
+		expect(result.steps).toContainEqual({
+			id: "fill_user",
+			action: "fill",
+			args: [{ by: "label", value: "Username" }, { ref: "credential", name: "loginUser" }]
+		});
+	});
+
+	it("fails loudly when an executed Step references a credential name the Training run never reported", async () => {
+		mockedSendChatCompletion.mockResolvedValue(JSON.stringify(VALID_RESPONSE));
+		const { compileRecipe, RecipeCompilationInvalidResponseError } = await import("./recipeCompilation");
+
+		await expect(
+			compileRecipe(
+				baseContext({
+					executedSteps: [
+						{ id: "fill_user", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "guessed" }] },
+						{ id: "s3", action: "finish", args: [null] }
+					],
+					credentialNames: ["loginUser"]
+				})
+			)
+		).rejects.toThrow(RecipeCompilationInvalidResponseError);
 	});
 
 	it("fails loudly when the response invents a field name that was never observed", async () => {
