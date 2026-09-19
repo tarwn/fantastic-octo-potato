@@ -29,11 +29,11 @@ export default defineConfig({
 			RUNNER_SHARED_SECRET: "test-e2e-shared-secret",
 			RUNNER_POLL_INTERVAL_SECONDS: "1",
 			RUNNER_INTERVENTION_TIMEOUT_SECONDS: "5",
-			// Points Hub's LLM client (docs/specs/0009-training-run/spec.md Step 2) at the local
-			// stub server (llm-stub/, started by globalSetup.ts) instead of a real OpenAI endpoint.
-			OPENAI_BASE_URL: `http://localhost:${DEFAULT_LLM_STUB_PORT}/v1`,
-			OPENAI_API_KEY: "test-e2e-llm-key",
-			OPENAI_MODEL: "test-e2e-llm-model"
+			// Points Hub's LLM client at the local stub server (llm-stub/, started by
+			// globalSetup.ts) instead of a real provider endpoint.
+			LLM_API_URL: `http://localhost:${DEFAULT_LLM_STUB_PORT}/v1`,
+			LLM_API_KEY: "test-e2e-llm-key",
+			LLM_MODEL: "test-e2e-llm-model"
 		}
 	},
 	use: { baseURL: `http://localhost:${HUB_PORT}` },

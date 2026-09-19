@@ -61,7 +61,7 @@ Step 1's e2e guards stay red through Step 7 (they need the LLM client, both prom
 - [API Request/Response Conventions](../../context/hub/backend/api-request-response-conventions.md)
 
 **Work:**
-- Add `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL` to `src/hub/.env.example` and a config loader that crashes on missing values (no default key/URL).
+- Add `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL` to `src/hub/.env.example` and a config loader that crashes on missing values (no default key/URL).
 - Add a small `llmClient.ts`: one function that sends a chat-completion request (system + user messages) and returns the raw text response; no retry/streaming/tool-calling beyond what the two callers below need.
 - If a library is added instead of `fetch`, write the ADR first (C001).
 
