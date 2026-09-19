@@ -32,7 +32,7 @@ interface JobBase {
 }
 
 export type Job =
-	| (JobBase & { jobType: JobType.Training; details: TrainingJob })
+	| (JobBase & { jobType: JobType.TrainingRun; details: TrainingJob })
 	| (JobBase & { jobType: JobType.Recipe; details: RecipeJob });
 
 export interface TranscriptFieldRef {

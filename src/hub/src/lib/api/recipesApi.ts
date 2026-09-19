@@ -26,7 +26,7 @@ export interface StartRecipeJobRequested {
 }
 
 export async function startRecipeJob(recipeId: number, request: StartRecipeJobRequested): Promise<Job> {
-	const response = await fetch(`/api/hub/recipes/${recipeId}/jobs`, {
+	const response = await fetch(`/api/hub/jobs/new/recipes/${recipeId}`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify(request)

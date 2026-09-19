@@ -80,7 +80,7 @@
 <div class="job-page">
 	{#if loadError}
 		<p class="job-page-message">{loadError}</p>
-	{:else if job && registeredApplication && job.jobType === JobType.Training}
+	{:else if job && registeredApplication && job.jobType === JobType.TrainingRun}
 		<div class="job-page-content">
 			<div class="job-page-eyebrow">
 				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>

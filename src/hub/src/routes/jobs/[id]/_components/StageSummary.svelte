@@ -3,7 +3,7 @@
 	import { JobType } from "$lib/jobType";
 	import type { Job } from "$lib/types/job";
 
-	type TrainingJobDetail = Extract<Job, { jobType: JobType.Training }>;
+	type TrainingJobDetail = Extract<Job, { jobType: JobType.TrainingRun }>;
 
 	let { job, stepsTaken }: { job: TrainingJobDetail; stepsTaken: number } = $props();
 

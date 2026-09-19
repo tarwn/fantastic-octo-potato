@@ -2,7 +2,7 @@
 
 Keeps every caller of a repository working with the same shape, regardless of which function produced it.
 
-Reference: [jobRepository.ts](../../../../src/hub/src/lib/server/repositories/jobRepository.ts)
+Reference: [jobRepository.ts](../../../../src/hub/src/lib/server/storage/repositories/jobRepository.ts)
 
 Notable:
 * **An insert that hands the caller back an entity returns the full thing, built in-memory from known inputs plus the generated id** — `insertJob` never re-selects the row it just wrote; it constructs the `Job` object directly from `lastInsertRowid` and the params it already has (see [Database Handling](./database-handling.md) for the `dates.ts` translation used here). Avoid the temptation to re-query for "safety" — if the object being returned isn't provably identical to what a re-select would produce, that's a sign the write itself is wrong, not a reason to add a round trip. (A write whose callers never need the row back, like `appendTranscriptEntry` or `upsertJobResult`, just returns `void`.)

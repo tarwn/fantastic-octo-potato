@@ -33,7 +33,7 @@ describe("StartTrainingModal", () => {
 		vi.mocked(startTrainingRun).mockResolvedValue({
 			id: 42,
 			customerApplicationXrefId: 1,
-			jobType: JobType.Training,
+			jobType: JobType.TrainingRun,
 			jobStatusId: 1,
 			details: {
 				goal: "Extract invoices",

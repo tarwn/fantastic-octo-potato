@@ -77,7 +77,7 @@ Step 1's e2e Job scenarios describe user-observable behavior that doesn't exist 
 
 **References**
 - [runner-api.md](../../context/hub/backend/runner-api.md), `runnerActions.ts`, `scriptedTrainingSteps.ts` (stand-in being replaced for `recipe_job` only — `training_job` keeps it, see C003)
-- [seed.ts](../../../src/hub/src/lib/server/db/seed.ts) — current minimal Customer/Application/Runner seed to extend
+- [seed.ts](../../../src/hub/src/lib/server/storage/db/seed.ts) — current minimal Customer/Application/Runner seed to extend
 
 **Work:**
 - Seed two Recipes (draft+published each, per R005) against the local target application: a happy path (log in, open the seeded invoice, read invoice/client/amount fields, finish) and a failing one (a Step whose target cannot resolve and has no matching recovery, per R008).

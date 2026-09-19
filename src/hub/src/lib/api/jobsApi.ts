@@ -49,7 +49,7 @@ export function parseJob(job: JobResponse): Job {
 		heartbeatOn: job.heartbeatOn === null ? null : new Date(job.heartbeatOn),
 		completedAt: job.completedAt === null ? null : new Date(job.completedAt)
 	};
-	if (job.jobType === JobType.Training) {
+	if (job.jobType === JobType.TrainingRun) {
 		return { ...job, ...dates };
 	}
 	return { ...job, ...dates };
@@ -90,10 +90,10 @@ export async function fetchJob(id: number): Promise<JobDetail> {
 }
 
 export async function startTrainingRun(registeredApplicationId: number, request: StartTrainingRunRequested): Promise<Job> {
-	const response = await fetch(`/api/hub/registered-applications/${registeredApplicationId}/jobs`, {
+	const response = await fetch("/api/hub/jobs/new/training", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
-		body: JSON.stringify(request)
+		body: JSON.stringify({ ...request, registeredApplicationId })
 	});
 	const body = (await response.json()) as { data: JobResponse } | { error: string };
 	if ("error" in body) {

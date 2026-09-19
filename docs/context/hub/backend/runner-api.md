@@ -1,6 +1,6 @@
 # Runner API: init, poll, and Job steps
 
-Reference: [init/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/init/+server.ts), [poll/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/poll/+server.ts), [steps/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/jobs/[jobId]/steps/+server.ts), [runnerActions.ts](../../../../src/hub/src/lib/server/runnerActions.ts), [runnerConfig.ts](../../../../src/hub/src/lib/server/runnerConfig.ts)
+Reference: [init/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/init/+server.ts), [poll/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/poll/+server.ts), [steps/+server.ts](../../../../src/hub/src/routes/api/runner/runners/[id]/jobs/[jobId]/steps/+server.ts), [runnerActions.ts](../../../../src/hub/src/lib/server/runner/runnerActions.ts), [runnerConfig.ts](../../../../src/hub/src/lib/server/runner/runnerConfig.ts)
 
 Also see: [Runner Config & Startup](../../runner-web/runner-config.md) (the runner-web side), [Job Queue](../job-queue.md) (the claim-atomicity/ownership rules these endpoints wrap), [Recipe Automatic Loop](../../runner-web/recipe-automatic-loop.md) (why the Runner needs the whole-Recipe payload/report shapes below).
 

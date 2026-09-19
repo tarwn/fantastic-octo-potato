@@ -2,7 +2,7 @@
 
 Use this pattern when touching Job persistence, claim-on-poll, or the Runner-facing step-reporting loop.
 
-Reference: [jobRepository.ts](../../../src/hub/src/lib/server/repositories/jobRepository.ts) (`claimNextJobForRunner`), [runnerActions.ts](../../../src/hub/src/lib/server/runnerActions.ts) (`reportJobStep`)
+Reference: [jobRepository.ts](../../../src/hub/src/lib/server/storage/repositories/jobRepository.ts) (`claimNextJobForRunner`), [jobActions.ts](../../../src/hub/src/lib/server/jobs/jobActions.ts) (`reportJobStep`)
 
 Notable:
 * A base/extension table split (`job` + `training_job`/`recipe_job` on `job_type_id`) always reads through a repository join, never `job` alone — an extension row is required, not optional, for the row's type.
