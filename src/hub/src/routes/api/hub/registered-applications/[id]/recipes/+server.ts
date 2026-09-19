@@ -2,11 +2,19 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { listRecipesAction } from "$lib/server/recipe/recipeActions";
+import { toRecipeSummaries } from "$lib/server/recipe/recipeActions";
 import { getDb } from "$lib/server/storage/db/db";
+import { getRegisteredApplicationById } from "$lib/server/storage/repositories/customerApplicationXrefRepository";
+import { listRecipesForApplication } from "$lib/server/storage/repositories/recipeRepository";
 
 export const GET: RequestHandler = ({ params }) => {
-	const result = listRecipesAction(getDb(), params.id);
+	const db = getDb();
+	const registeredApplicationId = Number(params.id);
+	const registeredApplication = Number.isNaN(registeredApplicationId) ? undefined : getRegisteredApplicationById(db, registeredApplicationId);
+	if (!registeredApplication) {
+		return json({ error: `Registered Application ${params.id} not found` }, { status: 404 });
+	}
 
-	return json(result.body, { status: result.status });
+	const recipes = listRecipesForApplication(db, registeredApplication.id);
+	return json({ data: toRecipeSummaries(recipes) }, { status: 200 });
 };

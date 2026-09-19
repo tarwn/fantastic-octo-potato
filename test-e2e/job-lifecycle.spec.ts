@@ -119,8 +119,8 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 
 	try {
 		// Create a Training Job scoped to the seeded Registered Application; it starts Pending.
-		const createResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
-			data: { goal: "Learn the thing", startingUrl: "https://teller.northwind.test/start", maxSteps: 5 }
+		const createResponse = await request.post("/api/hub/jobs/new/training", {
+			data: { goal: "Learn the thing", startingUrl: "https://teller.northwind.test/start", maxSteps: 5, registeredApplicationId: bambooInvoice.id }
 		});
 		expect(createResponse.status()).toBe(201);
 		const { data: created } = (await createResponse.json()) as { data: { id: number; jobStatusId: number } };
@@ -196,8 +196,8 @@ test("full Job lifecycle: claim, transcript, completion, ownership, and cancella
 			.toBeGreaterThanOrEqual(1);
 
 		// Cancel a second Job while the same Runner is assigned to it.
-		const secondCreateResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
-			data: { goal: "Learn the thing again", startingUrl: "https://teller.northwind.test/start", maxSteps: 5 }
+		const secondCreateResponse = await request.post("/api/hub/jobs/new/training", {
+			data: { goal: "Learn the thing again", startingUrl: "https://teller.northwind.test/start", maxSteps: 5, registeredApplicationId: bambooInvoice.id }
 		});
 		const { data: secondCreated } = (await secondCreateResponse.json()) as { data: { id: number } };
 		const secondJobDetailUrl = `/api/hub/jobs/${secondCreated.id}`;

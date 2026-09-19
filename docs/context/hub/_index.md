@@ -5,6 +5,7 @@
 * [Job Queue: schema, claim atomicity, ownership, scripted steps](./job-queue.md)
 
 Backend:
+* [lib/server Domain Structure](./backend/server-domain-structure.md)
 * [API Request/Response Conventions](./backend/api-request-response-conventions.md)
 * [Database Handling](./backend/database-handling.md)
 * [Repository Return Value Conventions](./backend/repository-return-value-conventions.md)

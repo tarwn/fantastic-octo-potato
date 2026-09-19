@@ -126,7 +126,7 @@ test.describe("recipe execution against a real target application (spec 0007)", 
 		try {
 			const recipe = await findRecipe(request, HAPPY_PATH_RECIPE_NAME);
 
-			const createResponse = await request.post(`/api/hub/recipes/${recipe.id}/jobs`, {
+			const createResponse = await request.post(`/api/hub/jobs/new/recipes/${recipe.id}`, {
 				data: { mode: "Execute", ingredients: { invoiceNumber: SEEDED_INVOICE_NUMBER } }
 			});
 			expect(createResponse.status()).toBe(201);
@@ -158,7 +158,7 @@ test.describe("recipe execution against a real target application (spec 0007)", 
 		try {
 			const recipe = await findRecipe(request, FAILING_RECIPE_NAME);
 
-			const createResponse = await request.post(`/api/hub/recipes/${recipe.id}/jobs`, {
+			const createResponse = await request.post(`/api/hub/jobs/new/recipes/${recipe.id}`, {
 				data: { mode: "Execute", ingredients: { invoiceNumber: SEEDED_INVOICE_NUMBER } }
 			});
 			expect(createResponse.status()).toBe(201);

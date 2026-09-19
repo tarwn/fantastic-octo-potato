@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
 
-import { fromDbDate, toDbDate } from "../db/dates";
-import { JobStatus } from "../db/jobStatus";
-import { TranscriptKind } from "../db/jobTranscriptKind";
-import { JobType } from "../db/jobType";
-import { SensitivityType } from "../db/sensitivityType";
+import { fromDbDate, toDbDate } from "../db/dates.ts";
+import { JobStatus } from "../db/jobStatus.ts";
+import { TranscriptKind } from "../db/jobTranscriptKind.ts";
+import { JobType } from "../db/jobType.ts";
+import { SensitivityType } from "../db/sensitivityType.ts";
 
 import type { ChildStep } from "$lib/types/recipeDefinition";
 

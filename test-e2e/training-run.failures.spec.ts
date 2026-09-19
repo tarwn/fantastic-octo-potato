@@ -39,8 +39,8 @@ test.describe("training run failure and correction outcomes (spec 0009)", () => 
 		try {
 			const bambooInvoice = await findBambooInvoiceApp(request);
 
-			const createResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
-				data: { goal, startingUrl: TARGET_APP_URL, maxSteps: 1 }
+			const createResponse = await request.post("/api/hub/jobs/new/training", {
+				data: { goal, startingUrl: TARGET_APP_URL, maxSteps: 1, registeredApplicationId: bambooInvoice.id }
 			});
 			expect(createResponse.status()).toBe(201);
 			const { data: created } = (await createResponse.json()) as { data: { id: number } };
@@ -76,8 +76,8 @@ test.describe("training run failure and correction outcomes (spec 0009)", () => 
 		try {
 			const bambooInvoice = await findBambooInvoiceApp(request);
 
-			const createResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
-				data: { goal, startingUrl: TARGET_APP_URL, maxSteps: 15 }
+			const createResponse = await request.post("/api/hub/jobs/new/training", {
+				data: { goal, startingUrl: TARGET_APP_URL, maxSteps: 15, registeredApplicationId: bambooInvoice.id }
 			});
 			expect(createResponse.status()).toBe(201);
 			const { data: created } = (await createResponse.json()) as { data: { id: number } };
@@ -110,8 +110,8 @@ test.describe("training run failure and correction outcomes (spec 0009)", () => 
 		try {
 			const bambooInvoice = await findBambooInvoiceApp(request);
 
-			const createResponse = await request.post(`/api/hub/registered-applications/${bambooInvoice.id}/jobs`, {
-				data: { goal, startingUrl: TARGET_APP_URL, maxSteps: 15 }
+			const createResponse = await request.post("/api/hub/jobs/new/training", {
+				data: { goal, startingUrl: TARGET_APP_URL, maxSteps: 15, registeredApplicationId: bambooInvoice.id }
 			});
 			expect(createResponse.status()).toBe(201);
 			const { data: created } = (await createResponse.json()) as { data: { id: number } };
