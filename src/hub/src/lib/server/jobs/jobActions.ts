@@ -28,35 +28,7 @@ import { type Runner, updateRunnerHeartbeat } from "../storage/repositories/runn
 
 import { reportDslStep as reportRecipeJobDslStep } from "./recipeJobs/reportDslStep";
 import { reportDslStep as reportTrainingRunJobDslStep } from "./trainingRunJobs/reportDslStep";
-
-export interface JobActionResult {
-	status: number;
-	body: { data: unknown } | { error: string };
-}
-
-// halt is deliberately excluded — it's a schema/enum slot for a future Intervention-Requested
-// status change, not something a Runner can submit as free text this spec.
-export type ReportStepBody =
-	| { kind: "status"; status: JobStatus; message: string }
-	| { kind: "info"; message: string }
-	// Both Recipe and Training Run Jobs report DSL Steps by string id (R004/C004 — Training issues
-	// real atomic DSL Steps, not a bespoke sequence-based shape). extractions still carries the raw
-	// value on the wire (upsertJobResult needs it to compute a safe value) — it's the transcript
-	// row built from this that only ever keeps the destination field name. credentialNames is
-	// Training-only and names only, never values — the Runner's only chance to tell Hub what
-	// `{ref:"credential"}` names its own RUNNER_CREDENTIAL_* env vars make available, since Hub has
-	// no other way to learn them ahead of a next-Step prompt.
-	| {
-			kind: "dslStep";
-			stepId: string;
-			outcome: "succeeded" | "failed";
-			parentStepId?: string;
-			extractions: Array<{ fieldName: string; value: string }>;
-			credentialNames?: string[];
-	  }
-	| { kind: "recover"; message: string }
-	| { kind: "observe"; message: string }
-	| { kind: "plan"; message: string };
+import { isJobStatus, isRecord, type JobActionResult, type ParseResult } from "./types";
 
 const NON_STEP_TRANSCRIPT_KIND: Record<"info" | "recover" | "observe" | "plan", Exclude<TranscriptKind, TranscriptKind.Step>> = {
 	info: TranscriptKind.Info,
@@ -65,21 +37,9 @@ const NON_STEP_TRANSCRIPT_KIND: Record<"info" | "recover" | "observe" | "plan", 
 	plan: TranscriptKind.Plan
 };
 
-const JOB_STATUS_VALUES = Object.values(JobStatus).filter((value): value is JobStatus => typeof value === "number");
-
-function isJobStatus(value: unknown): value is JobStatus {
-	return typeof value === "number" && JOB_STATUS_VALUES.includes(value as JobStatus);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
-
 function parseMessage(body: Record<string, unknown>): string | undefined {
 	return typeof body.message === "string" && body.message.trim() !== "" ? body.message : undefined;
 }
-
-type ParseResult = { ok: true; value: ReportStepBody } | { ok: false; error: string };
 
 // Validates the discriminant and per-kind required fields before any DB write — an
 // unrecognized kind or a kind/field mismatch is a 400, never a partially-applied write.

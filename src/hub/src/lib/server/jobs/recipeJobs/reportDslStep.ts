@@ -13,7 +13,7 @@ import {
 } from "../../storage/repositories/jobRepository";
 import { getRecipeById } from "../../storage/repositories/recipeRepository";
 import { updateRunnerHeartbeat } from "../../storage/repositories/runnerRepository";
-import type { JobActionResult, ReportStepBody } from "../jobActions";
+import type { JobActionResult, ReportStepBody } from "../types";
 
 // Transcript rows never carry the raw extracted value — only the destination field name and
 // outcome (folded into `message`) plus the already-masked safeValue.

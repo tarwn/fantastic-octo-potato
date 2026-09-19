@@ -25,8 +25,8 @@ import {
 	upsertJobResult
 } from "../../storage/repositories/jobRepository";
 import { updateRunnerHeartbeat } from "../../storage/repositories/runnerRepository";
-import type { JobActionResult, ReportStepBody } from "../jobActions";
 import { summarizeTranscriptForLlm } from "../transcriptSummary";
+import type { JobActionResult, ReportStepBody } from "../types";
 
 import type { ChildStep } from "$lib/types/recipeDefinition";
 
