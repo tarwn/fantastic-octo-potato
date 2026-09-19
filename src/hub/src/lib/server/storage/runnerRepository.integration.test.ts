@@ -1,8 +1,7 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { useIntegrationTestDb } from "../db/_test/integrationTestDb";
-
+import { useIntegrationTestDb } from "./_test/integrationTestDb";
 import { getRunnerById, insertRunner, listRunnersByCustomerApplicationXrefId, updateRunnerHeartbeat } from "./runnerRepository";
 
 function seedXref(db: Database.Database): void {

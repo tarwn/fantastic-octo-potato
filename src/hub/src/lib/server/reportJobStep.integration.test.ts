@@ -1,9 +1,9 @@
 import type Database from "better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
-import { JobType } from "./db/jobType";
-import { buildOpenStartingUrlStep, insertJob, insertTrainingJobStep } from "./repositories/jobRepository";
+import { useIntegrationTestDb } from "./storage/_test/integrationTestDb";
+import { buildOpenStartingUrlStep, insertJob, insertTrainingJobStep } from "./storage/jobRepository";
+import { JobType } from "./storage/jobType";
 import { deriveNextStep } from "./nextStep";
 import { reportJobStep, runnerPoll } from "./runnerActions";
 

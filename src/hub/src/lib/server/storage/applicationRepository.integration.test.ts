@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { useIntegrationTestDb } from "../db/_test/integrationTestDb";
-
+import { useIntegrationTestDb } from "./_test/integrationTestDb";
 import { countApplications, insertApplication } from "./applicationRepository";
 
 describe("applicationRepository", () => {

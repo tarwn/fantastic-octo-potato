@@ -6,7 +6,7 @@ export interface InitResult {
 	interventionTimeoutSeconds: number;
 }
 
-// Mirrors src/hub/src/lib/server/db/jobStatus.ts's hardcoded ids — kept in sync manually, same as
+// Mirrors src/hub/src/lib/server/storage/jobStatus.ts's hardcoded ids — kept in sync manually, same as
 // the DSL type mirroring described in dsl/types.ts.
 export enum JobStatus {
 	Pending = 1,

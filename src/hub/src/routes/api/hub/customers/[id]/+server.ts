@@ -2,9 +2,9 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
-import { listRegisteredApplicationsByCustomerId } from "$lib/server/repositories/customerApplicationXrefRepository";
-import { getCustomerById } from "$lib/server/repositories/customerRepository";
+import { listRegisteredApplicationsByCustomerId } from "$lib/server/storage/customerApplicationXrefRepository";
+import { getCustomerById } from "$lib/server/storage/customerRepository";
+import { getDb } from "$lib/server/storage/db";
 import type { CustomerDetail } from "$lib/types/customer";
 
 export const GET: RequestHandler = ({ params }) => {

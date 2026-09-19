@@ -2,8 +2,8 @@ import { error } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
 import { getJobStepArtifactImage } from "$lib/server/jobActions";
+import { getDb } from "$lib/server/storage/db";
 
 export const GET: RequestHandler = ({ params }) => {
 	const result = getJobStepArtifactImage(getDb(), params.id, params.artifactId);

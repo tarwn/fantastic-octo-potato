@@ -4,7 +4,7 @@ import { useIntegrationTestDb } from "./_test/integrationTestDb";
 import { seed } from "./seed";
 
 afterEach(() => {
-	vi.doUnmock("../repositories/runnerRepository.ts");
+	vi.doUnmock("./runnerRepository");
 	vi.resetModules();
 });
 
@@ -71,7 +71,7 @@ describe("seed", () => {
 	});
 
 	it("rolls back every insert when a later one fails, so a retry can seed cleanly", async () => {
-		vi.doMock("../repositories/runnerRepository.ts", () => ({
+		vi.doMock("./runnerRepository", () => ({
 			insertRunner: () => {
 				throw new Error("simulated failure");
 			}

@@ -1,12 +1,7 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { useIntegrationTestDb } from "../db/_test/integrationTestDb";
-import { JobStatus } from "../db/jobStatus";
-import { TranscriptKind } from "../db/jobTranscriptKind";
-import { JobType } from "../db/jobType";
-import { SensitivityType } from "../db/sensitivityType";
-
+import { useIntegrationTestDb } from "./_test/integrationTestDb";
 import {
 	appendTranscriptEntry,
 	getSafeJobIngredientByFieldName,
@@ -19,6 +14,10 @@ import {
 	upsertJobIngredient,
 	upsertJobResult
 } from "./jobRepository";
+import { JobStatus } from "./jobStatus";
+import { TranscriptKind } from "./jobTranscriptKind";
+import { JobType } from "./jobType";
+import { SensitivityType } from "./sensitivityType";
 
 function seedXref(db: Database.Database, id = 1): void {
 	db.exec(`

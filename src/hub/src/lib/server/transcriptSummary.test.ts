@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import type { JobTranscriptEntry } from "./repositories/jobRepository";
+import type { JobTranscriptEntry } from "./storage/jobRepository";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
 import { summarizeTranscriptForLlm } from "./transcriptSummary";
 
 function entry(overrides: Partial<JobTranscriptEntry> & Pick<JobTranscriptEntry, "kind" | "text">): JobTranscriptEntry {

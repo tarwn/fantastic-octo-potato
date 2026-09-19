@@ -2,8 +2,8 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
 import { createRecipeJobAction } from "$lib/server/recipeActions";
+import { getDb } from "$lib/server/storage/db";
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const body = await request.json();

@@ -1,10 +1,7 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { useIntegrationTestDb } from "../db/_test/integrationTestDb";
-import { JobStatus } from "../db/jobStatus";
-import { JobType } from "../db/jobType";
-
+import { useIntegrationTestDb } from "./_test/integrationTestDb";
 import {
 	buildOpenStartingUrlStep,
 	claimNextJobForRunner,
@@ -17,6 +14,8 @@ import {
 	updateJobHeartbeat,
 	updateJobStatus
 } from "./jobRepository";
+import { JobStatus } from "./jobStatus";
+import { JobType } from "./jobType";
 
 import type { ChildStep } from "$lib/types/recipeDefinition";
 

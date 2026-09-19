@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-import { fromDbDate, toDbDate } from "../db/dates.ts";
+import { fromDbDate, toDbDate } from "./dates";
 
 export interface Runner {
 	id: number;

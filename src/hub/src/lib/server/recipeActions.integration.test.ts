@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
-import { JobType } from "./db/jobType";
-import { listSafeJobIngredients, listTranscriptEntries } from "./repositories/jobRepository";
-import { createDraftRecipe, publishRecipe } from "./repositories/recipeRepository";
+import { useIntegrationTestDb } from "./storage/_test/integrationTestDb";
+import { listSafeJobIngredients, listTranscriptEntries } from "./storage/jobRepository";
+import { JobType } from "./storage/jobType";
+import { createDraftRecipe, publishRecipe } from "./storage/recipeRepository";
 import { createRecipeJobAction, listRecipesAction } from "./recipeActions";
 
 import type { RecipeDefinition } from "$lib/types/recipeDefinition";

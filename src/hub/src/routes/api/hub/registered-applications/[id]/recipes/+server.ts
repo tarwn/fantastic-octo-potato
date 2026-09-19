@@ -2,8 +2,8 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
 import { listRecipesAction } from "$lib/server/recipeActions";
+import { getDb } from "$lib/server/storage/db";
 
 export const GET: RequestHandler = ({ params }) => {
 	const result = listRecipesAction(getDb(), params.id);

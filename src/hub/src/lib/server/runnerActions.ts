@@ -1,10 +1,7 @@
 import type Database from "better-sqlite3";
 
-import { JobStatus } from "./db/jobStatus";
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import { JobType } from "./db/jobType";
-import { SensitivityType } from "./db/sensitivityType";
-import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
+import { readJobStepArtifact, writeJobStepArtifact } from "./storage/artifactStorage";
+import { getRegisteredApplicationById } from "./storage/customerApplicationXrefRepository";
 import {
 	appendAutoSequencedTranscriptEntry,
 	appendTranscriptEntry,
@@ -28,10 +25,13 @@ import {
 	updateJobStatus,
 	updateTrainingJobCredentialNames,
 	upsertJobResult
-} from "./repositories/jobRepository";
-import { getRecipeById } from "./repositories/recipeRepository";
-import { getRunnerById, updateRunnerHeartbeat } from "./repositories/runnerRepository";
-import { readJobStepArtifact, writeJobStepArtifact } from "./artifactStorage";
+} from "./storage/jobRepository";
+import { JobStatus } from "./storage/jobStatus";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
+import { JobType } from "./storage/jobType";
+import { getRecipeById } from "./storage/recipeRepository";
+import { getRunnerById, updateRunnerHeartbeat } from "./storage/runnerRepository";
+import { SensitivityType } from "./storage/sensitivityType";
 import { deriveNextStep, NextStepInvalidResponseError } from "./nextStep";
 import { summarizeTranscriptForLlm } from "./transcriptSummary";
 

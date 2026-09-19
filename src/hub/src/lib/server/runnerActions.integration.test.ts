@@ -1,12 +1,12 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
-import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
-import { JobStatus } from "./db/jobStatus";
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import { JobType } from "./db/jobType";
-import { buildOpenStartingUrlStep, getJobById, insertJob, insertTrainingJobStep, listTranscriptEntries } from "./repositories/jobRepository";
-import { getRunnerById } from "./repositories/runnerRepository";
+import { useIntegrationTestDb } from "./storage/_test/integrationTestDb";
+import { buildOpenStartingUrlStep, getJobById, insertJob, insertTrainingJobStep, listTranscriptEntries } from "./storage/jobRepository";
+import { JobStatus } from "./storage/jobStatus";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
+import { JobType } from "./storage/jobType";
+import { getRunnerById } from "./storage/runnerRepository";
 import { runnerInit, runnerPoll } from "./runnerActions";
 
 const SHARED_SECRET = "test-secret";

@@ -2,11 +2,11 @@ import type Database from "better-sqlite3";
 
 // resetCli.ts runs this directly via `node` (outside Vite/SvelteKit), so relative imports
 // need explicit extensions all the way down its dependency chain.
-import { insertApplication } from "../repositories/applicationRepository.ts";
-import { insertCustomerApplicationXref } from "../repositories/customerApplicationXrefRepository.ts";
-import { countCustomers, insertCustomer } from "../repositories/customerRepository.ts";
-import { createDraftRecipe, publishRecipe } from "../repositories/recipeRepository.ts";
-import { insertRunner } from "../repositories/runnerRepository.ts";
+import { insertApplication } from "./applicationRepository";
+import { insertCustomerApplicationXref } from "./customerApplicationXrefRepository";
+import { countCustomers, insertCustomer } from "./customerRepository";
+import { createDraftRecipe, publishRecipe } from "./recipeRepository";
+import { insertRunner } from "./runnerRepository";
 
 import type { ChildStep, RecipeDefinition } from "$lib/types/recipeDefinition";
 

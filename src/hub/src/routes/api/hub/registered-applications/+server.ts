@@ -2,8 +2,8 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
-import { listRegisteredApplications } from "$lib/server/repositories/customerApplicationXrefRepository";
+import { listRegisteredApplications } from "$lib/server/storage/customerApplicationXrefRepository";
+import { getDb } from "$lib/server/storage/db";
 
 export const GET: RequestHandler = () =>
 	json({

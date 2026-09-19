@@ -1,13 +1,13 @@
 import type Database from "better-sqlite3";
 
-import { JobStatus } from "./db/jobStatus";
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import { JobType } from "./db/jobType";
-import { RecipeStatus } from "./db/recipeStatus";
-import { SensitivityType } from "./db/sensitivityType";
-import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
-import { appendTranscriptEntry, insertJob, JOB_CREATED_SEQUENCE, upsertJobIngredient } from "./repositories/jobRepository";
-import { getRecipeById, listRecipesForApplication, type Recipe } from "./repositories/recipeRepository";
+import { getRegisteredApplicationById } from "./storage/customerApplicationXrefRepository";
+import { appendTranscriptEntry, insertJob, JOB_CREATED_SEQUENCE, upsertJobIngredient } from "./storage/jobRepository";
+import { JobStatus } from "./storage/jobStatus";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
+import { JobType } from "./storage/jobType";
+import { getRecipeById, listRecipesForApplication, type Recipe } from "./storage/recipeRepository";
+import { RecipeStatus } from "./storage/recipeStatus";
+import { SensitivityType } from "./storage/sensitivityType";
 
 import type { FieldDeclaration, RecipeDefinition } from "$lib/types/recipeDefinition";
 

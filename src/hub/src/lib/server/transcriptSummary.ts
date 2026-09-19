@@ -1,5 +1,5 @@
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import type { JobTranscriptEntry } from "./repositories/jobRepository";
+import type { JobTranscriptEntry } from "./storage/jobRepository";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
 
 // Compact, oldest-first text rendering of a Job's transcript for an LLM prompt (R003/R006). Every
 // value here already came through jobRepository as a masked/safe projection (R011) — this

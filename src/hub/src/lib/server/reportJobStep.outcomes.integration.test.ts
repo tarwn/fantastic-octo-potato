@@ -1,11 +1,7 @@
 import type Database from "better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
-import { JobStatus } from "./db/jobStatus";
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import { JobType } from "./db/jobType";
-import { SensitivityType } from "./db/sensitivityType";
+import { useIntegrationTestDb } from "./storage/_test/integrationTestDb";
 import {
 	buildOpenStartingUrlStep,
 	getJobById,
@@ -14,7 +10,11 @@ import {
 	listSafeJobResults,
 	listTrainingJobSteps,
 	listTranscriptEntries
-} from "./repositories/jobRepository";
+} from "./storage/jobRepository";
+import { JobStatus } from "./storage/jobStatus";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
+import { JobType } from "./storage/jobType";
+import { SensitivityType } from "./storage/sensitivityType";
 import { deriveNextStep, NextStepInvalidResponseError } from "./nextStep";
 import { reportJobStep, runnerPoll, uploadJobStepArtifact } from "./runnerActions";
 

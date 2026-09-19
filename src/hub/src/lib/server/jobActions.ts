@@ -1,10 +1,7 @@
 import type Database from "better-sqlite3";
 
-import { JobStatus } from "./db/jobStatus";
-import { TranscriptKind } from "./db/jobTranscriptKind";
-import { JobType } from "./db/jobType";
-import { SensitivityType } from "./db/sensitivityType";
-import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
+import { readJobStepArtifact } from "./storage/artifactStorage";
+import { getRegisteredApplicationById } from "./storage/customerApplicationXrefRepository";
 import {
 	appendTranscriptEntry,
 	buildOpenStartingUrlStep,
@@ -23,8 +20,11 @@ import {
 	terminalTranscriptSequence,
 	updateJobStatus,
 	upsertJobIngredient
-} from "./repositories/jobRepository";
-import { readJobStepArtifact } from "./artifactStorage";
+} from "./storage/jobRepository";
+import { JobStatus } from "./storage/jobStatus";
+import { TranscriptKind } from "./storage/jobTranscriptKind";
+import { JobType } from "./storage/jobType";
+import { SensitivityType } from "./storage/sensitivityType";
 import { deriveGoalIngredients, GoalIngredientsInvalidResponseError } from "./goalIngredients";
 
 export interface JobActionResult {

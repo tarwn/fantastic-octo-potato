@@ -1,8 +1,9 @@
 import type Database from "better-sqlite3";
 
-import { fromDbDate, toDbDate } from "../db/dates.ts";
-import { RecipeStatus } from "../db/recipeStatus.ts";
 import { validateRecipeDefinition } from "../recipeDefinitionValidation.ts";
+
+import { fromDbDate, toDbDate } from "./dates";
+import { RecipeStatus } from "./recipeStatus";
 
 import type { RecipeDefinition } from "$lib/types/recipeDefinition";
 
