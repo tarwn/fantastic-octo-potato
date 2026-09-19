@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 
 import { deriveNextStep, NextStepInvalidResponseError } from "../../llm/nextStep";
+import { compileRecipe, RecipeCompilationInvalidResponseError } from "../../llm/recipeCompilation";
 import { readJobStepArtifact } from "../../storage/artifactStorage";
 import { JobStatus } from "../../storage/db/jobStatus";
 import { TranscriptKind } from "../../storage/db/jobTranscriptKind";
@@ -24,6 +25,7 @@ import {
 	updateTrainingRunJobCredentialNames,
 	upsertJobResult
 } from "../../storage/repositories/jobRepository";
+import { createDraftRecipe } from "../../storage/repositories/recipeRepository";
 import { updateRunnerHeartbeat } from "../../storage/repositories/runnerRepository";
 import { summarizeTranscriptForLlm } from "../transcriptSummary";
 import type { JobActionResult, ReportStepBody } from "../types";
@@ -151,6 +153,34 @@ export async function reportDslStep(
 			now,
 			JobStatus.CompletedSuccess
 		);
+
+		// A compilation failure is recorded but never flips the Job's already-Completed-Success
+		// status, and never leaves a partially-written/updated draft Recipe (R007) — createDraftRecipe
+		// itself re-validates before persisting.
+		try {
+			const definition = await compileRecipe({
+				goal: job.details.goal,
+				transcriptSummary,
+				executedSteps: listTrainingRunJobSteps(db, job.id).map((trainingStep) => trainingStep.definition),
+				ingredients: listSafeJobIngredients(db, job.id),
+				results: listSafeJobResults(db, job.id)
+			});
+			createDraftRecipe(db, {
+				customerApplicationXrefId: job.customerApplicationXrefId,
+				name: job.details.goal,
+				goal: job.details.goal,
+				definition,
+				sourceTrainingRunId: String(job.id),
+				createdAt: now
+			});
+		}
+		catch (err) {
+			if (!(err instanceof RecipeCompilationInvalidResponseError)) {
+				throw err;
+			}
+			appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Info, `Recipe compilation failed: ${err.message}`, now);
+		}
+
 		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } };
 	}
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildOpenStartingUrlStep } from "../jobs/startingUrlInput";
 import { deriveNextStep, NextStepInvalidResponseError } from "../llm/nextStep";
+import { compileRecipe, RecipeCompilationInvalidResponseError } from "../llm/recipeCompilation";
 import { useIntegrationTestDb } from "../storage/db/_test/integrationTestDb";
 import { JobStatus } from "../storage/db/jobStatus";
 import { TranscriptKind } from "../storage/db/jobTranscriptKind";
@@ -16,15 +17,29 @@ import {
 	listTrainingRunJobSteps,
 	listTranscriptEntries
 } from "../storage/repositories/jobRepository";
+import { listRecipesForApplication } from "../storage/repositories/recipeRepository";
 
 import { reportJobStep, runnerPoll, uploadJobStepArtifact } from "./runnerActions";
 
-import type { ChildStep } from "$lib/types/recipeDefinition";
+import type { ChildStep, RecipeDefinition } from "$lib/types/recipeDefinition";
 
 vi.mock("../llm/nextStep", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../llm/nextStep")>();
 	return { ...actual, deriveNextStep: vi.fn() };
 });
+
+vi.mock("../llm/recipeCompilation", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../llm/recipeCompilation")>();
+	return { ...actual, compileRecipe: vi.fn() };
+});
+
+const COMPILED_DEFINITION: RecipeDefinition = {
+	schemaVersion: 1,
+	inputs: {},
+	outputs: {},
+	steps: [{ id: "s2", action: "finish", args: [{ test: "all", args: [] }] }],
+	recoveries: []
+};
 
 const SHARED_SECRET = "test-secret";
 const CLICK_SEARCH_STEP: ChildStep = { id: "click_search", action: "click", args: [{ by: "text", value: "Search" }] };
@@ -32,6 +47,7 @@ const FINISH_STEP: ChildStep = { id: "s2", action: "finish", args: [null] };
 
 beforeEach(() => {
 	vi.mocked(deriveNextStep).mockReset().mockResolvedValue(CLICK_SEARCH_STEP);
+	vi.mocked(compileRecipe).mockReset().mockResolvedValue(COMPILED_DEFINITION);
 });
 
 function seedRunner(db: Database.Database): number {
@@ -157,6 +173,40 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 				text: "Model issued a finish Step, marked Completed-Success",
 				jobStatusId: JobStatus.CompletedSuccess
 			})
+		);
+	});
+
+	it("compiles and creates a draft Recipe once the model issues a finish Step", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		const recipes = listRecipesForApplication(db, 1);
+		expect(recipes).toHaveLength(1);
+		expect(recipes[0]).toEqual(
+			expect.objectContaining({ goal: "Extract invoice total", definition: COMPILED_DEFINITION, sourceTrainingRunId: String(jobId) })
+		);
+	});
+
+	it("records a compilation failure on the transcript and creates no Recipe once retries are exhausted, without flipping the Job off Completed-Success (R007)", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
+		vi.mocked(compileRecipe).mockRejectedValueOnce(new RecipeCompilationInvalidResponseError("still invalid"));
+
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
+		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
+		expect(listRecipesForApplication(db, 1)).toEqual([]);
+		expect(listTranscriptEntries(db, jobId)).toContainEqual(
+			expect.objectContaining({ kind: TranscriptKind.Info, text: "Recipe compilation failed: still invalid" })
 		);
 	});
 
