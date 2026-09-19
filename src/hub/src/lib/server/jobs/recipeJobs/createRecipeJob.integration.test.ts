@@ -145,4 +145,42 @@ describe("createRecipeJob", () => {
 		);
 		expect(listTranscriptEntries(db, job.id)).toHaveLength(1);
 	});
+
+	it("derives the allowlist from the submitted startingUrl ingredient for a Recipe compiled from a Training run", () => {
+		const db = getDb();
+		const xrefId = seedRegisteredApplication(db);
+		const definition: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: {
+				startingUrl: { type: "string", description: "Starting URL", required: true, nullable: false, sensitive: false }
+			},
+			outputs: {},
+			steps: [
+				{ id: "open_starting_url", action: "open", args: [{ ref: "input", name: "startingUrl" }] },
+				{ id: "complete", action: "finish", args: [{ test: "all", args: [] }] }
+			],
+			recoveries: []
+		};
+		const draft = createDraftRecipe(db, {
+			customerApplicationXrefId: xrefId,
+			name: "Trained recipe",
+			goal: "Trained goal",
+			definition,
+			sourceTrainingRunId: "42",
+			createdAt: new Date("2026-09-17T00:00:00.000Z")
+		});
+		const recipe = publishRecipe(db, draft.id, new Date("2026-09-17T00:00:01.000Z"))!;
+
+		const result = createRecipeJob(db, String(recipe.id), {
+			mode: "Execute",
+			ingredients: { startingUrl: "https://different-origin.test/app" }
+		});
+
+		expect(result.status).toBe(201);
+		expect(result.body).toEqual({
+			data: expect.objectContaining({
+				details: expect.objectContaining({ allowlist: "https://different-origin.test" })
+			})
+		});
+	});
 });

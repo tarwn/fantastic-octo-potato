@@ -51,7 +51,7 @@ export function createRecipeJob(db: Database.Database, rawRecipeId: string, body
 		return { status: 400, body: { error: validationErrors.join("; ") } };
 	}
 
-	const allowlist = deriveAllowlistFromRecipe(recipe.definition);
+	const allowlist = deriveAllowlistFromRecipe(recipe.definition, ingredients);
 	if (!allowlist) {
 		return { status: 400, body: { error: "Recipe has no literal starting URL to derive an allowlist from" } };
 	}

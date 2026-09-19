@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { resolve } from "$app/paths";
-
 	import type { RecipeSummary } from "$lib/api/recipesApi";
 
 	let {
