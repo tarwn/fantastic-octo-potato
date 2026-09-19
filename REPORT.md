@@ -2,37 +2,77 @@
 
 ## Architecture
 
-The goal of this system is to easily train automation to pick data up from a customer's system that can't otherwise be surfaced through an API. An LLM is used in the training for speed and efficiency. We are sensitive to privacy and other regulatory classifications that may apply to data and screens on the Customer system. We have customers with 10s of apps, and 100s to thousands of customers. And of course automation breaks as systems change, so we need ways to get it back on course.
+This system learns how to automate a remote system that does not expose an API. The LLM model explores the system during Training to achieve goals, then again to convert that journey into a repeatable Recipe with defined Ingredients. The resulting typed, Recipe runs through an approval and Trial run process before being published for endless replay, with no LLM in the loop. Layered controls for sensitive data ensure customer credentials, inputs, outputs, and sensitive on-screen information follows clear policies for masking and transmission.
 
-(small draft)
-
-There are 3 systems:
-- **Runner(s)**: A small runner within the Customer's network, pre-registered to their Customer record in our system and a platform-wide Application. Access only to the credentials the customer gives it, none of our orchestration or training logic, no LLM access on our bill, and no risk of access to other customer's data.
-- **Hub**: The UI we work with, the orchestrator between the runner and LLM or Human Intervention session, and the job queue for repeating pre-trained recipes
-- **Target Application**: A sample application for test purposes, an abandoned invoice system
+The system includes 5 key actors:
+- **Runner**: Operates one Customer's Target Application from inside its network. Holds the application credentials, executes validated Steps, performs data masking, and has no model credentials or access to other Customer's information.
+- **Hub**: Stores Recipes and Jobs, coordinates Training, manages outputs and masked artifacts, serves the operator UI.
+- **LLM**: Used for understanding state and identifying next steps towards a goal
+- **User**: Provides direction, oversight, and intervention when needed
+- **Target Application**: A local BambooInvoice installation representing a legacy application without API access
 
 ### Key Decisions
 
-- Hub and Runner are separate systems to:
-  1. Security: no LLM access/keys in the hands of the customer, no customer credentials outside their system
-  2. Multi-tenant and Heterogeneity alignment: a single Hub, many runners keyed to specific Customers and Applications
-  3. Data Safety: sensitive values from the customer app are barred from leaving except in specific conditions, data from the LLM is forced to meet contracts before being applied near the Customer system
-  - For a trade-off: more complexity and work, to meet requirements that could have been on the cut list instead
-- Runner polls for work: allows for scaling patterns if data jobs need to run in parallel that can be managed at the edge, instead of centrally, less coupled to each others runtime during updates, and simpler control scheme than a centrally managed hub with persistent assignments and connections
-- Minimal Job Queue (below): the runner may not be running yet, it may already have another job, provides control to cancel an in-progress job and future support to detect stale (crashed) runners
-- A nice UI, for the Job screen at least: Less work than it may look like, given some experience with Claude Code and producing workable SCSS and Svelte components from it, and it helped flesh out the technical architecture and design through the lens of "How would a human do these activities", but it did pull in some extra trade-offs on time in a couple cases where relatively light looking adds on the screen were more work than expected (masking sensitive fields in the Transcript with styled markup, for instance)
-- Minimal authentication is in place between the Hub and Runner as an example stand-in, no authentication or user management is in pace on the Hub. This was a trade-off for less work on areas that I felt were far enough away from the core problem that a representative was enough to show the consideration was there, without a full implementation.
-- Technology selections:
-  - SvelteKit, TypeScript: fast, batteries-included framework with a small footprint (speed, token efficiency, review readability) plus typing from TypeScript
-  - SQLite is lightweight and similar to what we would pick for a real implementation, without a server requirement, without writing my own file management layer, and keeps integration tests 1:1 for fast feedback loops with low additional scaffolding
-  - Playwright was selected because it's been my primary pick for web test automation for several years, bringing speed of comprehension, familiarity, fit for this use case, but trading off against tooling that may have allowed more generic integration to desktop apps as well
-  - Claude Code was selected for Agentic coding, from 3 I've used recently, because I had skills and some context setup I could pull from a much further along personal project to get up and running fast
-  - LLM Provider: OpenRouter was selected to make it easy try different models and have strong control over the budget while experimenting and testing
-- Target App Selection: BambooInvoice turned up through some internet searches of older business platforms, and the trade-off ended up being negligible versus my other front runners (read data from my printer web page, from a sample project from 15 years ago I already had) because an Agent made quick work of figuring out how to get it working in containers, what versions of MySQL and PHP could be used, extra flags to flip, etc for a much more polished developed experience, end-to-end test automation experience, and realism
+| Decision                    | Reason and trade-off                                                                    |
+|-----------------------------|-----------------------------------------------------------------------------------------|
+| Hub and Runner services     | Security: Customer credentials stay in network, LLM access & keys stay in ours          |
+| .                           | Heterogeneity support: One Hub, many Runners keyed to specific Customers x Applications |
+| .                           | Safety: Customer sensitive data managed close to the source                             |
+| .                           | Trade-offs: more coordination and software to support than a single process             |
+| Runner polling              | Works through customer network boundaries and supports disconnected/busy Runners;       |
+| .                           | Trade-off: intervention responds more slowly than a persistent connection.              |
+| Minimal Job Queue           | Decouple Job lifecycle from system uptime, better visibility; more coordination & parts |
+| DSL for Steps               | Strong, shared definition for communications, training, validation, and driving agents  |
+| TypeScript, SvelteKit, Node | Familiar, batteries-included, typed stack for delivery speed and reduced token usage.   |
+| SQLite                      | Realistic persistence, simple to implement, closer-to-parity integration tests          |
+| .                           | Trade-off: unsuitable for production (multi-instance, zero downtime deploy) without replacement. |
+| Playwright                  | Strong web automation and locator support; does not support desktop applications.       |
+| OpenRouter                  | Allows model comparison and budget control during Training.                             |
+| BambooInvoice               | Local, realistic legacy web app that offers full control and synthetic data seeding     |
+| .                           | Trade-offs: an additional developer dependency (docker/podman), setup time              |
 
-### Runner Process
+## Artifact Schema
 
-A Runner uses a prepared Recipe (Artifact Schema) or incremental Steps during Training to determine the work it is doing. It reports status changes and Transcript entries back to the Hub as it works on the job. As outputs are identified and extracted, it reports these as well. On reaching a terminal state or receiving notice of a terminal state after sending data to the Hub, it cleans up all temporary data and assets and exist the job, polling for the next:
+### Recipe
+
+A successful Training Run produces a typed, versioned, reviewable draft Recipe. The Recipe is a separate artifact from the Training Run, linked for provenance. 
+
+A Recipe includes:
+
+- `inputs`: named fields with type and sensitivity
+- `outputs`: named fields with type and sensitivity
+- `steps`: ordered DSL actions, targets/selectors, and conditions
+- `recoveries`: array of conditions and Steps for known interruptions
+- `schemaVersion`: DSL compatibility version
+- Hub metadata: identity, revision, status (draft, published, archived), goals, audit dates and FKs
+
+The typed Steps DSL is shared by the Hub, Runner, and Training mode communications with the LLM. Strongly defined actions, conditions, and targets are used to direct model output, strictly validate it, present readable output for human review, and keep Recipes independent from one Runner's implementation details (Playwright, in this case). 
+
+The DSL is [limited](./docs/todos/supporting-docs/steps-dsl.md) in this version intentionally, but built with [extension in mind](./docs/todos/supporting-docs/steps-dsl-extended.md).
+
+Recipe, Job Inputs, and Job Outputs are transmitted as JSON. Hub stores Recipes as JSON in the database, as it retrieves them as a single immutable unit and does not query their internal structure.
+
+**[Example Recipe](#)**
+```json
+TODO: cut an example from the seeded Recipes once merged + export button is added
+...truncated
+```
+
+- [How a Runner processes a Recipe](#)
+- [How Hub works with the LLM](#)
+- [How Human Intervention translates to Recipe Steps](#)
+
+### Ingredients (and Controls)
+
+Each Job supplies Ingredients containing the Recipe's named inputs, starting URL, and URL allowlist. This separation between Ingredients and Recipe allows the immutable Recipe to run repeatedly with different values.
+
+## Determinism & Error Handling
+
+The two core elements for how this system approaches determinism are a clear Job status flow and the training/draft/publish flow for Recipes. Every Job produces a Transcript, a structured record of what the model, Runner, and operator did and why, with details and masked screenshots included during Training Runs and error scenarios requiring debugging.
+
+### Job Status Flow
+
+A Job is created and is run until it meets certain exit conditions. We make those paths explicit and assign specific terminal states that reflect the difference between a business failure, a system error, a cancellation, and a success. Human intervention is baked in, synchronizing the visible Job state for a user to strongly partitioned runtime logic in the Runner.
 
 ```mermaid
 flowchart LR
@@ -48,140 +88,82 @@ flowchart LR
     Interactive-User --> |Couldn't Finish| Completed-Failed
 ```
 
-## Artifact Schema
+### Training Run -> Trial -> Repeatable "Execute"
 
-### Recipe
+**Train**: The Training Run is exploratory; the LLM is goal seeking in this mode. It is running an observe, decide, act cycle to reach the goal the user has selected, and some sub-goals we have provided, by analyzing the results of each Step it takes, until it reaches the step budget set by the user at the beginning of the run. 
 
-A successful trained run produces a Recipe:
+**Trial**: Once a Training Run is successful, the LLM is led through a re-processing phase to identify a short successful path for the Recipe, alternate conditional Steps (detecting and handling "Not Found", for instance), any series of events that appear to be a one-time recoverable sidetrip, and setting the final conditions or checkpoint to consider the goal reached successfully. These become the Trial Recipe. The user reviews the trial recipe for approval and begins a Trial Run, which runs the first replay without a model in the decision loop.
 
-- `inputs`: fieldname, type support, sensitivity
-- `outputs`: same
-- `steps`: a DSL for actions, selectors, and conditions
-- `recoveries`: an array of Recoverable Scenarios, conditional checks with steps to take to recover
-- `schemaVersion`: future aligned, support making breaking changes withotu having to update all runner immediately to speak the enw language
-- And values private to Hub: 
-  - `id`, `createdAt`, `publishedAt`, `recipeStatus` (draft, published, archived), `name`, `goal`, ...
-
-The Steps DSL, also used for the Recoverable Scenarios (`recoveries` property) is used by the LLM, Hub, and Runner. This provides a shared language that can be used to constrain LLM output to a valid subset of activity, be communicated to an end user for review and approval in simpler, non-technical language, and is decoupled from the runner's implementation so upgrades or changes continue to meet a contract and not an implementation from another system. The set of steps is intentionally [limited](./docs/todos/supporting-docs/steps-dsl.md), but built with [extension in mind](./docs/todos/supporting-docs/steps-dsl-extended.md).
-
-Inputs and Outputs are structured so they can carry information about their sensitivity for data masking and be referenced by consistent name when communicated. A Transcript can be easily generated from a keyed name of "acct-number" to display the masked value in the UI, but used in secure usage as a field with the raw, non-masked value, without drift.
-
-Data is transmitted in JSON, instead of a custom format, and stored in the database as text since there's no intent of doing complex logic or conditions on it in the database.
-
-**[Example Recipe](#)**
-```json
-TODO: cut an example from the seeded recipes once merged + export button is added
-...truncated
-```
-
-- [How a runner processes a Recipe](#)
-- [How Hub works with the LLM](#)
-- [How Human Intervention translates to Recipe Steps](#)
-
-### Ingredients (and Controls)
-
-If the Recipe tells us how to bake the cake, the Ingredients are the cake we are baking today.
-
-Ingredients are sent with the Job next to the Recipe:
-
-- `controls.allowlist` - what URLs are allowed during this job run
-- `startingURL` - every job has an initial URl to start from
-- `name:value` - every Recipe Input field has a value
-
-Separating the Ingredients from the Recipe is how we bake 50 cakes from the same Recipe without cloning it each time.
-
-## Determinism & Error Handling
-
-### Training Run -> Trial -> Execute
-
-The Training Run is exploratory; the LLM is goal seeking in this mode. It is running a discover, decide, act cycle to reach the goal the user has selected, and some sub-goals we have provided, by analyzing the results of each step it takes, until it reaches the budget set by the user at the beginning of the run. 
-
-Once a Training Run is successful, the LLM is led through a re-processing phase to identify a short successful path for the Recipe, alternate conditional steps (detecting and handling "Not Found", for instance), any series of events that appear to be a one-time recoverable sidetrip, and setting the final conditions or checkpoint to consider the goal reached successfully. These become the Trial Recipe.
-
-A Trial Recipe is launched by a user, who approves those steps and fires it off to be Replayed. There is no LLM involvement with this Recipe, and if it works the user will publish it exactly as it is to be used for standard Execute job runs, replayed exactly the same way 10s or 100s of times with no changes.
+**Execute**: A successful Trial Run presents the user with the option to publish the Recipe as a new Recipe or replacement version for an existing one. Once published, the Recipe is available for "Execute" job runs, which will replay that Recipe one, ten, or hundreds of times, as needed.
 
 The Steps DSL is strict about the actions that can be taken:
-- [Clear, specific condition steps](./docs/todos/supporting-docs/steps-dsl.md#conditions)
+- [Clear, specific condition Steps](./docs/todos/supporting-docs/steps-dsl.md#conditions)
 - [Defined actions](./docs/todos/supporting-docs/steps-dsl.md#actions)
 - [Specific, differentiated targets ](./docs/todos/supporting-docs/steps-dsl.md#targets-and-values)
 
-And these are backed up by [specific implementation in the runner code](#). <- TODO
+And mapped strictly by the Runner to specific execution instructions (ex: [actions.ts, ln118](./src/runner-web/browser/actions.ts)).
 
-_Cut: Another form of creating new iterations of a Recipe to accommodate new conditional or recovery scenarios: using the results of a Human Intervention to ask an LLM to review the original recipe and intervention steps to draft a new Recipe for Trial. Even here, though, we are not altering the original Recipe, which continues to replay as it is until replaced by the user._
+### Unexpected Scenarios, Errors, Failures
 
-### Recoverable Scenarios
+The Job flow and Trial->Execute progression connect to explicitly support both the plotted happy path run, as well as any other scenarios that arise.
 
-Recipe's support Recoverable Scenarios, a conditional Step from the DSL with a series of child steps to run that will recover. "If dialog XYZ is visible, run these steps to hide it".
-
-### Unplanned Screen States
-
-When something unplanned happens on the screen to block the runner, it shifts the job to "Intervention-Requested" status and pauses further execution, keeping the browser session state live. This could be a condition state not matching, a checkpoint condition failing, an extraction selector not finding an element that is expected to always be present, and so on.
-
-When this happens, the Hub Job screen has the option for a human to take over, switching the job to `Interactive-User` status and logging it in the Transcript. An overlay opens that enables the user to click directly on the screen (a screenshot, which sends a "Click on x,y" step to the runner), prompt the LLM to generate a step that hub will pass to the runner ("extract the number from the input labeled amount"), turn control back over to the runner to continue (or immediately fail), or mark the run as failed.
-
-If assistance doesn't occur within a timeout period, the runner marks the job as `Completed-Failed` and exist the run.
-
-Every status change, custom Step, and decision is logged in the Transcript for auditability as well as input into a future training run for a new draft recipe (not implemented yet).
-
-### AllowList violations
-
-An API call by the target application that is blocked by the Runner's allowlist will be reported by the Runner to it's Transcript, but not fail the job (though it may leave the browser in a state that the Runner fails at the action it is attempting to take).
-
-A navigation step that is blocked by the Runner's allowlist will fail the job with a terminal `Completed-Error` and be reported in the Transcript.
-
-### System Crashes
-
-A system crash will currently leave the job in a Running status until cancelled, but will not be picked up to be started again.
-
-_Cut: a background timer on Hub to watch for idle Runners and mark their jobs as a terminal `Completed-Stale` with a Transcript entry._
-
-### A Runtime Error
-
-Runtime errors are caught y the job, reported as a terminal `Completed-Error` status job, and logged in the transcript, with error details or a masked screenshot, depending on the type of error.
+| Scenario                        | Handling                                                                                  |
+|---------------------------------|-------------------------------------------------------------------------------------------|
+| Expected states ("Not Found")   | A conditional case and "goto" in Recipe Steps keeps this on track for `Completed-Success` |
+| Recoverable condition           | Recipe recovery scenarios are used, keeps this on track for `Completed-Success`           |
+| Failed Step                     | Calls for assistance, `Intervention-Requested`                                            |
+| Failed checkpoint               | A necessary value or end state is missed, `Completed-Failed`                             |
+| Blocked Navigation (allowlist)  | `Completed-Error`, this Job cannot proceed and the Recipe may need attention              |
+| Blocked sub request (allowlist) | Recorded in the Transcript; the affected Step may subsequently fail                       |
+| Runtime/Hard failure            | `Completed-Error` with details or a masked screenshot                                     |
+| Runner system crash             | Remains `Running` until cancelled; `Completed-Stale` implementation is deferred           |
 
 ## Heterogeneity & multi-tenant
 
-- The Hub/Runner model is broadly intended to be extensible to other surface-specific types of runners
-  - the DSL supports evolving versions or variations of the web runner, for differences in tooling, environments, customer requirements (if they sign up for the enterprise tier, of course), or change over time
-  - alternate types of runners, such as a family for desktop applications, could support a common subset of the DSL (minus things like CSS targeting) or a similar in nature DSL specific to those types of surfaces and capabilities
-- Applications are Customer-agnostic, Runners and Recipes are specific to a Customer x Application:
-  - leaves room to correlate recipes across the catalog or add methods to link curated recipes directly to applications and copies in use
-  - ability to analyze recipes across customers or over a customer over time for failure patterns and potential replacement
-  - ability to rollout a change to a single Customer x Application, but also add a mechanism to then stage copies of that out to the broader Customer pool, with review, an opt-in feature, a separate trial run prerequisite, or similar
+The DSL separates Recipe intent from the Runner's individual implementation. An alternate web application implementation would support the same DSL translated to its own implementation or constraints. A runner for a Desktop application would either share a common core of the DSL for forked specific web/app extensions or a parallel DSL, while still using similar LLM prompts, producing similar english descriptions for easy approval, and integration to the same Human Intervention mechanisms. `schemaVersion`, Runner capabilities, and Application registration make incompatibility explicit.
 
-A light versioning scheme is in place for Recipes, as a stand-in for something that would only need to be a layer or two more complex to support more surfaces and requirements.
+Recipes belong to a single Customer x Application. A future Application catalog could correlate these individual copies to offer an option to copy and Trial run across Customers, or present curated "golden" Recipes. Copies remain independent but carry provenance, enabling controlled Trial and rollout to Customers, minor adaptation of curated Recipes for specific Customer conditions, and independent test and review cycles that match Customer requirements and scheduling, if needed.
 
 ## Escalation & Handoff
 
-A runner detects it is "Stuck" when it cannot continue with the Recipe steps or provided Recoverable Scenarios, resulting in the "Intervention-Requested" state describe above in [Unplanned Screen States](#unplanned-screen-states).
+A Runner requests intervention when it is "Stuck"; a Step cannot be performed due to the screen or system being in a different state then expected and no Recoverable Scenario can resolve it. The Runner signals a Job status change to `Intervention-Requested` and waits for human intervention. It retains the live session, pausing for direct instructions.
 
 (TODO: screenshot)
 
-The Intervention dialog on the Job Screen provides controls to the user to attempt to get the Runner back on track, hand control back ot the runner, or determine the job has failed and transfer it to `Completed-Failed` directly. Steps, in the form of clicks or LLM-prompted values, are transmitted to the Runner, similar to when it's running a Training job. It runs each step, returns a masked screenshot and Transcript log entry, and then waits for the next Step. If it's told to take over control again, it advances to the specified step and re-enters the normal automated mode.
+The Intervention dialog on the Job Screen provides a user with controls to direct the Runner. The user attempts to get the Runner back on track so they can cede control back, or determines the Job cannot be completed and sends a signal to explicitly fail to `Completed-Failed` before existing the session. Every action and change of control is explicitly logged in the Transcript.
+
+Control is exercised through Steps. The user can click the latest (masked) screenshot to send a "Click on x,y" Step to the Runner or enter a prompt for more complex behavior that an LLM translates into validated Steps for Hub to provide for the Runner. The Runner, while in Intervention mode, waits for these intervention Steps or a signal for status change. The signal to return to automated run mode can include a specific step to start back on as it leaves manual mode and returns to the Recipe Steps.
 
 (TODO: add a link to the context doc once merged)
 
 ## Safety
 
-- Allowlist for Networking: all navigation and API calls by the browser must pass the configured Allowlist or be denied
-- Allowlist for Steps: a human reviews the steps before sending the first Trial Job, and the Recipe cannot be altered once published without going through a Trial stage again
-- Allowlist for Human Intervention: currently a mix of constrained human steps with non-human reviewed LLM steps (see cut list below)
-- System Credentials: the LLM credentials are never available to the runner (and presumably customer), the runner credentials to the application live on their system, are not sent in transcripts, and are masked in screenshots
-- Sensitive Inputs and Outputs: stored as a partitioned pair of raw and masked values. Hub screens only get access to masked values. Runner automatically masks input and output values from screenshots and sends only field names, not values, in transcript records
-- Other Sensitive on-screen data: detected through a third-party library before screenshots and masked
-- Irreversible actions are lightly designed into some handling, but otherwise cut
+- **Network**: all navigation and API calls by the browser must pass the configured Allowlist or be denied
+- **Actions**: Runner accepts only the typed DSL, a human reviews a draft before its first Trial
+- **Credentials**: Model credentials stay in the Hub, application credentials stay with the Runner and are masked from screenshots and Transcripts
+- **Sensitive values**: Hub stores declared inputs/results separately from their masked display values; no access to raw values for default paths
+- **Screen Data**: Runner uses configured values and a detection library to mask sensitive screen content
+- **Known limitation**: Intervention model Steps are not previewed, irreversible Steps are designed but implementation is incomplete
 
 ## Cuts
 
-This lists the cuts made against the requirements and places I intentionally went shallow. These were cut to preserve time:
+This lists the cuts made against the requirements and a few notable other places I intentionally went shallow within my own architecture choices.
 
-- Allowlist, URLs - enforced in the right places but very simplistic implementation. It starts with the URL you provided for the recipe and denies any call whose origin does not match the single entry's origin. 
-  - Next: The necessary extension would be adding something like glob matching and more capability within Hub to manage the patterns being added.
-- Allowlist, Human Intervention, LLM-generated Step - does not include a human-in-the-loop step during intervention before sending the Step to the Runner
-  - Next: Change to Hub receiving the LLM-generated Step and then presenting it to the user, who could then choose to send it or clear it (and both the LLM suggestion and the user decision logged ot the transcript).
-- Allowlist, Training, LLM-generated Steps - no human review during this stage, could be mitigated at the contract level rather then with technology (grant us access to a non-production system with synthetic data for onboarding)
-  - Next: I'm on the fence and would want more of the business requirements. At some level, if the amount of work for a human is the same as them driving an interface to train it, then it might still be worth having an LLM generate a step for a human to review to then run it, in a loop, just to cut down on one person generating steps and a second reviewing them.
-- Irreversible actions shaped some of the Architecture (removal of ideas around automatic retries for now) and considered for LLM detection during recipe creation, but otherwise not addressed 
-  - Next: early thought on this was to have the LLM classify it's expectation of the steps while building the Trial Recipe, but this would need more thought. I'm not convinced that would be sufficient and would want to see the results from a first set of passes.
+| Cut / Limitation                          | Next Step                                                                         |
+|-------------------------------------------|-----------------------------------------------------------------------------------|
+| URL policy, 1 origin match only           | Add route pattern options and Hub user capability to manage additional policies   |
+| Action policy limited only by DSL         | Add user-defined Action policy to Training/Recipe Jobs for fine-grained control   |
+| Intervention LLM Steps run w/out approval | Display the LLM generated Step for user approval ("is this what you meant?")      |
+| .                                         | before transmitting to the Runner                                                 |
+| Recipe iteration from Intervention        | Add capability to send a Recipe and Transcript of a Human Intervention through the|
+| .                                         | LLM Recipe drafting flow to propose additions to `steps` or `recovery` scenarios  |
+| Training Steps run w/out approval         | Decide w/ product & security whether training Steps require human-in-the-loop or  |
+| .                                         | if synthetic-only customer environments for Training is something we can require  |
+| Irreversible-action handling incomplete   | LLM-classification of Risky Steps during Recipe creation, with human override     |
+| .                                         | before publication and explicit validation during Trial runs                      |
+| Stale Runner/Job detection                | Add Hub monitoring that marks abandoned Jobs as `Completed-Stale` automatically   |
+| .                                         | and produces a retry Job if no irreversible Steps were reached                    |
+| Runner is pre-registered                  | Add an explicit Runner registration process (human approval on both sides) before |
+| .                                         | Runners can accept Jobs for a customer, access details, or send information       |
+| Limited evaluation of LLM choice          | Perform structured experimentation, add evals for ongoing testing, s/yolo/science |
 
-I've noted a few smaller cuts above and have a list of (deferred design decisions)[].

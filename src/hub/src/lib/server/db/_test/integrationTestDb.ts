@@ -29,6 +29,11 @@ export function useIntegrationTestDb(): () => Database.Database {
 			env: { ...process.env, INTEGRATION_TEST_DATABASE_URL: `sqlite:${dbPath}` }
 		});
 		db = openDb(`sqlite:${dbPath}`);
+		// Scratch db is thrown away after the run, so trade durability for speed: default
+		// rollback-journal + synchronous=FULL fsyncs on every write, which is very slow on
+		// Windows (FlushFileBuffers latency).
+		db.pragma("journal_mode = WAL");
+		db.pragma("synchronous = NORMAL");
 	});
 
 	beforeEach(() => {
