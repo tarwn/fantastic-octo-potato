@@ -31,6 +31,7 @@ const DRAFT_RECIPE: RecipeSummary = {
 	name: "Draft recipe",
 	goal: "Goal",
 	state: "Draft",
+	sourceTrainingRunId: null,
 	definition: {
 		schemaVersion: 1,
 		inputs: {
@@ -52,6 +53,7 @@ const TYPED_RECIPE: RecipeSummary = {
 	name: "Typed recipe",
 	goal: "Goal",
 	state: "Draft",
+	sourceTrainingRunId: null,
 	definition: {
 		schemaVersion: 1,
 		inputs: {
@@ -69,6 +71,7 @@ const BOOLEAN_RECIPE: RecipeSummary = {
 	name: "Boolean recipe",
 	goal: "Goal",
 	state: "Draft",
+	sourceTrainingRunId: null,
 	definition: {
 		schemaVersion: 1,
 		inputs: { confirmed: { type: "boolean", description: "Confirm the search", required: true, nullable: false, sensitive: false } },
@@ -199,6 +202,15 @@ describe("StartRecipeJobModal", () => {
 		await fireEvent.click(screen.getByRole("button", { name: "Start Trial" }));
 
 		expect(startRecipeJob).toHaveBeenCalledWith(4, { mode: "Trial", ingredients: { confirmed: false } });
+	});
+
+	it("preselects the Recipe passed via initialRecipeId", async () => {
+		vi.mocked(fetchRecipes).mockResolvedValue([DRAFT_RECIPE, { ...DRAFT_RECIPE, id: 5, name: "Other draft" }]);
+
+		render(StartRecipeJobModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1, mode: "Trial", initialRecipeId: 5 });
+
+		await screen.findByText("Other draft");
+		expect(screen.getByRole("combobox")).toHaveValue("5");
 	});
 
 	it("calls onClose when the cancel button is clicked", async () => {

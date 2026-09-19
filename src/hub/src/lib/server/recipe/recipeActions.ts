@@ -7,6 +7,7 @@ export interface RecipeSummary {
 	goal: string;
 	state: "Draft" | "Published";
 	definition: Recipe["definition"];
+	sourceTrainingRunId: string | null;
 }
 
 const RECIPE_STATUS_LABELS: Record<RecipeStatus, "Draft" | "Published"> = {
@@ -24,6 +25,7 @@ export function toRecipeSummaries(recipes: Recipe[]): RecipeSummary[] {
 		name: recipe.name,
 		goal: recipe.goal,
 		state: RECIPE_STATUS_LABELS[recipe.recipeStatusId],
-		definition: recipe.definition
+		definition: recipe.definition,
+		sourceTrainingRunId: recipe.sourceTrainingRunId
 	}));
 }

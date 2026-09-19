@@ -9,6 +9,7 @@ export interface RecipeSummary {
 	goal: string;
 	state: "Draft" | "Published";
 	definition: RecipeDefinition;
+	sourceTrainingRunId: string | null;
 }
 
 export async function fetchRecipes(registeredApplicationId: number): Promise<RecipeSummary[]> {

@@ -55,4 +55,10 @@ describe("toRecipeSummaries", () => {
 
 		expect(summaries[0].definition).toBe(definition);
 	});
+
+	it("carries the Recipe's sourceTrainingRunId through unchanged", () => {
+		const summaries = toRecipeSummaries([sampleRecipe({ sourceTrainingRunId: "7" })]);
+
+		expect(summaries[0].sourceTrainingRunId).toBe("7");
+	});
 });
