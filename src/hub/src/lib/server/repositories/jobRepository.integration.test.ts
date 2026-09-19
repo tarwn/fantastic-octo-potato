@@ -36,6 +36,9 @@ function insertPendingTrainingJob(db: Database.Database, xrefId: number): number
 		startingUrl: "https://example.com/start",
 		allowlist: "https://example.com",
 		maxSteps: 10,
+		alternateGoals: [],
+		syntheticDataConfirmed: false,
+		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
 	});
 	return job.id;
@@ -55,6 +58,9 @@ describe("jobRepository", () => {
 				startingUrl: "https://example.com/start",
 				allowlist: "https://example.com",
 				maxSteps: 10,
+				alternateGoals: ["Also capture the due date"],
+				syntheticDataConfirmed: true,
+				stepTimeoutMs: 15000,
 				createdAt: new Date("2026-09-15T00:00:00.000Z")
 			});
 
@@ -72,7 +78,10 @@ describe("jobRepository", () => {
 					goal: "Extract invoice total",
 					startingUrl: "https://example.com/start",
 					allowlist: "https://example.com",
-					maxSteps: 10
+					maxSteps: 10,
+					alternateGoals: ["Also capture the due date"],
+					syntheticDataConfirmed: true,
+					stepTimeoutMs: 15000
 				}
 			});
 			expect(getJobById(getDb(), job.id)).toEqual(job);
@@ -152,7 +161,10 @@ describe("jobRepository", () => {
 				goal: "Extract invoice total",
 				startingUrl: "https://example.com/start",
 				allowlist: "https://example.com",
-				maxSteps: 10
+				maxSteps: 10,
+				alternateGoals: [],
+				syntheticDataConfirmed: false,
+				stepTimeoutMs: 15000
 			}
 		});
 		expect(secondClaim).toBeUndefined();

@@ -8,6 +8,9 @@ export interface TrainingJob {
 	startingUrl: string;
 	allowlist: string;
 	maxSteps: number;
+	alternateGoals: string[];
+	syntheticDataConfirmed: boolean;
+	stepTimeoutMs: number;
 }
 
 export interface RecipeJob {

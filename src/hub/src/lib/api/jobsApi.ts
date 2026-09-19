@@ -33,6 +33,8 @@ export interface StartTrainingRunRequested {
 	goal: string;
 	startingUrl: string;
 	maxSteps: number;
+	alternateGoals?: string[];
+	syntheticDataConfirmed?: boolean;
 }
 
 // Branching on the discriminant before spreading keeps TypeScript's narrowing intact —

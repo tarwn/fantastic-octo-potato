@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
@@ -7,7 +7,16 @@ import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
 import { SensitivityType } from "./db/sensitivityType";
 import { claimNextJobForRunner, insertJob, upsertJobIngredient, upsertJobResult } from "./repositories/jobRepository";
+import { deriveGoalIngredients } from "./goalIngredients";
 import { cancelJob, createJob, getJobDetail, listJobsAction } from "./jobActions";
+
+// createJob calls the LLM to derive Ingredients before persisting the Job — stub it here so this
+// integration test exercises the DB/action wiring without needing real LLM config (that's
+// goalIngredients.test.ts's job).
+vi.mock("./goalIngredients", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./goalIngredients")>();
+	return { ...actual, deriveGoalIngredients: vi.fn() };
+});
 
 function seedRegisteredApplication(db: Database.Database, id = 1): number {
 	db.exec(`
@@ -26,6 +35,9 @@ function insertTrainingJob(db: Database.Database, xrefId: number) {
 		startingUrl: "https://example.com/start",
 		allowlist: "https://example.com",
 		maxSteps: 5,
+		alternateGoals: [],
+		syntheticDataConfirmed: false,
+		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
 	});
 }
@@ -33,41 +45,45 @@ function insertTrainingJob(db: Database.Database, xrefId: number) {
 describe("jobActions", () => {
 	const getDb = useIntegrationTestDb();
 
+	beforeEach(() => {
+		vi.mocked(deriveGoalIngredients).mockReset().mockResolvedValue([]);
+	});
+
 	describe("createJob", () => {
-		it("rejects an unknown Registered Application", () => {
-			const result = createJob(getDb(), "999", { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 5 });
+		it("rejects an unknown Registered Application", async () => {
+			const result = await createJob(getDb(), "999", { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 5 });
 
 			expect(result).toEqual({ status: 404, body: { error: "Registered Application 999 not found" } });
 		});
 
-		it("rejects a missing goal", () => {
+		it("rejects a missing goal", async () => {
 			const id = seedRegisteredApplication(getDb());
 
-			const result = createJob(getDb(), String(id), { goal: "  ", startingUrl: "https://example.com/start", maxSteps: 5 });
+			const result = await createJob(getDb(), String(id), { goal: "  ", startingUrl: "https://example.com/start", maxSteps: 5 });
 
 			expect(result).toEqual({ status: 400, body: { error: "goal is required" } });
 		});
 
-		it("rejects an invalid starting URL", () => {
+		it("rejects an invalid starting URL", async () => {
 			const id = seedRegisteredApplication(getDb());
 
-			const result = createJob(getDb(), String(id), { goal: "Goal", startingUrl: "not-a-url", maxSteps: 5 });
+			const result = await createJob(getDb(), String(id), { goal: "Goal", startingUrl: "not-a-url", maxSteps: 5 });
 
 			expect(result).toEqual({ status: 400, body: { error: "startingUrl must be a valid URL" } });
 		});
 
-		it("rejects a non-positive maxSteps", () => {
+		it("rejects a non-positive maxSteps", async () => {
 			const id = seedRegisteredApplication(getDb());
 
-			const result = createJob(getDb(), String(id), { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 0 });
+			const result = await createJob(getDb(), String(id), { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 0 });
 
 			expect(result).toEqual({ status: 400, body: { error: "maxSteps must be a positive integer" } });
 		});
 
-		it("creates a Pending Training Job with the allowlist derived from the starting URL's origin", () => {
+		it("creates a Pending Training Job with the allowlist derived from the starting URL's origin", async () => {
 			const id = seedRegisteredApplication(getDb());
 
-			const result = createJob(getDb(), String(id), {
+			const result = await createJob(getDb(), String(id), {
 				goal: "Extract invoice total",
 				startingUrl: "https://example.com/start?x=1",
 				maxSteps: 5
@@ -83,16 +99,75 @@ describe("jobActions", () => {
 						goal: "Extract invoice total",
 						startingUrl: "https://example.com/start?x=1",
 						allowlist: "https://example.com",
-						maxSteps: 5
+						maxSteps: 5,
+						alternateGoals: [],
+						syntheticDataConfirmed: false,
+						stepTimeoutMs: 15000
 					}
 				})
 			});
 		});
 
-		it("records a status transcript entry announcing the new Pending Job", () => {
+		it("passes through alternate goals and the synthetic-data confirmation from the request body", async () => {
 			const id = seedRegisteredApplication(getDb());
 
-			const result = createJob(getDb(), String(id), { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 5 });
+			const result = await createJob(getDb(), String(id), {
+				goal: "Extract invoice total",
+				startingUrl: "https://example.com/start?x=1",
+				maxSteps: 5,
+				alternateGoals: ["Also capture the due date", "  ", 42],
+				syntheticDataConfirmed: true
+			});
+
+			expect(result.status).toBe(201);
+			expect(result.body).toEqual({
+				data: expect.objectContaining({
+					details: expect.objectContaining({
+						alternateGoals: ["Also capture the due date"],
+						syntheticDataConfirmed: true
+					})
+				})
+			});
+		});
+
+		it("persists the Ingredients the LLM derives from the goal before the Job is returned", async () => {
+			vi.mocked(deriveGoalIngredients).mockResolvedValue([
+				{ name: "accountNumber", value: "ACCT-1042", type: "string", sensitive: true }
+			]);
+			const id = seedRegisteredApplication(getDb());
+
+			const result = await createJob(getDb(), String(id), {
+				goal: "Look up account ACCT-1042",
+				startingUrl: "https://example.com/start",
+				maxSteps: 5
+			});
+			const job = (result.body as { data: { id: number } }).data;
+
+			const detail = getJobDetail(getDb(), String(job.id));
+			expect((detail.body as { data: { ingredients: unknown[] } }).data.ingredients).toEqual([
+				expect.objectContaining({ fieldName: "accountNumber", sensitivityType: SensitivityType.PII })
+			]);
+		});
+
+		it("surfaces an exhausted-retry LLM response as a submit error with no Job created", async () => {
+			const { GoalIngredientsInvalidResponseError } = await import("./goalIngredients");
+			vi.mocked(deriveGoalIngredients).mockRejectedValue(new GoalIngredientsInvalidResponseError("still invalid"));
+			const id = seedRegisteredApplication(getDb());
+
+			const result = await createJob(getDb(), String(id), {
+				goal: "Extract invoice total",
+				startingUrl: "https://example.com/start",
+				maxSteps: 5
+			});
+
+			expect(result).toEqual({ status: 502, body: { error: "still invalid" } });
+			expect(listJobsAction(getDb()).body).toEqual({ data: [] });
+		});
+
+		it("records a status transcript entry announcing the new Pending Job", async () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = await createJob(getDb(), String(id), { goal: "Goal", startingUrl: "https://example.com/start", maxSteps: 5 });
 			const job = (result.body as { data: { id: number } }).data;
 
 			const detail = getJobDetail(getDb(), String(job.id));

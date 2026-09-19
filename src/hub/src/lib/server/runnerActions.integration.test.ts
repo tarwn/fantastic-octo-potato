@@ -43,6 +43,9 @@ function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10):
 		startingUrl: "https://example.com/start",
 		allowlist: "https://example.com",
 		maxSteps,
+		alternateGoals: [],
+		syntheticDataConfirmed: false,
+		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
 	}).id;
 }
@@ -121,9 +124,12 @@ describe("runnerActions", () => {
 						job: {
 							id: jobId,
 							goal: "Extract invoice total",
+							alternateGoals: [],
 							startingUrl: "https://example.com/start",
 							allowlist: "https://example.com",
 							maxSteps: 10,
+							stepTimeoutMs: 15000,
+							syntheticDataConfirmed: false,
 							nextStep: { sequence: 1, kind: SCRIPTED_TRAINING_STEPS[0].kind, text: SCRIPTED_TRAINING_STEPS[0].text }
 						}
 					}

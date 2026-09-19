@@ -4,6 +4,7 @@ const mockEnv: {
 	LLM_API_URL?: string;
 	LLM_API_KEY?: string;
 	LLM_MODEL?: string;
+	LLM_MAX_CORRECTION_ATTEMPTS?: string;
 } = {};
 
 vi.mock("$env/dynamic/private", () => ({ env: mockEnv }));
@@ -12,6 +13,7 @@ beforeEach(() => {
 	delete mockEnv.LLM_API_URL;
 	delete mockEnv.LLM_API_KEY;
 	delete mockEnv.LLM_MODEL;
+	delete mockEnv.LLM_MAX_CORRECTION_ATTEMPTS;
 	vi.resetModules();
 });
 
@@ -40,7 +42,7 @@ describe("requireLlmConfig", () => {
 		expect(() => requireLlmConfig()).toThrow(/LLM_MODEL is not set/);
 	});
 
-	it("returns the configured values", async () => {
+	it("returns the configured values, defaulting maxCorrectionAttempts when unset", async () => {
 		mockEnv.LLM_API_URL = "https://example.test/v1";
 		mockEnv.LLM_API_KEY = "key";
 		mockEnv.LLM_MODEL = "model";
@@ -49,7 +51,28 @@ describe("requireLlmConfig", () => {
 		expect(requireLlmConfig()).toEqual({
 			baseUrl: "https://example.test/v1",
 			apiKey: "key",
-			model: "model"
+			model: "model",
+			maxCorrectionAttempts: 2
 		});
+	});
+
+	it("uses a configured LLM_MAX_CORRECTION_ATTEMPTS", async () => {
+		mockEnv.LLM_API_URL = "https://example.test/v1";
+		mockEnv.LLM_API_KEY = "key";
+		mockEnv.LLM_MODEL = "model";
+		mockEnv.LLM_MAX_CORRECTION_ATTEMPTS = "5";
+		const { requireLlmConfig } = await import("./llmConfig");
+
+		expect(requireLlmConfig().maxCorrectionAttempts).toBe(5);
+	});
+
+	it("throws when LLM_MAX_CORRECTION_ATTEMPTS is not a positive integer", async () => {
+		mockEnv.LLM_API_URL = "https://example.test/v1";
+		mockEnv.LLM_API_KEY = "key";
+		mockEnv.LLM_MODEL = "model";
+		mockEnv.LLM_MAX_CORRECTION_ATTEMPTS = "0";
+		const { requireLlmConfig } = await import("./llmConfig");
+
+		expect(() => requireLlmConfig()).toThrow(/LLM_MAX_CORRECTION_ATTEMPTS must be a positive integer/);
 	});
 });

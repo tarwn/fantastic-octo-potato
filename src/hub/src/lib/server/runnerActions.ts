@@ -299,9 +299,12 @@ export function runnerPoll(
 				job: {
 					id: job.id,
 					goal: job.details.goal,
+					alternateGoals: job.details.alternateGoals,
 					startingUrl: job.details.startingUrl,
 					allowlist: job.details.allowlist,
 					maxSteps: job.details.maxSteps,
+					stepTimeoutMs: job.details.stepTimeoutMs,
+					syntheticDataConfirmed: job.details.syntheticDataConfirmed,
 					nextStep: toWireStep(1, firstStep)
 				}
 			}

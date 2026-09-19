@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { JobStatus } from "./db/jobStatus";
 import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
+import { SensitivityType } from "./db/sensitivityType";
 import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
 import {
 	appendTranscriptEntry,
@@ -17,19 +18,27 @@ import {
 	listTranscriptEntries,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
-	updateJobStatus
+	updateJobStatus,
+	upsertJobIngredient
 } from "./repositories/jobRepository";
 import { readJobStepArtifact } from "./artifactStorage";
+import { deriveGoalIngredients, GoalIngredientsInvalidResponseError } from "./goalIngredients";
 
 export interface JobActionResult {
 	status: number;
 	body: { data: unknown } | { error: string };
 }
 
+// One default per Training Job, mirroring recipeActions.ts's RECIPE_JOB_STEP_TIMEOUT_MS — no
+// per-Step override exists yet for either Job type.
+const TRAINING_JOB_STEP_TIMEOUT_MS = 15_000;
+
 interface CreateJobBody {
 	goal?: unknown;
 	startingUrl?: unknown;
 	maxSteps?: unknown;
+	alternateGoals?: unknown;
+	syntheticDataConfirmed?: unknown;
 }
 
 function deriveAllowlist(startingUrl: string): string | undefined {
@@ -41,7 +50,17 @@ function deriveAllowlist(startingUrl: string): string | undefined {
 	}
 }
 
-export function createJob(db: Database.Database, rawRegisteredApplicationId: string, body: CreateJobBody): JobActionResult {
+function deriveAlternateGoals(rawAlternateGoals: unknown): string[] {
+	if (!Array.isArray(rawAlternateGoals)) {
+		return [];
+	}
+	return rawAlternateGoals
+		.filter((entry): entry is string => typeof entry === "string")
+		.map((entry) => entry.trim())
+		.filter((entry) => entry !== "");
+}
+
+export async function createJob(db: Database.Database, rawRegisteredApplicationId: string, body: CreateJobBody): Promise<JobActionResult> {
 	const registeredApplicationId = Number(rawRegisteredApplicationId);
 	const registeredApplication = Number.isNaN(registeredApplicationId)
 		? undefined
@@ -66,15 +85,49 @@ export function createJob(db: Database.Database, rawRegisteredApplicationId: str
 		return { status: 400, body: { error: "maxSteps must be a positive integer" } };
 	}
 
-	const job = insertJob(db, {
-		jobType: JobType.Training,
-		customerApplicationXrefId: registeredApplication.id,
-		goal,
-		startingUrl,
-		allowlist,
-		maxSteps,
-		createdAt: new Date()
-	});
+	const alternateGoals = deriveAlternateGoals(body.alternateGoals);
+	const syntheticDataConfirmed = body.syntheticDataConfirmed === true;
+
+	// Analyze the goal for probable input values before the Job is persisted — an invalid/
+	// exhausted-retry LLM response (GoalIngredientsInvalidResponseError) surfaces as a submit
+	// error with no Job created; any other thrown error (e.g. missing LLM config) crashes loudly.
+	let ingredients;
+	try {
+		ingredients = await deriveGoalIngredients(goal);
+	}
+	catch (err) {
+		if (err instanceof GoalIngredientsInvalidResponseError) {
+			return { status: 502, body: { error: err.message } };
+		}
+		throw err;
+	}
+
+	const job = db.transaction(() => {
+		const inserted = insertJob(db, {
+			jobType: JobType.Training,
+			customerApplicationXrefId: registeredApplication.id,
+			goal,
+			startingUrl,
+			allowlist,
+			maxSteps,
+			alternateGoals,
+			syntheticDataConfirmed,
+			stepTimeoutMs: TRAINING_JOB_STEP_TIMEOUT_MS,
+			createdAt: new Date()
+		});
+		for (const ingredient of ingredients) {
+			upsertJobIngredient(
+				db,
+				inserted.id,
+				ingredient.name,
+				ingredient.value,
+				ingredient.sensitive ? SensitivityType.PII : SensitivityType.None,
+				inserted.createdAt
+			);
+		}
+		return inserted;
+	})();
+
 	appendTranscriptEntry(
 		db,
 		job.id,

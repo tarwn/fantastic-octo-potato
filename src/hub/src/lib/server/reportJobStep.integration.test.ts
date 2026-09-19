@@ -39,6 +39,9 @@ function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10):
 		startingUrl: "https://example.com/start",
 		allowlist: "https://example.com",
 		maxSteps,
+		alternateGoals: [],
+		syntheticDataConfirmed: false,
+		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
 	}).id;
 }

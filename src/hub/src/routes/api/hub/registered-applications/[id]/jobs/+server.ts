@@ -7,7 +7,7 @@ import { createJob } from "$lib/server/jobActions";
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const body = await request.json();
-	const result = createJob(getDb(), params.id, body);
+	const result = await createJob(getDb(), params.id, body);
 
 	return json(result.body, { status: result.status });
 };

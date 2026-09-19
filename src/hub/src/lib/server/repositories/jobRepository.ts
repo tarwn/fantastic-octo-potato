@@ -46,6 +46,9 @@ export interface TrainingJob {
 	startingUrl: string;
 	allowlist: string;
 	maxSteps: number;
+	alternateGoals: string[];
+	syntheticDataConfirmed: boolean;
+	stepTimeoutMs: number;
 }
 
 export interface RecipeJob {
@@ -78,6 +81,9 @@ export type InsertJobParams =
 			startingUrl: string;
 			allowlist: string;
 			maxSteps: number;
+			alternateGoals: string[];
+			syntheticDataConfirmed: boolean;
+			stepTimeoutMs: number;
 			createdAt: Date;
 	  }
 	| {
@@ -146,6 +152,9 @@ interface JobRow {
 	trainingStartingUrl: string | null;
 	trainingAllowlist: string | null;
 	trainingMaxSteps: number | null;
+	trainingAlternateGoals: string | null;
+	trainingSyntheticDataConfirmed: number | null;
+	trainingStepTimeoutMs: number | null;
 	recipeId: number | null;
 	recipeJobId: number | null;
 	recipeMode: string | null;
@@ -183,6 +192,9 @@ const JOB_SELECT = `
 	       job.started_at AS startedAt, job.heartbeat_on AS heartbeatOn, job.completed_at AS completedAt,
 	       training_job.goal AS trainingGoal, training_job.starting_url AS trainingStartingUrl,
 	       training_job.allowlist AS trainingAllowlist, training_job.max_steps AS trainingMaxSteps,
+	       training_job.alternate_goals AS trainingAlternateGoals,
+	       training_job.synthetic_data_confirmed AS trainingSyntheticDataConfirmed,
+	       training_job.step_timeout_ms AS trainingStepTimeoutMs,
 	       recipe_job.recipe_id AS recipeId, recipe_job.job_id AS recipeJobId, recipe_job.mode AS recipeMode,
 	       recipe_job.allowlist AS recipeAllowlist, recipe_job.step_timeout_ms AS recipeStepTimeoutMs
 	FROM job
@@ -203,7 +215,15 @@ function mapJobRow(row: JobRow): Job {
 	};
 
 	if (row.jobTypeId === JobType.Training) {
-		if (row.trainingGoal === null || row.trainingStartingUrl === null || row.trainingAllowlist === null || row.trainingMaxSteps === null) {
+		if (
+			row.trainingGoal === null ||
+			row.trainingStartingUrl === null ||
+			row.trainingAllowlist === null ||
+			row.trainingMaxSteps === null ||
+			row.trainingAlternateGoals === null ||
+			row.trainingSyntheticDataConfirmed === null ||
+			row.trainingStepTimeoutMs === null
+		) {
 			throw new Error(`Job ${row.id} is job_type Training but has no training_job row`);
 		}
 		return {
@@ -213,7 +233,10 @@ function mapJobRow(row: JobRow): Job {
 				goal: row.trainingGoal,
 				startingUrl: row.trainingStartingUrl,
 				allowlist: row.trainingAllowlist,
-				maxSteps: row.trainingMaxSteps
+				maxSteps: row.trainingMaxSteps,
+				alternateGoals: JSON.parse(row.trainingAlternateGoals) as string[],
+				syntheticDataConfirmed: row.trainingSyntheticDataConfirmed !== 0,
+				stepTimeoutMs: row.trainingStepTimeoutMs
 			}
 		};
 	}
@@ -285,17 +308,31 @@ export function insertJob(db: Database.Database, params: InsertJobParams): Job {
 		};
 
 		if (params.jobType === JobType.Training) {
-			db.prepare("INSERT INTO training_job (job_id, goal, starting_url, allowlist, max_steps) VALUES (?, ?, ?, ?, ?)").run(
+			db.prepare(
+				`INSERT INTO training_job (job_id, goal, starting_url, allowlist, max_steps, alternate_goals, synthetic_data_confirmed, step_timeout_ms)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+			).run(
 				jobId,
 				params.goal,
 				params.startingUrl,
 				params.allowlist,
-				params.maxSteps
+				params.maxSteps,
+				JSON.stringify(params.alternateGoals),
+				params.syntheticDataConfirmed ? 1 : 0,
+				params.stepTimeoutMs
 			);
 			return {
 				...base,
 				jobType: JobType.Training,
-				details: { goal: params.goal, startingUrl: params.startingUrl, allowlist: params.allowlist, maxSteps: params.maxSteps }
+				details: {
+					goal: params.goal,
+					startingUrl: params.startingUrl,
+					allowlist: params.allowlist,
+					maxSteps: params.maxSteps,
+					alternateGoals: params.alternateGoals,
+					syntheticDataConfirmed: params.syntheticDataConfirmed,
+					stepTimeoutMs: params.stepTimeoutMs
+				}
 			};
 		}
 

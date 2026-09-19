@@ -134,6 +134,9 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 			startingUrl: "https://example.test",
 			allowlist: "https://example.test",
 			maxSteps: 5,
+			alternateGoals: [],
+			syntheticDataConfirmed: false,
+			stepTimeoutMs: 15000,
 			createdAt: new Date("2026-09-15T00:00:00.000Z")
 		});
 		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
@@ -209,6 +212,9 @@ describe("uploadJobStepArtifact (Recipe Job screenshots)", () => {
 			startingUrl: "https://example.test",
 			allowlist: "https://example.test",
 			maxSteps: 5,
+			alternateGoals: [],
+			syntheticDataConfirmed: false,
+			stepTimeoutMs: 15000,
 			createdAt: new Date("2026-09-15T00:00:00.000Z")
 		});
 		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);

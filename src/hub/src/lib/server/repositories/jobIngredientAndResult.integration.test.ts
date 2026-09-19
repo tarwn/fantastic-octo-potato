@@ -36,6 +36,9 @@ function insertPendingTrainingJob(db: Database.Database, xrefId: number): number
 		startingUrl: "https://example.com/start",
 		allowlist: "https://example.com",
 		maxSteps: 10,
+		alternateGoals: [],
+		syntheticDataConfirmed: false,
+		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
 	});
 	return job.id;
