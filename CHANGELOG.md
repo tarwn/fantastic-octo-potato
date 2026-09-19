@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 - 2026-09-19
+
+Training Run (spec 0009): an operator can start a Training Run from a Registered Application with just a goal, starting URL, and step limit — Hub calls an OpenAI-scheme LLM to turn the goal into typed Ingredients, then drives per-step discovery by sending the goal, transcript, and masked screenshot to the LLM for one next DSL Step at a time, all validated with bounded correction retries. runner-web's new Training loop executes each Hub-issued Step against a real Playwright browser, mirroring the Recipe Job loop's execution/masking but staying Hub-authoritative for progression. On success, Hub compiles the run's actual observed path into a validated draft Recipe (never a synthesized alternate branch); the Registered Application and Job screens surface a draft Recipe with "Start Trial" and link it back to the Training Job that produced it.
+
 ## 0.8.0 - 2026-09-17
 
 Runner Masking (spec 0008): known-secrets masking now grows mid-Job as declared-sensitive Recipe outputs are extracted, and the same redaction pass scrubs every Hub-bound `INFO`/status/error message and local log line, not just screenshots. Screenshots additionally get a second, independent masking pass using `@redactpii/node` to catch on-screen PII the Runner has no advance knowledge of (email, SSN, credit card, phone patterns). Every terminal Job exit path cleans up its browser session, and a new `npm run clean:runner-web` command clears stray Runner-launched browser processes left behind by an ungraceful stop.

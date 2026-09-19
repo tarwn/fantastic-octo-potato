@@ -10,6 +10,7 @@ Backend:
 * [Database Handling](./backend/database-handling.md)
 * [Repository Return Value Conventions](./backend/repository-return-value-conventions.md)
 * [Runner API: init, poll, and Job steps](./backend/runner-api.md)
+* [LLM Call With Validation Retry](./backend/llm-call-validation-retry.md)
 
 Frontend:
 * [API Calling Pattern](./frontend/api-calling-pattern.md)
