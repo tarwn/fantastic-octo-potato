@@ -1,16 +1,37 @@
 import type Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
 import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
 import { SensitivityType } from "./db/sensitivityType";
-import { getJobById, insertJob, listTranscriptEntries, upsertJobIngredient } from "./repositories/jobRepository";
-import { reportJobStep, runnerPoll } from "./runnerActions";
-import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
+import {
+	buildOpenStartingUrlStep,
+	getJobById,
+	insertJob,
+	insertTrainingJobStep,
+	listSafeJobResults,
+	listTrainingJobSteps,
+	listTranscriptEntries
+} from "./repositories/jobRepository";
+import { deriveNextStep, NextStepInvalidResponseError } from "./nextStep";
+import { reportJobStep, runnerPoll, uploadJobStepArtifact } from "./runnerActions";
+
+import type { ChildStep } from "$lib/types/recipeDefinition";
+
+vi.mock("./nextStep", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./nextStep")>();
+	return { ...actual, deriveNextStep: vi.fn() };
+});
 
 const SHARED_SECRET = "test-secret";
+const CLICK_SEARCH_STEP: ChildStep = { id: "click_search", action: "click", args: [{ by: "text", value: "Search" }] };
+const FINISH_STEP: ChildStep = { id: "s2", action: "finish", args: [null] };
+
+beforeEach(() => {
+	vi.mocked(deriveNextStep).mockReset().mockResolvedValue(CLICK_SEARCH_STEP);
+});
 
 function seedRunner(db: Database.Database): number {
 	db.exec(`
@@ -23,7 +44,7 @@ function seedRunner(db: Database.Database): number {
 }
 
 function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10): number {
-	return insertJob(db, {
+	const job = insertJob(db, {
 		jobType: JobType.Training,
 		customerApplicationXrefId: xrefId,
 		goal: "Extract invoice total",
@@ -34,27 +55,28 @@ function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10):
 		syntheticDataConfirmed: false,
 		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
-	}).id;
+	});
+	insertTrainingJobStep(db, job.id, buildOpenStartingUrlStep(), job.createdAt);
+	return job.id;
 }
 
-describe("reportJobStep outcomes", () => {
+const dslStepBody = (stepId: string, extractions: Array<{ fieldName: string; value: string }> = []) => ({
+	kind: "dslStep" as const,
+	stepId,
+	outcome: "succeeded" as const,
+	extractions
+});
+
+describe("reportJobStep outcomes (Training Jobs)", () => {
 	const getDb = useIntegrationTestDb();
 
-	const emptyStepBody = (sequence: number, message = "did a thing") => ({
-		kind: "step" as const,
-		sequence,
-		message,
-		inputs: [] as string[],
-		outputs: [] as Array<{ fieldName: string; value: string }>
-	});
-
-	it("records an info/recover/observe/plan message as a plain-string transcript row without mutating status", () => {
+	it("records an info/recover/observe/plan message as a plain-string transcript row without mutating status", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "observe",
 			message: "Looked at the page"
 		});
@@ -66,13 +88,13 @@ describe("reportJobStep outcomes", () => {
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.Running);
 	});
 
-	it("applies a status-kind submission's status change and records it on the transcript row", () => {
+	it("applies a status-kind submission's status change and records it on the transcript row", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "status",
 			status: JobStatus.CompletedCancelled,
 			message: "Cancelled itself"
@@ -85,32 +107,25 @@ describe("reportJobStep outcomes", () => {
 		);
 	});
 
-	it("no-ops and returns the current status without mutating an already-terminal Job", () => {
+	it("no-ops and returns the current status without mutating an already-terminal Job", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
-		reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1));
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
 
-		const result = reportJobStep(
-			db,
-			String(runnerId),
-			String(jobId),
-			`Bearer ${SHARED_SECRET}`,
-			SHARED_SECRET,
-			emptyStepBody(2, "another report, too late")
-		);
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("too_late"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } });
 	});
 
-	it("sets Completed-Failed once the reported sequence reaches maxSteps", () => {
+	it("sets Completed-Failed once the reported Step count reaches maxSteps", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } });
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedFailed);
@@ -124,119 +139,162 @@ describe("reportJobStep outcomes", () => {
 		);
 	});
 
-	it("sets Completed-Success once the scripted steps are exhausted, recording results along the way", () => {
+	it("sets Completed-Success once the model issues a finish Step", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 100);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		let result;
-		for (let sequence = 1; sequence <= SCRIPTED_TRAINING_STEPS.length; sequence++) {
-			const step = SCRIPTED_TRAINING_STEPS[sequence - 1];
-			result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-				kind: "step",
-				sequence,
-				message: step.text,
-				inputs: [],
-				outputs: step.resultField ? [{ fieldName: step.resultField, value: step.resultValue ?? "" }] : []
-			});
-		}
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
 		expect(listTranscriptEntries(db, jobId)).toContainEqual(
 			expect.objectContaining({
-				sequence: 101,
 				kind: TranscriptKind.Status,
-				text: "Run finished, marked Completed-Success",
+				text: "Model issued a finish Step, marked Completed-Success",
 				jobStatusId: JobStatus.CompletedSuccess
 			})
 		);
 	});
 
-	it("resolves an output's sensitivityType from the matching scripted step definition, never from the request body", () => {
+	it("marks Completed-Error when next-Step generation is exhausted, without a further nextStep", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 100);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
-		const scriptedResultStep = SCRIPTED_TRAINING_STEPS.findIndex((step) => step.resultField !== undefined);
-		const sequence = scriptedResultStep + 1;
-		const step = SCRIPTED_TRAINING_STEPS[scriptedResultStep];
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		vi.mocked(deriveNextStep).mockRejectedValueOnce(new NextStepInvalidResponseError("still invalid"));
 
-		for (let s = 1; s < sequence; s++) {
-			reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(s));
-		}
-		reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			kind: "step",
-			sequence,
-			message: step.text,
-			inputs: [],
-			outputs: [{ fieldName: step.resultField as string, value: step.resultValue as string }]
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedError } } });
+		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedError);
+	});
+
+	it("marks Completed-Error when the model reuses an already-used Step id, without inserting a duplicate training_job_step row", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		vi.mocked(deriveNextStep).mockResolvedValueOnce({ id: "open_starting_url", action: "click", args: [{ by: "text", value: "Search" }] });
+
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
+
+		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedError } } });
+		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedError);
+		expect(listTrainingJobSteps(db, jobId)).toHaveLength(1);
+	});
+
+	it("records an extraction as a Job Result, sensitivity None (real classification happens at compile time, Step 6)", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+		await reportJobStep(
+			db,
+			String(runnerId),
+			String(jobId),
+			`Bearer ${SHARED_SECRET}`,
+			SHARED_SECRET,
+			dslStepBody("click_search", [{ fieldName: "total", value: "100" }])
+		);
+
+		expect(listSafeJobResults(db, jobId)).toEqual([{ fieldName: "total", safeValue: "100", sensitivityType: SensitivityType.None }]);
+	});
+
+	it("returns the LLM-generated next Step while the run continues", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		const readTotalStep: ChildStep = {
+			id: "read_total",
+			action: "read",
+			args: [{ by: "text", value: "Total" }, "text", { ref: "output", name: "total" }]
+		};
+		vi.mocked(deriveNextStep).mockResolvedValueOnce(readTotalStep);
+
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.Running, nextStep: readTotalStep } } });
+	});
+
+	it("persists a derived Step before returning it, so a later transcript row can be correlated back to its action/args", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
+
+		expect(listTrainingJobSteps(db, jobId)).toEqual([
+			expect.objectContaining({ stepId: "open_starting_url" }),
+			expect.objectContaining({ stepId: "click_search", definition: CLICK_SEARCH_STEP })
+		]);
+	});
+
+	it("also persists a model-issued finish Step", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		expect(listTrainingJobSteps(db, jobId)).toContainEqual(expect.objectContaining({ stepId: "s2", definition: FINISH_STEP }));
+	});
+
+	it("builds the next-Step prompt with the just-uploaded screenshot for the reported stepId (C004)", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1, 100);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		uploadJobStepArtifact(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			stepId: "click_search",
+			imageBase64: Buffer.from("masked-png-bytes").toString("base64")
 		});
 
-		expect(listTranscriptEntries(db, jobId)).toContainEqual(
-			expect.objectContaining({
-				sequence,
-				kind: TranscriptKind.Step,
-				text: {
-					message: step.text,
-					inputs: [],
-					outputs: [{ fieldName: step.resultField, safeValue: step.resultValue, sensitivityType: step.sensitivityType }]
-				}
-			})
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		expect(vi.mocked(deriveNextStep)).toHaveBeenLastCalledWith(
+			expect.objectContaining({ maskedScreenshotPngBase64: Buffer.from("masked-png-bytes").toString("base64") })
 		);
 	});
 
-	it("resolves a step submission's inputs to the safe read of an already-known ingredient", () => {
+	it("stores reported credential names (never values) and passes them to the next-Step prompt", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 100);
-		upsertJobIngredient(db, jobId, "customer_name", "Jane Doe", SensitivityType.PII, new Date("2026-09-15T00:00:00.000Z"));
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			kind: "step",
-			sequence: 1,
-			message: "used the customer name",
-			inputs: ["customer_name"],
-			outputs: []
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			...dslStepBody("open_starting_url"),
+			credentialNames: ["loginUser", "loginPassword"]
 		});
 
-		expect(listTranscriptEntries(db, jobId)).toContainEqual(
-			expect.objectContaining({
-				sequence: 1,
-				kind: TranscriptKind.Step,
-				text: {
-					message: "used the customer name",
-					inputs: [{ fieldName: "customer_name", safeValue: "••••••", sensitivityType: SensitivityType.PII }],
-					outputs: []
-				}
-			})
+		const job = getJobById(db, jobId);
+		expect(job?.jobType === JobType.Training ? job.details.credentialNames : undefined).toEqual(["loginUser", "loginPassword"]);
+		expect(vi.mocked(deriveNextStep)).toHaveBeenLastCalledWith(
+			expect.objectContaining({ knownCredentialNames: ["loginUser", "loginPassword"] })
 		);
 	});
 
-	it("returns the next scripted step while steps remain", () => {
+	it("keeps the previously reported credential names on a later report that omits them", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 100);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
-
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1, "did the first thing"));
-
-		expect(result).toEqual({
-			status: 200,
-			body: {
-				data: {
-					jobStatusId: JobStatus.Running,
-					nextStep: {
-						sequence: 2,
-						kind: SCRIPTED_TRAINING_STEPS[1].kind,
-						text: SCRIPTED_TRAINING_STEPS[1].text,
-						resultField: SCRIPTED_TRAINING_STEPS[1].resultField,
-						resultValue: SCRIPTED_TRAINING_STEPS[1].resultValue
-					}
-				}
-			}
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			...dslStepBody("open_starting_url"),
+			credentialNames: ["loginUser"]
 		});
+		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+
+		expect(vi.mocked(deriveNextStep)).toHaveBeenLastCalledWith(expect.objectContaining({ knownCredentialNames: ["loginUser"] }));
 	});
 });

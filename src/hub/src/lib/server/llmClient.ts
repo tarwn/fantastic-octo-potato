@@ -8,9 +8,23 @@ import { requireLlmConfig } from "./llmConfig";
 export interface ChatCompletionRequest {
 	systemPrompt: string;
 	userPrompt: string;
+	// Base64-encoded PNG bytes (no data-URL prefix) for a masked screenshot, when the caller has
+	// one — sent as an OpenAI-scheme vision content part alongside the text prompt. The caller is
+	// responsible for masking (R011); this function never inspects the image.
+	userImagePngBase64?: string;
 }
 
-export async function sendChatCompletion({ systemPrompt, userPrompt }: ChatCompletionRequest): Promise<string> {
+function buildUserContent(userPrompt: string, userImagePngBase64: string | undefined): string | Array<Record<string, unknown>> {
+	if (userImagePngBase64 === undefined) {
+		return userPrompt;
+	}
+	return [
+		{ type: "text", text: userPrompt },
+		{ type: "image_url", image_url: { url: `data:image/png;base64,${userImagePngBase64}` } }
+	];
+}
+
+export async function sendChatCompletion({ systemPrompt, userPrompt, userImagePngBase64 }: ChatCompletionRequest): Promise<string> {
 	const { baseUrl, apiKey, model } = requireLlmConfig();
 
 	const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -23,7 +37,7 @@ export async function sendChatCompletion({ systemPrompt, userPrompt }: ChatCompl
 			model,
 			messages: [
 				{ role: "system", content: systemPrompt },
-				{ role: "user", content: userPrompt }
+				{ role: "user", content: buildUserContent(userPrompt, userImagePngBase64) }
 			]
 		})
 	});

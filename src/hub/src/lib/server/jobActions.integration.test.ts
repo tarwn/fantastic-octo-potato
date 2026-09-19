@@ -6,7 +6,7 @@ import { JobStatus } from "./db/jobStatus";
 import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
 import { SensitivityType } from "./db/sensitivityType";
-import { claimNextJobForRunner, insertJob, upsertJobIngredient, upsertJobResult } from "./repositories/jobRepository";
+import { claimNextJobForRunner, insertJob, listTrainingJobSteps, upsertJobIngredient, upsertJobResult } from "./repositories/jobRepository";
 import { deriveGoalIngredients } from "./goalIngredients";
 import { cancelJob, createJob, getJobDetail, listJobsAction } from "./jobActions";
 
@@ -102,10 +102,29 @@ describe("jobActions", () => {
 						maxSteps: 5,
 						alternateGoals: [],
 						syntheticDataConfirmed: false,
-						stepTimeoutMs: 15000
+						stepTimeoutMs: 15000,
+						credentialNames: []
 					}
 				})
 			});
+		});
+
+		it("persists the fixed 'open starting URL' first Step at creation, before any Runner claims the Job", async () => {
+			const id = seedRegisteredApplication(getDb());
+
+			const result = await createJob(getDb(), String(id), {
+				goal: "Extract invoice total",
+				startingUrl: "https://example.com/start",
+				maxSteps: 5
+			});
+			const job = (result.body as { data: { id: number } }).data;
+
+			expect(listTrainingJobSteps(getDb(), job.id)).toEqual([
+				expect.objectContaining({
+					stepId: "open_starting_url",
+					definition: { id: "open_starting_url", action: "open", args: [{ ref: "input", name: "startingUrl" }], intent: "Open the starting URL" }
+				})
+			]);
 		});
 
 		it("passes through alternate goals and the synthetic-data confirmation from the request body", async () => {
@@ -145,7 +164,8 @@ describe("jobActions", () => {
 
 			const detail = getJobDetail(getDb(), String(job.id));
 			expect((detail.body as { data: { ingredients: unknown[] } }).data.ingredients).toEqual([
-				expect.objectContaining({ fieldName: "accountNumber", sensitivityType: SensitivityType.PII })
+				expect.objectContaining({ fieldName: "accountNumber", sensitivityType: SensitivityType.PII }),
+				expect.objectContaining({ fieldName: "startingUrl" })
 			]);
 		});
 

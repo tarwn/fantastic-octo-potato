@@ -7,15 +7,18 @@ import { SensitivityType } from "./db/sensitivityType";
 import { getRegisteredApplicationById } from "./repositories/customerApplicationXrefRepository";
 import {
 	appendTranscriptEntry,
+	buildOpenStartingUrlStep,
 	getJobById,
 	getJobStepArtifactById,
 	insertJob,
+	insertTrainingJobStep,
 	JOB_CREATED_SEQUENCE,
 	listJobs,
 	listJobStepArtifactsForJob,
 	listSafeJobIngredients,
 	listSafeJobResults,
 	listTranscriptEntries,
+	STARTING_URL_INGREDIENT_NAME,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
 	updateJobStatus,
@@ -125,6 +128,15 @@ export async function createJob(db: Database.Database, rawRegisteredApplicationI
 				inserted.createdAt
 			);
 		}
+		// Stored as a regular Ingredient (not just training_job.starting_url) so the fixed first
+		// Step (below) can reference it the same way a Recipe Job's Steps reference any other
+		// declared input — this also prepares Training to run against a test system's URL the same
+		// way a later Trial/Execute run would. Upserted last, after the goal-derived Ingredients
+		// above, so a same-named ("startingUrl") goal Ingredient can never silently overwrite it.
+		upsertJobIngredient(db, inserted.id, STARTING_URL_INGREDIENT_NAME, startingUrl, SensitivityType.None, inserted.createdAt);
+		// Persisted now, before any Runner ever claims the Job, per insertTrainingJobStep's
+		// contract: a Step is saved before it's handed out, never derived only on the fly.
+		insertTrainingJobStep(db, inserted.id, buildOpenStartingUrlStep(), inserted.createdAt);
 		return inserted;
 	})();
 

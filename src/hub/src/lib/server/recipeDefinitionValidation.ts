@@ -35,52 +35,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object";
 }
 
-export function validateRecipeDefinition(definition: RecipeDefinition): string[] {
-	const errors: string[] = [];
-	const seenIds = new Set<string>();
-	const mainStepIds = new Set<string>();
-
-	function collectIds(steps: unknown[], isChild: boolean): void {
-		for (const step of steps) {
-			if (!isRecord(step)) {
-				continue;
-			}
-			const s = step as StepLike;
-			if (typeof s.id === "string") {
-				if (seenIds.has(s.id)) {
-					errors.push(`Duplicate step id: ${s.id}`);
-				}
-				seenIds.add(s.id);
-				if (!isChild) {
-					mainStepIds.add(s.id);
-				}
-			}
-			if (s.action === "group") {
-				collectIds((s.args?.[0] as unknown[]) ?? [], true);
-			}
-			if (s.action === "if") {
-				const cases = (s.args?.[0] as IfCaseLike[]) ?? [];
-				for (const ifCase of cases) {
-					collectIds(ifCase.steps ?? [], true);
-				}
-				collectIds((s.args?.[1] as unknown[]) ?? [], true);
-			}
-		}
-	}
-
-	function checkValueRef(value: unknown): void {
-		if (!isRecord(value) || !("ref" in value)) {
-			return;
-		}
-		const ref = value as { ref?: unknown; name?: unknown };
-		if (ref.ref === "input" && !(String(ref.name) in definition.inputs)) {
-			errors.push(`Unknown input reference: ${String(ref.name)}`);
-		}
-		if (ref.ref === "output" && !(String(ref.name) in definition.outputs)) {
-			errors.push(`Unknown output reference: ${String(ref.name)}`);
-		}
-	}
-
+// Shared by validateRecipeDefinition (a full Recipe, finish requires a non-null checkpoint) and
+// validateAtomicStep (one Training next-Step at a time, steps-dsl.md: "Training finish may use
+// null") — the only difference between those two callers is finish's checkpoint requirement and
+// how a value reference's known input/output names are known ahead of time.
+function checkStepShape(
+	step: unknown,
+	isChild: boolean,
+	errors: string[],
+	mainStepIds: Set<string>,
+	checkValueRef: (value: unknown) => void,
+	requireFinishCheckpoint: boolean
+): void {
 	function checkTarget(target: unknown): void {
 		if (!isRecord(target)) {
 			return;
@@ -175,7 +141,9 @@ export function validateRecipeDefinition(definition: RecipeDefinition): string[]
 				break;
 			case "finish":
 				if (args[0] === null || args[0] === undefined) {
-					errors.push(`Step ${id}: finish requires a non-null checkpoint condition`);
+					if (requireFinishCheckpoint) {
+						errors.push(`Step ${id}: finish requires a non-null checkpoint condition`);
+					}
 				}
 				else {
 					checkCondition(args[0]);
@@ -197,6 +165,88 @@ export function validateRecipeDefinition(definition: RecipeDefinition): string[]
 		}
 	}
 
+	checkStep(step, isChild);
+}
+
+// Validates one atomic Training next-Step (steps-dsl.md, C003: no group/if) in isolation, against
+// the Ingredient/output field names observed so far — a Training run has no fixed input/output
+// schema up front (unlike a full Recipe), and no named main Steps to `goto`.
+export function validateAtomicStep(
+	step: unknown,
+	knownInputNames: ReadonlySet<string>,
+	knownOutputNames: ReadonlySet<string>,
+	knownCredentialNames: ReadonlySet<string> = new Set()
+): string[] {
+	const errors: string[] = [];
+	const checkValueRef = (value: unknown): void => {
+		if (!isRecord(value) || !("ref" in value)) {
+			return;
+		}
+		const ref = value as { ref?: unknown; name?: unknown };
+		if (ref.ref === "input" && !knownInputNames.has(String(ref.name))) {
+			errors.push(`Unknown input reference: ${String(ref.name)}`);
+		}
+		if (ref.ref === "output" && !knownOutputNames.has(String(ref.name))) {
+			errors.push(`Unknown output reference: ${String(ref.name)}`);
+		}
+		if (ref.ref === "credential" && !knownCredentialNames.has(String(ref.name))) {
+			errors.push(`Unknown credential reference: ${String(ref.name)}`);
+		}
+	};
+	checkStepShape(step, true, errors, new Set(), checkValueRef, false);
+	return errors;
+}
+
+export function validateRecipeDefinition(definition: RecipeDefinition): string[] {
+	const errors: string[] = [];
+	const seenIds = new Set<string>();
+	const mainStepIds = new Set<string>();
+
+	function collectIds(steps: unknown[], isChild: boolean): void {
+		for (const step of steps) {
+			if (!isRecord(step)) {
+				continue;
+			}
+			const s = step as StepLike;
+			if (typeof s.id === "string") {
+				if (seenIds.has(s.id)) {
+					errors.push(`Duplicate step id: ${s.id}`);
+				}
+				seenIds.add(s.id);
+				if (!isChild) {
+					mainStepIds.add(s.id);
+				}
+			}
+			if (s.action === "group") {
+				collectIds((s.args?.[0] as unknown[]) ?? [], true);
+			}
+			if (s.action === "if") {
+				const cases = (s.args?.[0] as IfCaseLike[]) ?? [];
+				for (const ifCase of cases) {
+					collectIds(ifCase.steps ?? [], true);
+				}
+				collectIds((s.args?.[1] as unknown[]) ?? [], true);
+			}
+		}
+	}
+
+	function checkValueRef(value: unknown): void {
+		if (!isRecord(value) || !("ref" in value)) {
+			return;
+		}
+		const ref = value as { ref?: unknown; name?: unknown };
+		if (ref.ref === "input" && !(String(ref.name) in definition.inputs)) {
+			errors.push(`Unknown input reference: ${String(ref.name)}`);
+		}
+		if (ref.ref === "output" && !(String(ref.name) in definition.outputs)) {
+			errors.push(`Unknown output reference: ${String(ref.name)}`);
+		}
+	}
+
+	function checkStep(step: unknown, isChild: boolean): void {
+		checkStepShape(step, isChild, errors, mainStepIds, checkValueRef, true);
+	}
+
 	collectIds(definition.steps, false);
 	for (const recovery of definition.recoveries) {
 		if (seenIds.has(recovery.id)) {
@@ -208,7 +258,9 @@ export function validateRecipeDefinition(definition: RecipeDefinition): string[]
 
 	definition.steps.forEach((step) => checkStep(step, false));
 	for (const recovery of definition.recoveries) {
-		checkCondition(recovery.when);
+		// No standalone checkCondition entry point on the shared shape-checker — a synthetic
+		// `verify` step reuses its condition-checking branch without duplicating it here.
+		checkStep({ id: recovery.id, action: "verify", args: [recovery.when] }, false);
 		recovery.steps.forEach((child) => checkStep(child, true));
 	}
 

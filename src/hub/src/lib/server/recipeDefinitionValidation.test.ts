@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { validateRecipeDefinition } from "./recipeDefinitionValidation";
+import { validateAtomicStep, validateRecipeDefinition } from "./recipeDefinitionValidation";
 
 import type { RecipeDefinition } from "$lib/types/recipeDefinition";
 
@@ -114,5 +114,79 @@ describe("validateRecipeDefinition", () => {
 		const errors = validateRecipeDefinition(withSteps([{ id: "s1", action: "finish", args: [null] }]));
 
 		expect(errors).toContain("Step s1: finish requires a non-null checkpoint condition");
+	});
+});
+
+describe("validateAtomicStep", () => {
+	it("accepts a valid atomic Step referencing a known input", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "fill", args: [{ by: "label", value: "Account number" }, { ref: "input", name: "accountNumber" }] },
+			new Set(["accountNumber"]),
+			new Set()
+		);
+
+		expect(errors).toEqual([]);
+	});
+
+	it("accepts a finish Step with a null checkpoint (Training finish may use null)", () => {
+		const errors = validateAtomicStep({ id: "s1", action: "finish", args: [null] }, new Set(), new Set());
+
+		expect(errors).toEqual([]);
+	});
+
+	it("rejects a group Step (atomic-only, no group/if)", () => {
+		const errors = validateAtomicStep({ id: "s1", action: "group", args: [[]] }, new Set(), new Set());
+
+		expect(errors).toContain("Step s1: nested group/if is not allowed beyond one level");
+	});
+
+	it("rejects an if Step (atomic-only, no group/if)", () => {
+		const errors = validateAtomicStep({ id: "s1", action: "if", args: [[], []] }, new Set(), new Set());
+
+		expect(errors).toContain("Step s1: nested group/if is not allowed beyond one level");
+	});
+
+	it("rejects an unknown action", () => {
+		const errors = validateAtomicStep({ id: "s1", action: "teleport", args: [] }, new Set(), new Set());
+
+		expect(errors).toContain("Step s1: invalid action: teleport");
+	});
+
+	it("rejects a reference to an unknown input", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "fill", args: [{ by: "label", value: "Account number" }, { ref: "input", name: "missing" }] },
+			new Set(),
+			new Set()
+		);
+
+		expect(errors).toContain("Unknown input reference: missing");
+	});
+
+	it("rejects a goto Step, since a Training Step has no named main Steps to jump to", () => {
+		const errors = validateAtomicStep({ id: "s1", action: "goto", args: ["somewhere"] }, new Set(), new Set());
+
+		expect(errors).toContain("Step s1: unknown goto target: somewhere");
+	});
+
+	it("accepts a reference to a known credential", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "loginUser" }] },
+			new Set(),
+			new Set(),
+			new Set(["loginUser"])
+		);
+
+		expect(errors).toEqual([]);
+	});
+
+	it("rejects a reference to an unknown credential, since the model must never guess a name", () => {
+		const errors = validateAtomicStep(
+			{ id: "s1", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "guessed" }] },
+			new Set(),
+			new Set(),
+			new Set(["loginUser"])
+		);
+
+		expect(errors).toContain("Unknown credential reference: guessed");
 	});
 });

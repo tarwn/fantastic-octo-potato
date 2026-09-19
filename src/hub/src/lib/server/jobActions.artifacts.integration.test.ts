@@ -30,7 +30,11 @@ const sampleDefinition: RecipeDefinition = {
 	recoveries: []
 };
 
-function createRunningRecipeJobAndUploadArtifact(db: Database.Database, runnerId: number, image: Buffer): { jobId: number; artifactId: number } {
+async function createRunningRecipeJobAndUploadArtifact(
+	db: Database.Database,
+	runnerId: number,
+	image: Buffer
+): Promise<{ jobId: number; artifactId: number }> {
 	const draft = createDraftRecipe(db, {
 		customerApplicationXrefId: 1,
 		name: "Sample recipe",
@@ -49,7 +53,7 @@ function createRunningRecipeJobAndUploadArtifact(db: Database.Database, runnerId
 		stepTimeoutMs: 15_000,
 		createdAt: new Date("2026-09-15T00:00:02.000Z")
 	});
-	runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+	await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 	const uploadResult = uploadJobStepArtifact(db, String(runnerId), String(job.id), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 		stepId: "start",
 		imageBase64: image.toString("base64")
@@ -61,11 +65,11 @@ function createRunningRecipeJobAndUploadArtifact(db: Database.Database, runnerId
 describe("getJobStepArtifactImage", () => {
 	const getDb = useIntegrationTestDb();
 
-	it("serves back exactly the bytes the Runner uploaded", () => {
+	it("serves back exactly the bytes the Runner uploaded", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const image = Buffer.from("served-back-bytes");
-		const { jobId, artifactId } = createRunningRecipeJobAndUploadArtifact(db, runnerId, image);
+		const { jobId, artifactId } = await createRunningRecipeJobAndUploadArtifact(db, runnerId, image);
 
 		const result = getJobStepArtifactImage(db, String(jobId), String(artifactId));
 
@@ -77,11 +81,11 @@ describe("getJobStepArtifactImage", () => {
 		expect(getJobStepArtifactImage(db, "999", "999")).toBeUndefined();
 	});
 
-	it("returns undefined when the artifact exists but belongs to a different Job", () => {
+	it("returns undefined when the artifact exists but belongs to a different Job", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId: firstJobId, artifactId } = createRunningRecipeJobAndUploadArtifact(db, runnerId, Buffer.from("job-one-bytes"));
-		const { jobId: secondJobId } = createRunningRecipeJobAndUploadArtifact(db, runnerId, Buffer.from("job-two-bytes"));
+		const { jobId: firstJobId, artifactId } = await createRunningRecipeJobAndUploadArtifact(db, runnerId, Buffer.from("job-one-bytes"));
+		const { jobId: secondJobId } = await createRunningRecipeJobAndUploadArtifact(db, runnerId, Buffer.from("job-two-bytes"));
 
 		expect(secondJobId).not.toBe(firstJobId);
 		expect(getJobStepArtifactImage(db, String(secondJobId), String(artifactId))).toBeUndefined();

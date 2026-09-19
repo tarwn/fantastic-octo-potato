@@ -42,7 +42,7 @@ function sampleDefinition(): RecipeDefinition {
 describe("runnerActions Recipe Job dispatch", () => {
 	const getDb = useIntegrationTestDb();
 
-	it("returns the full runner payload contract for a claimed recipe_job, built from the stored Recipe", () => {
+	it("returns the full runner payload contract for a claimed recipe_job, built from the stored Recipe", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const draft = createDraftRecipe(db, {
@@ -65,7 +65,7 @@ describe("runnerActions Recipe Job dispatch", () => {
 		});
 		upsertJobIngredient(db, job.id, "accountQuery", "ACCT-1042", SensitivityType.PII, new Date("2026-09-15T00:00:02.000Z"));
 
-		const result = runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		const result = await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
 		expect(result).toEqual({
 			status: 200,
@@ -91,7 +91,7 @@ describe("runnerActions Recipe Job dispatch", () => {
 		});
 	});
 
-	it("marks the claimed recipe_job Running, not still Pending", () => {
+	it("marks the claimed recipe_job Running, not still Pending", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const draft = createDraftRecipe(db, {
@@ -113,13 +113,13 @@ describe("runnerActions Recipe Job dispatch", () => {
 			createdAt: new Date("2026-09-15T00:00:02.000Z")
 		});
 
-		const result = runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		const result = await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
 		expect((result.body as { data: { job: { mode: string } } }).data.job.mode).toBe("Trial");
 		expect(result.status).toBe(200);
 	});
 
-	it("coerces ingredient values to the Recipe's declared input types", () => {
+	it("coerces ingredient values to the Recipe's declared input types", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const definition: RecipeDefinition = {
@@ -153,7 +153,7 @@ describe("runnerActions Recipe Job dispatch", () => {
 		upsertJobIngredient(db, job.id, "count", "3", SensitivityType.None, new Date("2026-09-15T00:00:02.000Z"));
 		upsertJobIngredient(db, job.id, "confirmed", "true", SensitivityType.None, new Date("2026-09-15T00:00:02.000Z"));
 
-		const result = runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		const result = await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
 		expect((result.body as { data: { job: { ingredients: unknown } } }).data.job.ingredients).toEqual({ count: 3, confirmed: true });
 	});

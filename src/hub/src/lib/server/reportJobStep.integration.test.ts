@@ -1,12 +1,25 @@
 import type Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobType } from "./db/jobType";
-import { insertJob } from "./repositories/jobRepository";
+import { buildOpenStartingUrlStep, insertJob, insertTrainingJobStep } from "./repositories/jobRepository";
+import { deriveNextStep } from "./nextStep";
 import { reportJobStep, runnerPoll } from "./runnerActions";
 
+// This suite exercises the generic (kind-independent) auth/lookup/parsing checks in
+// reportJobStep — the LLM-driven next-Step generation itself is covered by nextStep.test.ts and
+// reportJobStep.outcomes.integration.test.ts, so it's mocked here.
+vi.mock("./nextStep", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./nextStep")>();
+	return { ...actual, deriveNextStep: vi.fn() };
+});
+
 const SHARED_SECRET = "test-secret";
+
+beforeEach(() => {
+	vi.mocked(deriveNextStep).mockReset().mockResolvedValue({ id: "s1", action: "click", args: [{ by: "text", value: "Search" }] });
+});
 
 function seedRunner(db: Database.Database): number {
 	db.exec(`
@@ -32,7 +45,7 @@ function seedXref(db: Database.Database, id: number): void {
 }
 
 function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10): number {
-	return insertJob(db, {
+	const job = insertJob(db, {
 		jobType: JobType.Training,
 		customerApplicationXrefId: xrefId,
 		goal: "Extract invoice total",
@@ -43,81 +56,70 @@ function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10):
 		syntheticDataConfirmed: false,
 		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
-	}).id;
+	});
+	insertTrainingJobStep(db, job.id, buildOpenStartingUrlStep(), job.createdAt);
+	return job.id;
 }
 
 describe("reportJobStep", () => {
 	const getDb = useIntegrationTestDb();
 
-	const emptyStepBody = (sequence: number, message = "did a thing") => ({
-		kind: "step" as const,
-		sequence,
-		message,
-		inputs: [] as string[],
-		outputs: [] as Array<{ fieldName: string; value: string }>
+	const dslStepBody = (stepId = "s1") => ({
+		kind: "dslStep" as const,
+		stepId,
+		outcome: "succeeded" as const,
+		extractions: [] as Array<{ fieldName: string; value: string }>
 	});
 
-	it("rejects a missing/incorrect bearer secret", () => {
+	it("rejects a missing/incorrect bearer secret", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), "Bearer wrong-secret", SHARED_SECRET, emptyStepBody(1));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), "Bearer wrong-secret", SHARED_SECRET, dslStepBody());
 
 		expect(result).toEqual({ status: 401, body: { error: "Unauthorized" } });
 	});
 
-	it("rejects an unknown runner id", () => {
+	it("rejects an unknown runner id", async () => {
 		const db = getDb();
 		seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
 
-		const result = reportJobStep(db, "999", String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1));
+		const result = await reportJobStep(db, "999", String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody());
 
 		expect(result).toEqual({ status: 404, body: { error: "Runner 999 not found" } });
 	});
 
-	it("rejects an unknown job id", () => {
+	it("rejects an unknown job id", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 
-		const result = reportJobStep(db, String(runnerId), "999", `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1));
+		const result = await reportJobStep(db, String(runnerId), "999", `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody());
 
 		expect(result).toEqual({ status: 404, body: { error: "Job 999 not found" } });
 	});
 
-	it("rejects a Runner not assigned to the Job with 403", () => {
+	it("rejects a Runner not assigned to the Job with 403", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		seedXref(db, 2);
 		const otherRunnerId = seedRunnerOnXref(db, 2);
 
-		const result = reportJobStep(db, String(otherRunnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1));
+		const result = await reportJobStep(db, String(otherRunnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody());
 
 		expect(result).toEqual({ status: 403, body: { error: `Runner ${otherRunnerId} is not assigned to Job ${jobId}` } });
 	});
 
-	it("rejects a non-positive-integer sequence with 400", () => {
+	it("rejects a missing kind with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(0));
-
-		expect(result).toEqual({ status: 400, body: { error: "sequence must be a positive integer" } });
-	});
-
-	it("rejects a missing kind with 400", () => {
-		const db = getDb();
-		const runnerId = seedRunner(db);
-		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
-
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			sequence: 1,
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "",
 			message: "did a thing"
 		});
@@ -125,25 +127,27 @@ describe("reportJobStep", () => {
 		expect(result).toEqual({ status: 400, body: { error: "kind is required" } });
 	});
 
-	it("rejects a missing message with 400", () => {
+	it("rejects a missing message with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, emptyStepBody(1, "  "));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			kind: "info",
+			message: "  "
+		});
 
 		expect(result).toEqual({ status: 400, body: { error: "message is required" } });
 	});
 
-	it("rejects an unrecognized kind with 400", () => {
+	it("rejects an unrecognized kind with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			sequence: 1,
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "bogus",
 			message: "did a thing"
 		});
@@ -151,24 +155,24 @@ describe("reportJobStep", () => {
 		expect(result).toEqual({ status: 400, body: { error: "Unrecognized kind: bogus" } });
 	});
 
-	it("rejects a halt kind, since it is not runner-submittable this spec", () => {
+	it("rejects a halt kind, since it is not runner-submittable this spec", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, { kind: "halt" });
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, { kind: "halt" });
 
 		expect(result).toEqual({ status: 400, body: { error: "Unrecognized kind: halt" } });
 	});
 
-	it("rejects a status kind whose status is not a valid JobStatus with 400", () => {
+	it("rejects a status kind whose status is not a valid JobStatus with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "status",
 			status: 999,
 			message: "bogus status"
@@ -177,54 +181,34 @@ describe("reportJobStep", () => {
 		expect(result).toEqual({ status: 400, body: { error: "status must be a valid JobStatus" } });
 	});
 
-	it("rejects a step submission whose inputs is not an array of strings with 400", () => {
+	it("rejects a dslStep submission missing a stepId with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			kind: "step",
-			sequence: 1,
-			message: "did a thing",
-			inputs: [123],
-			outputs: []
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			kind: "dslStep",
+			outcome: "succeeded",
+			extractions: []
 		});
 
-		expect(result).toEqual({ status: 400, body: { error: "inputs must be an array of field names" } });
+		expect(result).toEqual({ status: 400, body: { error: "stepId is required" } });
 	});
 
-	it("rejects a step submission whose outputs entries are malformed with 400", () => {
+	it("rejects a dslStep submission with malformed extractions with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			kind: "step",
-			sequence: 1,
-			message: "did a thing",
-			inputs: [],
-			outputs: [{ fieldName: "total" }]
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			kind: "dslStep",
+			stepId: "s1",
+			outcome: "succeeded",
+			extractions: [{ fieldName: "total" }]
 		});
 
-		expect(result).toEqual({ status: 400, body: { error: "outputs must be an array of { fieldName, value }" } });
-	});
-
-	it("rejects a step submission whose inputs name an unknown ingredient with 400", () => {
-		const db = getDb();
-		const runnerId = seedRunner(db);
-		const jobId = insertPendingJob(db, 1);
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
-
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			kind: "step",
-			sequence: 1,
-			message: "did a thing",
-			inputs: ["missing_field"],
-			outputs: []
-		});
-
-		expect(result).toEqual({ status: 400, body: { error: "Unknown ingredient: missing_field" } });
+		expect(result).toEqual({ status: 400, body: { error: "extractions must be an array of { fieldName, value }" } });
 	});
 });

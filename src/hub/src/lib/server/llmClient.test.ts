@@ -92,6 +92,35 @@ describe("sendChatCompletion", () => {
 		expect(receivedAuth).toBe("Bearer the-key");
 	});
 
+	it("sends the user prompt as a vision content array when an image is provided", async () => {
+		let receivedBody: unknown;
+		const server = await startFakeLlmServer((body) => {
+			receivedBody = body;
+			return { status: 200, body: { choices: [{ message: { role: "assistant", content: "ok" } }] } };
+		});
+		stopServer = server.close;
+		mockEnv.LLM_API_URL = server.url;
+		mockEnv.LLM_API_KEY = "the-key";
+		mockEnv.LLM_MODEL = "the-model";
+		const { sendChatCompletion } = await import("./llmClient");
+
+		await sendChatCompletion({ systemPrompt: "system prompt", userPrompt: "user prompt", userImagePngBase64: "aGVsbG8=" });
+
+		expect(receivedBody).toEqual({
+			model: "the-model",
+			messages: [
+				{ role: "system", content: "system prompt" },
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: "user prompt" },
+						{ type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+					]
+				}
+			]
+		});
+	});
+
 	it("throws when the response body is malformed JSON", async () => {
 		const server = createServer((req, res) => {
 			res.writeHead(200, { "content-type": "application/json" }).end("not json");

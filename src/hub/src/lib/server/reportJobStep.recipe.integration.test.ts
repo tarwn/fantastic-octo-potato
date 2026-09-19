@@ -1,17 +1,29 @@
 import type Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobType } from "./db/jobType";
 import { SensitivityType } from "./db/sensitivityType";
-import { insertJob, listSafeJobResults, listTranscriptEntries } from "./repositories/jobRepository";
+import { buildOpenStartingUrlStep, insertJob, insertTrainingJobStep, listSafeJobResults, listTranscriptEntries } from "./repositories/jobRepository";
 import { createDraftRecipe, publishRecipe } from "./repositories/recipeRepository";
 import { readJobStepArtifact } from "./artifactStorage";
+import { deriveNextStep } from "./nextStep";
 import { reportJobStep, runnerPoll, uploadJobStepArtifact } from "./runnerActions";
 
 import type { RecipeDefinition } from "$lib/types/recipeDefinition";
 
+// This suite is Recipe-Job-focused and never exercises the LLM-driven Training path for real —
+// mocked here only because a couple of tests still claim a Training Job via the shared runnerPoll.
+vi.mock("./nextStep", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./nextStep")>();
+	return { ...actual, deriveNextStep: vi.fn() };
+});
+
 const SHARED_SECRET = "test-secret";
+
+beforeEach(() => {
+	vi.mocked(deriveNextStep).mockReset().mockResolvedValue({ id: "s1", action: "finish", args: [null] });
+});
 
 function seedRunner(db: Database.Database): number {
 	db.exec(`
@@ -39,7 +51,7 @@ function sampleDefinition(): RecipeDefinition {
 	};
 }
 
-function createRunningRecipeJob(db: Database.Database, runnerId: number): { jobId: number } {
+async function createRunningRecipeJob(db: Database.Database, runnerId: number): Promise<{ jobId: number }> {
 	const draft = createDraftRecipe(db, {
 		customerApplicationXrefId: 1,
 		name: "Sample recipe",
@@ -58,19 +70,19 @@ function createRunningRecipeJob(db: Database.Database, runnerId: number): { jobI
 		stepTimeoutMs: 15_000,
 		createdAt: new Date("2026-09-15T00:00:02.000Z")
 	});
-	runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+	await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 	return { jobId: job.id };
 }
 
 describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 	const getDb = useIntegrationTestDb();
 
-	it("persists a transcript row with the field name and outcome only, never the raw extracted value", () => {
+	it("persists a transcript row with the field name and outcome only, never the raw extracted value", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "dslStep",
 			stepId: "copy_number",
 			parentStepId: "copy_summary",
@@ -94,12 +106,12 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 		);
 	});
 
-	it("persists the extracted value as a Job Result through the masked-upsert path", () => {
+	it("persists the extracted value as a Job Result through the masked-upsert path", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 
-		reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "dslStep",
 			stepId: "mark_found",
 			outcome: "succeeded",
@@ -109,12 +121,12 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 		expect(listSafeJobResults(db, jobId)).toEqual([{ fieldName: "status", safeValue: "found", sensitivityType: SensitivityType.None }]);
 	});
 
-	it("rejects an extraction for a field the Recipe doesn't declare as an output", () => {
+	it("rejects an extraction for a field the Recipe doesn't declare as an output", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "dslStep",
 			stepId: "bogus_step",
 			outcome: "succeeded",
@@ -124,39 +136,12 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 		expect(result).toEqual({ status: 400, body: { error: "Unknown output: notDeclared" } });
 	});
 
-	it("rejects a dslStep report for a Training Job", () => {
+	it("rejects an unrecognized kind, since Training no longer reports a bespoke sequence-based step shape", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const job = insertJob(db, {
-			jobType: JobType.Training,
-			customerApplicationXrefId: 1,
-			goal: "Extract",
-			startingUrl: "https://example.test",
-			allowlist: "https://example.test",
-			maxSteps: 5,
-			alternateGoals: [],
-			syntheticDataConfirmed: false,
-			stepTimeoutMs: 15000,
-			createdAt: new Date("2026-09-15T00:00:00.000Z")
-		});
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 
-		const result = reportJobStep(db, String(runnerId), String(job.id), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
-			kind: "dslStep",
-			stepId: "x",
-			outcome: "succeeded",
-			extractions: []
-		});
-
-		expect(result).toEqual({ status: 400, body: { error: "dslStep reporting is Recipe Job-only" } });
-	});
-
-	it("rejects a Training-style step report for a Recipe Job", () => {
-		const db = getDb();
-		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
-
-		const result = reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "step",
 			sequence: 1,
 			message: "did a thing",
@@ -164,17 +149,17 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 			outputs: []
 		});
 
-		expect(result).toEqual({ status: 400, body: { error: "step reporting is Training Job-only" } });
+		expect(result).toEqual({ status: 400, body: { error: "Unrecognized kind: step" } });
 	});
 });
 
 describe("uploadJobStepArtifact (Recipe Job screenshots)", () => {
 	const getDb = useIntegrationTestDb();
 
-	it("accepts a screenshot for a Step and stores it on disk, recording the pointer", () => {
+	it("accepts a screenshot for a Step and stores it on disk, recording the pointer", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 		const imageBytes = Buffer.from("fake-png-bytes");
 
 		const result = uploadJobStepArtifact(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
@@ -187,10 +172,10 @@ describe("uploadJobStepArtifact (Recipe Job screenshots)", () => {
 		expect(artifactId).toBeGreaterThan(0);
 	});
 
-	it("round-trips the stored bytes back out through artifactStorage", () => {
+	it("round-trips the stored bytes back out through artifactStorage", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 		const imageBytes = Buffer.from("another-fake-png");
 
 		uploadJobStepArtifact(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
@@ -202,7 +187,7 @@ describe("uploadJobStepArtifact (Recipe Job screenshots)", () => {
 		expect(readJobStepArtifact(filePath)).toEqual(imageBytes);
 	});
 
-	it("rejects a screenshot upload for a Training Job", () => {
+	it("accepts a screenshot upload for a Training Job (C004 drops the Recipe-only restriction)", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const job = insertJob(db, {
@@ -217,20 +202,21 @@ describe("uploadJobStepArtifact (Recipe Job screenshots)", () => {
 			stepTimeoutMs: 15000,
 			createdAt: new Date("2026-09-15T00:00:00.000Z")
 		});
-		runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+		insertTrainingJobStep(db, job.id, buildOpenStartingUrlStep(), job.createdAt);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 
 		const result = uploadJobStepArtifact(db, String(runnerId), String(job.id), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			stepId: "start",
 			imageBase64: Buffer.from("x").toString("base64")
 		});
 
-		expect(result).toEqual({ status: 400, body: { error: "Screenshot artifacts are Recipe Job-only" } });
+		expect(result.status).toBe(201);
 	});
 
-	it("rejects a malformed upload with 400", () => {
+	it("rejects a malformed upload with 400", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
-		const { jobId } = createRunningRecipeJob(db, runnerId);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
 
 		const result = uploadJobStepArtifact(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, { stepId: "" });
 

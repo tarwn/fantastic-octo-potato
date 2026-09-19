@@ -5,10 +5,9 @@ import { useIntegrationTestDb } from "./db/_test/integrationTestDb";
 import { JobStatus } from "./db/jobStatus";
 import { TranscriptKind } from "./db/jobTranscriptKind";
 import { JobType } from "./db/jobType";
-import { getJobById, insertJob, listTranscriptEntries } from "./repositories/jobRepository";
+import { buildOpenStartingUrlStep, getJobById, insertJob, insertTrainingJobStep, listTranscriptEntries } from "./repositories/jobRepository";
 import { getRunnerById } from "./repositories/runnerRepository";
 import { runnerInit, runnerPoll } from "./runnerActions";
-import { SCRIPTED_TRAINING_STEPS } from "./scriptedTrainingSteps";
 
 const SHARED_SECRET = "test-secret";
 
@@ -36,7 +35,7 @@ function seedXref(db: Database.Database, id: number): void {
 }
 
 function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10): number {
-	return insertJob(db, {
+	const job = insertJob(db, {
 		jobType: JobType.Training,
 		customerApplicationXrefId: xrefId,
 		goal: "Extract invoice total",
@@ -47,7 +46,9 @@ function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10):
 		syntheticDataConfirmed: false,
 		stepTimeoutMs: 15000,
 		createdAt: new Date("2026-09-15T00:00:00.000Z")
-	}).id;
+	});
+	insertTrainingJobStep(db, job.id, buildOpenStartingUrlStep(), job.createdAt);
+	return job.id;
 }
 
 describe("runnerActions", () => {
@@ -109,7 +110,7 @@ describe("runnerActions", () => {
 			expect(getRunnerById(getDb(), runnerId)?.lastHeartbeatOn).toBeInstanceOf(Date);
 		});
 
-		it("claims the oldest matching-xref Pending job, handing back the first scripted step", () => {
+		it("claims the oldest matching-xref Pending job, handing back the fixed 'open starting URL' first Step", () => {
 			const db = getDb();
 			const runnerId = seedRunner(db);
 			const jobId = insertPendingJob(db, 1);
@@ -130,7 +131,12 @@ describe("runnerActions", () => {
 							maxSteps: 10,
 							stepTimeoutMs: 15000,
 							syntheticDataConfirmed: false,
-							nextStep: { sequence: 1, kind: SCRIPTED_TRAINING_STEPS[0].kind, text: SCRIPTED_TRAINING_STEPS[0].text }
+							nextStep: {
+								id: "open_starting_url",
+								action: "open",
+								args: [{ ref: "input", name: "startingUrl" }],
+								intent: "Open the starting URL"
+							}
 						}
 					}
 				}
@@ -168,5 +174,4 @@ describe("runnerActions", () => {
 			expect((result.body as { data: { job: { id: number } } }).data.job.id).toBe(otherXrefJobId);
 		});
 	});
-
 });

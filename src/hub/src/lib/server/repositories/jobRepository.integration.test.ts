@@ -6,14 +6,19 @@ import { JobStatus } from "../db/jobStatus";
 import { JobType } from "../db/jobType";
 
 import {
+	buildOpenStartingUrlStep,
 	claimNextJobForRunner,
 	getJobById,
 	insertJob,
+	insertTrainingJobStep,
 	listJobs,
 	listRunningJobIdsByRunnerId,
+	listTrainingJobSteps,
 	updateJobHeartbeat,
 	updateJobStatus
 } from "./jobRepository";
+
+import type { ChildStep } from "$lib/types/recipeDefinition";
 
 function seedXref(db: Database.Database, id = 1): void {
 	db.exec(`
@@ -81,7 +86,8 @@ describe("jobRepository", () => {
 					maxSteps: 10,
 					alternateGoals: ["Also capture the due date"],
 					syntheticDataConfirmed: true,
-					stepTimeoutMs: 15000
+					stepTimeoutMs: 15000,
+					credentialNames: []
 				}
 			});
 			expect(getJobById(getDb(), job.id)).toEqual(job);
@@ -164,7 +170,8 @@ describe("jobRepository", () => {
 				maxSteps: 10,
 				alternateGoals: [],
 				syntheticDataConfirmed: false,
-				stepTimeoutMs: 15000
+				stepTimeoutMs: 15000,
+				credentialNames: []
 			}
 		});
 		expect(secondClaim).toBeUndefined();
@@ -233,5 +240,33 @@ describe("jobRepository", () => {
 
 	it("returns an empty map for no Runner ids", () => {
 		expect(listRunningJobIdsByRunnerId(getDb(), [])).toEqual(new Map());
+	});
+
+	describe("insertTrainingJobStep / listTrainingJobSteps", () => {
+		it("round-trips a Step definition, oldest first", () => {
+			const db = getDb();
+			seedXref(db);
+			const jobId = insertPendingTrainingJob(db, 1);
+			const createdAt = new Date("2026-09-15T00:00:00.000Z");
+			insertTrainingJobStep(db, jobId, buildOpenStartingUrlStep(), createdAt);
+			const secondStep: ChildStep = { id: "click_search", action: "click", args: [{ by: "text", value: "Search" }] };
+			insertTrainingJobStep(db, jobId, secondStep, new Date("2026-09-15T00:00:05.000Z"));
+
+			const steps = listTrainingJobSteps(db, jobId);
+
+			expect(steps).toEqual([
+				expect.objectContaining({ jobId, stepId: "open_starting_url", definition: buildOpenStartingUrlStep(), createdAt }),
+				expect.objectContaining({ jobId, stepId: "click_search", definition: secondStep })
+			]);
+		});
+
+		it("crashes loudly on a duplicate step id for the same Job", () => {
+			const db = getDb();
+			seedXref(db);
+			const jobId = insertPendingTrainingJob(db, 1);
+			insertTrainingJobStep(db, jobId, buildOpenStartingUrlStep(), new Date("2026-09-15T00:00:00.000Z"));
+
+			expect(() => insertTrainingJobStep(db, jobId, buildOpenStartingUrlStep(), new Date("2026-09-15T00:00:01.000Z"))).toThrow();
+		});
 	});
 });

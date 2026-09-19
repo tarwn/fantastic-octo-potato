@@ -10,25 +10,32 @@ import {
 	appendTranscriptEntry,
 	claimNextJobForRunner,
 	getJobById,
-	getSafeJobIngredientByFieldName,
+	getLatestJobStepArtifact,
 	insertJobStepArtifact,
+	insertTrainingJobStep,
 	type Job,
 	JOB_CLAIMED_SEQUENCE,
+	listSafeJobIngredients,
+	listSafeJobResults,
 	listSensitiveJobIngredients,
+	listTrainingJobSteps,
+	listTranscriptEntries,
 	maskValue,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
 	type TranscriptFieldRef,
 	updateJobHeartbeat,
 	updateJobStatus,
+	updateTrainingJobCredentialNames,
 	upsertJobResult
 } from "./repositories/jobRepository";
 import { getRecipeById } from "./repositories/recipeRepository";
 import { getRunnerById, updateRunnerHeartbeat } from "./repositories/runnerRepository";
-import { writeJobStepArtifact } from "./artifactStorage";
-import { SCRIPTED_TRAINING_STEPS, type ScriptedTrainingStep } from "./scriptedTrainingSteps";
+import { readJobStepArtifact, writeJobStepArtifact } from "./artifactStorage";
+import { deriveNextStep, NextStepInvalidResponseError } from "./nextStep";
+import { summarizeTranscriptForLlm } from "./transcriptSummary";
 
-import type { FieldType } from "$lib/types/recipeDefinition";
+import type { ChildStep, FieldType } from "$lib/types/recipeDefinition";
 
 export interface RunnerActionResult {
 	status: number;
@@ -40,11 +47,21 @@ export interface RunnerActionResult {
 export type ReportStepBody =
 	| { kind: "status"; status: JobStatus; message: string }
 	| { kind: "info"; message: string }
-	| { kind: "step"; sequence: number; message: string; inputs: string[]; outputs: Array<{ fieldName: string; value: string }> }
-	// Recipe Jobs report DSL Steps by string id, not a Training-style sequence. extractions still
-	// carries the raw value on the wire (upsertJobResult needs it to compute a safe value) — it's
-	// the transcript row built from this that only ever keeps the destination field name.
-	| { kind: "dslStep"; stepId: string; outcome: "succeeded" | "failed"; parentStepId?: string; extractions: Array<{ fieldName: string; value: string }> }
+	// Both Recipe and Training Jobs report DSL Steps by string id (R004/C004 — Training issues real
+	// atomic DSL Steps, not a bespoke sequence-based shape). extractions still carries the raw
+	// value on the wire (upsertJobResult needs it to compute a safe value) — it's the transcript
+	// row built from this that only ever keeps the destination field name. credentialNames is
+	// Training-only and names only, never values — the Runner's only chance to tell Hub what
+	// `{ref:"credential"}` names its own RUNNER_CREDENTIAL_* env vars make available, since Hub has
+	// no other way to learn them ahead of a next-Step prompt.
+	| {
+			kind: "dslStep";
+			stepId: string;
+			outcome: "succeeded" | "failed";
+			parentStepId?: string;
+			extractions: Array<{ fieldName: string; value: string }>;
+			credentialNames?: string[];
+	  }
 	| { kind: "recover"; message: string }
 	| { kind: "observe"; message: string }
 	| { kind: "plan"; message: string };
@@ -100,31 +117,6 @@ function parseReportStepBody(body: unknown): ParseResult {
 			}
 			return { ok: true, value: { kind: body.kind as "info" | "recover" | "observe" | "plan", message } };
 		}
-		case "step": {
-			if (!Number.isInteger(body.sequence) || (body.sequence as number) <= 0) {
-				return { ok: false, error: "sequence must be a positive integer" };
-			}
-			const message = parseMessage(body);
-			if (message === undefined) {
-				return { ok: false, error: "message is required" };
-			}
-			if (!Array.isArray(body.inputs) || !body.inputs.every((value): value is string => typeof value === "string")) {
-				return { ok: false, error: "inputs must be an array of field names" };
-			}
-			if (
-				!Array.isArray(body.outputs) ||
-				!body.outputs.every(
-					(value): value is { fieldName: string; value: string } =>
-						isRecord(value) && typeof value.fieldName === "string" && typeof value.value === "string"
-				)
-			) {
-				return { ok: false, error: "outputs must be an array of { fieldName, value }" };
-			}
-			return {
-				ok: true,
-				value: { kind: "step", sequence: body.sequence as number, message, inputs: body.inputs, outputs: body.outputs }
-			};
-		}
 		case "dslStep": {
 			if (typeof body.stepId !== "string" || body.stepId.trim() === "") {
 				return { ok: false, error: "stepId is required" };
@@ -145,6 +137,13 @@ function parseReportStepBody(body: unknown): ParseResult {
 			) {
 				return { ok: false, error: "extractions must be an array of { fieldName, value }" };
 			}
+			if (
+				body.credentialNames !== undefined &&
+				(!Array.isArray(body.credentialNames) ||
+					!body.credentialNames.every((value): value is string => typeof value === "string" && value.trim() !== ""))
+			) {
+				return { ok: false, error: "credentialNames must be an array of non-empty strings" };
+			}
 			return {
 				ok: true,
 				value: {
@@ -152,24 +151,14 @@ function parseReportStepBody(body: unknown): ParseResult {
 					stepId: body.stepId,
 					outcome: body.outcome,
 					...(body.parentStepId !== undefined ? { parentStepId: body.parentStepId } : {}),
-					extractions
+					extractions,
+					...(body.credentialNames !== undefined ? { credentialNames: body.credentialNames as string[] } : {})
 				}
 			};
 		}
 		default:
 			return { ok: false, error: `Unrecognized kind: ${body.kind}` };
 	}
-}
-
-// The Runner has no other way to learn a step's fake-extracted resultField/resultValue (there's
-// no real browser automation to derive it from) — it only ever echoes back what this hands it.
-function toWireStep(sequence: number, step: ScriptedTrainingStep) {
-	return {
-		sequence,
-		kind: step.kind,
-		text: step.text,
-		...(step.resultField !== undefined ? { resultField: step.resultField, resultValue: step.resultValue } : {})
-	};
 }
 
 // Job ingredients are stored as TEXT (raw_value); the Recipe's declared input type says how the
@@ -191,8 +180,7 @@ function coerceInputValue(fieldName: string, type: FieldType, rawValue: string):
 	return rawValue;
 }
 
-// Builds the full runner dispatch payload from the persisted Recipe — replaces the Training
-// stand-in's SCRIPTED_TRAINING_STEPS for a Recipe Job.
+// Builds the full runner dispatch payload from the persisted Recipe.
 function buildRecipeJobPayload(db: Database.Database, job: Extract<Job, { jobType: JobType.Recipe }>, runnerId: number) {
 	if (job.details.recipeId === null) {
 		throw new Error(`Job ${job.id} is a Recipe Job with no recipe_id set`);
@@ -256,12 +244,29 @@ export function runnerInit(
 	return { status: 200, body: { data: { pollIntervalSeconds, interventionTimeoutSeconds } } };
 }
 
-export function runnerPoll(
-	db: Database.Database,
-	rawId: string,
-	authHeader: string | null,
-	sharedSecret: string
-): RunnerActionResult {
+// The Job's very first Step is fixed, Hub-authored, and already persisted (jobActions.ts, at Job
+// creation, per insertTrainingJobStep's "saved before it's handed out" contract) — this just reads
+// it back. Every deriveNextStep call happens inside the `steps` handler instead
+// (handleTrainingDslStepReport), where a just-uploaded screenshot is always on hand (C004).
+function buildTrainingJobPayload(db: Database.Database, job: Extract<Job, { jobType: JobType.Training }>) {
+	const [firstStep] = listTrainingJobSteps(db, job.id);
+	if (!firstStep) {
+		throw new Error(`Training Job ${job.id} has no persisted first Step`);
+	}
+	return {
+		id: job.id,
+		goal: job.details.goal,
+		alternateGoals: job.details.alternateGoals,
+		startingUrl: job.details.startingUrl,
+		allowlist: job.details.allowlist,
+		maxSteps: job.details.maxSteps,
+		stepTimeoutMs: job.details.stepTimeoutMs,
+		syntheticDataConfirmed: job.details.syntheticDataConfirmed,
+		nextStep: firstStep.definition
+	};
+}
+
+export function runnerPoll(db: Database.Database, rawId: string, authHeader: string | null, sharedSecret: string): RunnerActionResult {
 	if (!requireRunnerBearerAuth(authHeader, sharedSecret)) {
 		return { status: 401, body: { error: "Unauthorized" } };
 	}
@@ -289,27 +294,7 @@ export function runnerPoll(
 		throw new Error(`Job ${jobId} has an unrecognized job type`);
 	}
 
-	// The claim hands back scripted step 1 too, so the Runner has something to perform before its first `steps` call.
-	const firstStep = SCRIPTED_TRAINING_STEPS[0];
-	return {
-		status: 200,
-		body: {
-			data: {
-				hasWork: true,
-				job: {
-					id: job.id,
-					goal: job.details.goal,
-					alternateGoals: job.details.alternateGoals,
-					startingUrl: job.details.startingUrl,
-					allowlist: job.details.allowlist,
-					maxSteps: job.details.maxSteps,
-					stepTimeoutMs: job.details.stepTimeoutMs,
-					syntheticDataConfirmed: job.details.syntheticDataConfirmed,
-					nextStep: toWireStep(1, firstStep)
-				}
-			}
-		}
-	};
+	return { status: 200, body: { data: { hasWork: true, job: buildTrainingJobPayload(db, job) } } };
 }
 
 function findJob(db: Database.Database, rawJobId: string) {
@@ -318,8 +303,8 @@ function findJob(db: Database.Database, rawJobId: string) {
 }
 
 // Transcript rows never carry the raw extracted value — only the destination field name and
-// outcome (folded into `message`) plus the already-masked safeValue, same as Training's step rows.
-function handleDslStepReport(
+// outcome (folded into `message`) plus the already-masked safeValue.
+function handleRecipeDslStepReport(
 	db: Database.Database,
 	job: Extract<Job, { jobType: JobType.Recipe }>,
 	runnerId: number,
@@ -353,6 +338,133 @@ function handleDslStepReport(
 	return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
 }
 
+// A Training run has no fixed output schema to validate an extraction's fieldName against (unlike
+// Recipe) — real sensitivity classification for an extracted field happens at compile time
+// (Step 6), so it's recorded None here.
+async function handleTrainingDslStepReport(
+	db: Database.Database,
+	job: Extract<Job, { jobType: JobType.Training }>,
+	runnerId: number,
+	step: Extract<ReportStepBody, { kind: "dslStep" }>,
+	now: Date
+): Promise<RunnerActionResult> {
+	const outputs: TranscriptFieldRef[] = step.extractions.map((extraction) => {
+		upsertJobResult(db, job.id, extraction.fieldName, extraction.value, SensitivityType.None, now);
+		return { fieldName: extraction.fieldName, safeValue: maskValue(extraction.value, SensitivityType.None), sensitivityType: SensitivityType.None };
+	});
+
+	// The Runner's only chance to tell Hub what credential names it has — Hub has no other source
+	// (they resolve only on the Runner). Overwritten wholesale on whichever report includes it,
+	// normally just the first.
+	const knownCredentialNames = step.credentialNames ?? job.details.credentialNames;
+	if (step.credentialNames !== undefined) {
+		updateTrainingJobCredentialNames(db, job.id, step.credentialNames);
+	}
+
+	const message = `${step.parentStepId ? `${step.parentStepId} > ` : ""}${step.stepId}: ${step.outcome}`;
+	appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Step, { message, inputs: [], outputs }, now);
+	updateJobHeartbeat(db, job.id, now);
+	updateRunnerHeartbeat(db, runnerId, now);
+
+	// One fetch, reused below for both the maxSteps count and the LLM transcript summary — this
+	// table only grows, so a per-report double scan isn't free once a run gets long.
+	const transcriptEntries = listTranscriptEntries(db, job.id);
+
+	// Only executable Steps count toward maxSteps (steps-dsl.md) — Training issues atomic Steps
+	// only (C003), so every dslStep report here is one such Step.
+	const stepsSoFar = transcriptEntries.filter((entry) => entry.kind === TranscriptKind.Step).length;
+	if (stepsSoFar >= job.details.maxSteps) {
+		updateJobStatus(db, job.id, JobStatus.CompletedFailed, now);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
+			"Reached max steps, marked Completed-Failed",
+			now,
+			JobStatus.CompletedFailed
+		);
+		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } };
+	}
+
+	const artifact = getLatestJobStepArtifact(db, job.id, step.stepId);
+	const maskedScreenshotPngBase64 = artifact ? readJobStepArtifact(artifact.filePath).toString("base64") : undefined;
+	const knownInputNames = listSafeJobIngredients(db, job.id).map((ingredient) => ingredient.fieldName);
+	const knownOutputNames = listSafeJobResults(db, job.id).map((result) => result.fieldName);
+	const transcriptSummary = summarizeTranscriptForLlm(transcriptEntries);
+
+	let next: ChildStep;
+	try {
+		next = await deriveNextStep({
+			goal: job.details.goal,
+			alternateGoals: job.details.alternateGoals,
+			transcriptSummary,
+			maskedScreenshotPngBase64,
+			knownInputNames,
+			knownOutputNames,
+			knownCredentialNames
+		});
+	}
+	catch (err) {
+		if (!(err instanceof NextStepInvalidResponseError)) {
+			throw err;
+		}
+		updateJobStatus(db, job.id, JobStatus.CompletedError, now);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
+			`Next-Step generation failed: ${err.message}`,
+			now,
+			JobStatus.CompletedError
+		);
+		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedError } } };
+	}
+
+	// validateAtomicStep checks one Step in isolation and has no visibility into ids already used
+	// this run — a repeat id would otherwise only surface as training_job_step's UNIQUE constraint
+	// throwing after the writes above already committed. Caught here instead, before any of that,
+	// and treated the same as an invalid LLM response (steps-dsl.md: "IDs are unique across main
+	// steps").
+	if (listTrainingJobSteps(db, job.id).some((existing) => existing.stepId === next.id)) {
+		updateJobStatus(db, job.id, JobStatus.CompletedError, now);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
+			`Next-Step generation failed: LLM reused an already-used Step id: ${next.id}`,
+			now,
+			JobStatus.CompletedError
+		);
+		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedError } } };
+	}
+
+	// Saved before the Runner ever sees it (insertTrainingJobStep) — the transcript row the
+	// Runner later reports for this stepId only ever carries message/outcome, never the action/args
+	// a Recipe compiler needs to reconstruct what actually ran.
+	insertTrainingJobStep(db, job.id, next, now);
+
+	// An explicit model-issued finish Step ends discovery immediately (R005) — Training's
+	// checkpoint may be null (steps-dsl.md), so satisfying it needs no further Runner round-trip.
+	if (next.action === "finish") {
+		updateJobStatus(db, job.id, JobStatus.CompletedSuccess, now);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
+			"Model issued a finish Step, marked Completed-Success",
+			now,
+			JobStatus.CompletedSuccess
+		);
+		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } };
+	}
+
+	return { status: 200, body: { data: { jobStatusId: JobStatus.Running, nextStep: next } } };
+}
+
 // Persists the Runner-masked screenshot bytes via artifactStorage, then records where they
 // landed — the DB never stores the image itself, mirroring the design's storage/metadata split.
 export function uploadJobStepArtifact(
@@ -379,9 +491,6 @@ export function uploadJobStepArtifact(
 	if (job.runnerId !== runner.id) {
 		return { status: 403, body: { error: `Runner ${rawRunnerId} is not assigned to Job ${rawJobId}` } };
 	}
-	if (job.jobType !== JobType.Recipe) {
-		return { status: 400, body: { error: "Screenshot artifacts are Recipe Job-only" } };
-	}
 
 	if (!isRecord(body) || typeof body.stepId !== "string" || body.stepId.trim() === "" || typeof body.imageBase64 !== "string") {
 		return { status: 400, body: { error: "stepId and imageBase64 are required" } };
@@ -399,15 +508,16 @@ export function uploadJobStepArtifact(
 	return { status: 201, body: { data: { id: artifact.id } } };
 }
 
-// Reports the outcome of step `sequence` and, in the same call, returns the next scripted step or the terminal status; an already-terminal Job is returned as-is, unmutated.
-export function reportJobStep(
+// Reports the outcome of a Step and, for Training, returns the next LLM-generated Step or the
+// terminal status in the same call (C004); an already-terminal Job is returned as-is, unmutated.
+export async function reportJobStep(
 	db: Database.Database,
 	rawRunnerId: string,
 	rawJobId: string,
 	authHeader: string | null,
 	sharedSecret: string,
 	body: unknown
-): RunnerActionResult {
+): Promise<RunnerActionResult> {
 	if (!requireRunnerBearerAuth(authHeader, sharedSecret)) {
 		return { status: 401, body: { error: "Unauthorized" } };
 	}
@@ -445,88 +555,13 @@ export function reportJobStep(
 	}
 
 	if (parsed.value.kind === "dslStep") {
-		if (job.jobType !== JobType.Recipe) {
-			return { status: 400, body: { error: "dslStep reporting is Recipe Job-only" } };
-		}
-		return handleDslStepReport(db, job, runner.id, parsed.value, now);
+		return job.jobType === JobType.Recipe
+			? handleRecipeDslStepReport(db, job, runner.id, parsed.value, now)
+			: handleTrainingDslStepReport(db, job, runner.id, parsed.value, now);
 	}
 
-	if (parsed.value.kind !== "step") {
-		appendAutoSequencedTranscriptEntry(db, job.id, NON_STEP_TRANSCRIPT_KIND[parsed.value.kind], parsed.value.message, now);
-		updateJobHeartbeat(db, job.id, now);
-		updateRunnerHeartbeat(db, runner.id, now);
-		return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
-	}
-
-	if (job.jobType !== JobType.Training) {
-		return { status: 400, body: { error: "step reporting is Training Job-only" } };
-	}
-
-	const step = parsed.value;
-
-	const resolvedInputs: TranscriptFieldRef[] = [];
-	for (const fieldName of step.inputs) {
-		const ingredient = getSafeJobIngredientByFieldName(db, job.id, fieldName);
-		if (!ingredient) {
-			return { status: 400, body: { error: `Unknown ingredient: ${fieldName}` } };
-		}
-		resolvedInputs.push(ingredient);
-	}
-
-	const resolvedOutputs: TranscriptFieldRef[] = [];
-	for (const output of step.outputs) {
-		const sensitivityType = SCRIPTED_TRAINING_STEPS.find((s) => s.resultField === output.fieldName)?.sensitivityType ?? SensitivityType.None;
-		upsertJobResult(db, job.id, output.fieldName, output.value, sensitivityType, now);
-		resolvedOutputs.push({ fieldName: output.fieldName, safeValue: maskValue(output.value, sensitivityType), sensitivityType });
-	}
-
-	appendTranscriptEntry(
-		db,
-		job.id,
-		step.sequence,
-		TranscriptKind.Step,
-		{ message: step.message, inputs: resolvedInputs, outputs: resolvedOutputs },
-		now
-	);
+	appendAutoSequencedTranscriptEntry(db, job.id, NON_STEP_TRANSCRIPT_KIND[parsed.value.kind], parsed.value.message, now);
 	updateJobHeartbeat(db, job.id, now);
 	updateRunnerHeartbeat(db, runner.id, now);
-
-	if (step.sequence >= job.details.maxSteps) {
-		updateJobStatus(db, job.id, JobStatus.CompletedFailed, now);
-		appendTranscriptEntry(
-			db,
-			job.id,
-			terminalTranscriptSequence(job.details.maxSteps),
-			TranscriptKind.Status,
-			"Reached max steps, marked Completed-Failed",
-			now,
-			JobStatus.CompletedFailed
-		);
-		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedFailed } } };
-	}
-
-	if (step.sequence >= SCRIPTED_TRAINING_STEPS.length) {
-		updateJobStatus(db, job.id, JobStatus.CompletedSuccess, now);
-		appendTranscriptEntry(
-			db,
-			job.id,
-			terminalTranscriptSequence(job.details.maxSteps),
-			TranscriptKind.Status,
-			"Run finished, marked Completed-Success",
-			now,
-			JobStatus.CompletedSuccess
-		);
-		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } };
-	}
-
-	const next = SCRIPTED_TRAINING_STEPS[step.sequence];
-	return {
-		status: 200,
-		body: {
-			data: {
-				jobStatusId: JobStatus.Running,
-				nextStep: toWireStep(step.sequence + 1, next)
-			}
-		}
-	};
+	return { status: 200, body: { data: { jobStatusId: job.jobStatusId } } };
 }

@@ -176,4 +176,6 @@ Step 1's e2e guards stay red through Step 7 (they need the LLM client, both prom
 
 1. Step 3: the goal text an operator types can itself embed a sensitive example value (e.g. "look up account ACCT-1042"), and the idea doc flags this unresolved ("we need to consider when we mask it in the goal input (completion of the job?)"). Once R002 identifies which substring is sensitive, should the stored/displayed/transmitted goal be masked?
    User Answer: Leave goal-text masking out of this spec — filed as its own Defer (Step 8) instead.
+2. Step 4: `jobActions.ts`'s `deriveAllowlist` derives a Training Job's allowlist directly from `startingUrl`'s origin (`new URL(startingUrl).origin`). Training now stores `startingUrl` as a regular Ingredient (named `startingUrl`) so the fixed first Step can reference it like any other input — the same origin-from-URL approach will need revisiting once a Recipe compiled from a Training run (against a test system) is re-pointed at a different origin for a Trial/Execute run.
+   User Answer: Deferred — filed as plan item 9, to be addressed later rather than as part of Step 4.
 

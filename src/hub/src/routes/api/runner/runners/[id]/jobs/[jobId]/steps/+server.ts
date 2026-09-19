@@ -8,7 +8,7 @@ import { requireRunnerSharedSecret } from "$lib/server/runnerConfig";
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const body = await request.json();
-	const result = reportJobStep(
+	const result = await reportJobStep(
 		getDb(),
 		params.id,
 		params.jobId,

@@ -6,6 +6,8 @@ import { TranscriptKind } from "../db/jobTranscriptKind.ts";
 import { JobType } from "../db/jobType.ts";
 import { SensitivityType } from "../db/sensitivityType.ts";
 
+import type { ChildStep } from "$lib/types/recipeDefinition";
+
 // Intervention-Requested is a halted, non-terminal state (ARCHITECTURE.md's Core Loop) — it waits
 // for a human or an intervention timeout, it doesn't end the Job.
 export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled, JobStatus.CompletedError];
@@ -41,6 +43,20 @@ export function maskValue(rawValue: string, sensitivityType: SensitivityType): s
 	return sensitivityType === SensitivityType.None ? rawValue : MASK_TOKEN;
 }
 
+// Shared between jobActions.ts (stores the Job's startingUrl as this Ingredient at creation) and
+// runnerActions.ts (the fixed first Step's `open` action references it by this name) — one name,
+// defined once, rather than a string literal duplicated across both call sites.
+export const STARTING_URL_INGREDIENT_NAME = "startingUrl";
+
+export const OPEN_STARTING_URL_STEP_ID = "open_starting_url";
+
+// A Training Job's first Step is fixed and Hub-authored, not LLM-generated (steps-dsl.md/C004) —
+// persisted at Job creation (jobActions.ts) so the Runner's claim just reads it back rather than
+// deriving it, same as every later Step (see insertTrainingJobStep).
+export function buildOpenStartingUrlStep(): ChildStep {
+	return { id: OPEN_STARTING_URL_STEP_ID, action: "open", args: [{ ref: "input", name: STARTING_URL_INGREDIENT_NAME }], intent: "Open the starting URL" };
+}
+
 export interface TrainingJob {
 	goal: string;
 	startingUrl: string;
@@ -49,6 +65,9 @@ export interface TrainingJob {
 	alternateGoals: string[];
 	syntheticDataConfirmed: boolean;
 	stepTimeoutMs: number;
+	// Reported by the Runner (names only, never values) alongside its first Step's dslStep report
+	// — unknown at Job creation, so this is always [] until then.
+	credentialNames: string[];
 }
 
 export interface RecipeJob {
@@ -155,6 +174,7 @@ interface JobRow {
 	trainingAlternateGoals: string | null;
 	trainingSyntheticDataConfirmed: number | null;
 	trainingStepTimeoutMs: number | null;
+	trainingCredentialNames: string | null;
 	recipeId: number | null;
 	recipeJobId: number | null;
 	recipeMode: string | null;
@@ -195,6 +215,7 @@ const JOB_SELECT = `
 	       training_job.alternate_goals AS trainingAlternateGoals,
 	       training_job.synthetic_data_confirmed AS trainingSyntheticDataConfirmed,
 	       training_job.step_timeout_ms AS trainingStepTimeoutMs,
+	       training_job.credential_names AS trainingCredentialNames,
 	       recipe_job.recipe_id AS recipeId, recipe_job.job_id AS recipeJobId, recipe_job.mode AS recipeMode,
 	       recipe_job.allowlist AS recipeAllowlist, recipe_job.step_timeout_ms AS recipeStepTimeoutMs
 	FROM job
@@ -222,7 +243,8 @@ function mapJobRow(row: JobRow): Job {
 			row.trainingMaxSteps === null ||
 			row.trainingAlternateGoals === null ||
 			row.trainingSyntheticDataConfirmed === null ||
-			row.trainingStepTimeoutMs === null
+			row.trainingStepTimeoutMs === null ||
+			row.trainingCredentialNames === null
 		) {
 			throw new Error(`Job ${row.id} is job_type Training but has no training_job row`);
 		}
@@ -236,7 +258,8 @@ function mapJobRow(row: JobRow): Job {
 				maxSteps: row.trainingMaxSteps,
 				alternateGoals: JSON.parse(row.trainingAlternateGoals) as string[],
 				syntheticDataConfirmed: row.trainingSyntheticDataConfirmed !== 0,
-				stepTimeoutMs: row.trainingStepTimeoutMs
+				stepTimeoutMs: row.trainingStepTimeoutMs,
+				credentialNames: JSON.parse(row.trainingCredentialNames) as string[]
 			}
 		};
 	}
@@ -331,7 +354,8 @@ export function insertJob(db: Database.Database, params: InsertJobParams): Job {
 					maxSteps: params.maxSteps,
 					alternateGoals: params.alternateGoals,
 					syntheticDataConfirmed: params.syntheticDataConfirmed,
-					stepTimeoutMs: params.stepTimeoutMs
+					stepTimeoutMs: params.stepTimeoutMs,
+					credentialNames: []
 				}
 			};
 		}
@@ -412,6 +436,13 @@ export function updateJobStatus(db: Database.Database, jobId: number, status: Jo
 
 export function updateJobHeartbeat(db: Database.Database, jobId: number, when: Date): void {
 	db.prepare("UPDATE job SET heartbeat_on = ? WHERE id = ?").run(toDbDate(when), jobId);
+}
+
+// Names only, never values (R011-adjacent — nothing about a credential's value is ever sent to
+// Hub) — overwritten wholesale each time the Runner reports a fresh list, since it's the only
+// source of truth for what its own RUNNER_CREDENTIAL_* env vars currently declare.
+export function updateTrainingJobCredentialNames(db: Database.Database, jobId: number, credentialNames: string[]): void {
+	db.prepare("UPDATE training_job SET credential_names = ? WHERE job_id = ?").run(JSON.stringify(credentialNames), jobId);
 }
 
 // UNIQUE(job_id, sequence) plus INSERT OR IGNORE makes a repeated/late report a no-op, not a
@@ -621,9 +652,58 @@ export function getJobStepArtifactById(db: Database.Database, id: number): JobSt
 	return row ? mapJobStepArtifactRow(row) : undefined;
 }
 
+// Looks up the screenshot the Runner just uploaded for a Training Step (by stepId, C004) so the
+// next-Step prompt can be built with it in the same `steps` call. Newest first — a stepId is
+// unique per Job in practice, but this tolerates a re-upload without picking a stale row.
+export function getLatestJobStepArtifact(db: Database.Database, jobId: number, stepId: string): JobStepArtifact | undefined {
+	const row = db.prepare(`${JOB_STEP_ARTIFACT_SELECT} WHERE job_id = ? AND step_id = ? ORDER BY id DESC LIMIT 1`).get(jobId, stepId) as
+		| JobStepArtifactRow
+		| undefined;
+	return row ? mapJobStepArtifactRow(row) : undefined;
+}
+
 // Ordered oldest-to-newest so the Job screen's diagnostic screenshot (the last entry) is
 // whichever Step the Runner most recently reported/exited on.
 export function listJobStepArtifactsForJob(db: Database.Database, jobId: number): JobStepArtifact[] {
 	const rows = db.prepare(`${JOB_STEP_ARTIFACT_SELECT} WHERE job_id = ? ORDER BY id`).all(jobId) as JobStepArtifactRow[];
 	return rows.map(mapJobStepArtifactRow);
+}
+
+export interface TrainingJobStep {
+	id: number;
+	jobId: number;
+	stepId: string;
+	definition: ChildStep;
+	createdAt: Date;
+}
+
+interface TrainingJobStepRow {
+	id: number;
+	jobId: number;
+	stepId: string;
+	definition: string;
+	createdAt: string;
+}
+
+const TRAINING_JOB_STEP_SELECT =
+	"SELECT id, job_id AS jobId, step_id AS stepId, definition, created_at AS createdAt FROM training_job_step";
+
+function mapTrainingJobStepRow(row: TrainingJobStepRow): TrainingJobStep {
+	return { id: row.id, jobId: row.jobId, stepId: row.stepId, definition: JSON.parse(row.definition) as ChildStep, createdAt: fromDbDate(row.createdAt) };
+}
+
+// Persists a Step before it is ever handed to the Runner — whether the fixed first Step
+// (jobActions.ts, at Job creation) or a later LLM-derived one (runnerActions.ts, right after
+// deriveNextStep succeeds) — so a later transcript row's stepId can be correlated back to the
+// actual DSL action/args a Step used (the transcript alone only keeps message/outcome).
+export function insertTrainingJobStep(db: Database.Database, jobId: number, step: ChildStep, createdAt: Date): TrainingJobStep {
+	const { lastInsertRowid } = db
+		.prepare("INSERT INTO training_job_step (job_id, step_id, definition, created_at) VALUES (?, ?, ?, ?)")
+		.run(jobId, step.id, JSON.stringify(step), toDbDate(createdAt));
+	return { id: Number(lastInsertRowid), jobId, stepId: step.id, definition: step, createdAt };
+}
+
+export function listTrainingJobSteps(db: Database.Database, jobId: number): TrainingJobStep[] {
+	const rows = db.prepare(`${TRAINING_JOB_STEP_SELECT} WHERE job_id = ? ORDER BY id`).all(jobId) as TrainingJobStepRow[];
+	return rows.map(mapTrainingJobStepRow);
 }
