@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
+	import PublishRecipeModal from "../../_components/PublishRecipeModal.svelte";
+
 	import RecipeReview from "./_components/RecipeReview.svelte";
 
 	import { page } from "$app/state";
 	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 
 	let recipe = $state<RecipeSummary | null>(null);
+	let publishedRecipes = $state<RecipeSummary[]>([]);
+	let publishModalOpen = $state(false);
 	let loadError = $state<string | null>(null);
 
 	async function load() {
@@ -19,6 +23,7 @@
 				return;
 			}
 			recipe = found;
+			publishedRecipes = recipes.filter((candidate) => candidate.state === "Published");
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load Recipe";
@@ -35,7 +40,21 @@
 {#if loadError}
 	<p class="page-message">{loadError}</p>
 {:else if recipe}
-	<RecipeReview name={recipe.name} goal={recipe.goal} definition={recipe.definition} />
+	<RecipeReview
+		name={recipe.name}
+		goal={recipe.goal}
+		state={recipe.state}
+		qualifiedByJobId={recipe.qualifiedByJobId}
+		definition={recipe.definition}
+		onPublish={() => (publishModalOpen = true)}
+	/>
+	<PublishRecipeModal
+		open={publishModalOpen}
+		onClose={() => (publishModalOpen = false)}
+		onPublished={load}
+		{recipe}
+		{publishedRecipes}
+	/>
 {/if}
 
 <style lang="scss">

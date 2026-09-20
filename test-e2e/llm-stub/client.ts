@@ -28,3 +28,11 @@ export async function resetLlmStub(): Promise<void> {
 		throw new Error(`llm stub: failed to reset (${response.status})`);
 	}
 }
+
+export async function getLlmRequestCount(): Promise<number> {
+	const response = await fetch(`${LLM_STUB_URL}/_requestCount`);
+	if (!response.ok) {
+		throw new Error(`llm stub: failed to read request count (${response.status})`);
+	}
+	return ((await response.json()) as { count: number }).count;
+}

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import RecipeStateBadge from "./RecipeStateBadge.svelte";
+
 	import { resolve } from "$app/paths";
 	import type { RecipeSummary } from "$lib/api/recipesApi";
 
@@ -6,12 +8,14 @@
 		recipes,
 		registeredApplicationId,
 		onStartTrial,
-		onStartJob
+		onStartJob,
+		onPublish
 	}: {
 		recipes: RecipeSummary[];
 		registeredApplicationId: number;
 		onStartTrial: (recipeId: number) => void;
 		onStartJob: (recipeId: number) => void;
+		onPublish: (recipeId: number) => void;
 	} = $props();
 
 	// "Newest first" is approximated by descending id — Recipe ids are assigned in insertion
@@ -41,8 +45,10 @@
 					>
 						{recipe.name}
 					</a>
+					<RecipeStateBadge state={recipe.state} qualifiedByJobId={recipe.qualifiedByJobId} />
 					{#if recipe.state === "Draft"}
 						<button type="button" class="btn btn-secondary" onclick={() => onStartTrial(recipe.id)}>Start Trial</button>
+						<button type="button" class="btn btn-secondary" disabled={recipe.qualifiedByJobId === null} onclick={() => onPublish(recipe.id)}>Publish</button>
 					{:else}
 						<button type="button" class="btn btn-secondary" onclick={() => onStartJob(recipe.id)}>Start Job</button>
 					{/if}
@@ -81,6 +87,7 @@
 	}
 
 	.recipe-link {
+		margin-right: auto;
 		font-family: $font-family-ui;
 		font-size: $text-regular-size;
 		color: $text-color-primary;

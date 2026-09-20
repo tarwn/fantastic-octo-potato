@@ -29,13 +29,14 @@ function sampleRecipe(overrides: Partial<Recipe> = {}): Recipe {
 		sourceTrainingRunId: null,
 		createdAt: new Date("2026-09-17T00:00:00.000Z"),
 		publishedAt: null,
+		replacesRecipeId: null,
 		...overrides
 	};
 }
 
 describe("toRecipeSummaries", () => {
 	it("maps a Draft Recipe's status to the 'Draft' label", () => {
-		const summaries = toRecipeSummaries([sampleRecipe({ recipeStatusId: RecipeStatus.Draft })]);
+		const summaries = toRecipeSummaries([sampleRecipe({ recipeStatusId: RecipeStatus.Draft })], new Map());
 
 		expect(summaries).toEqual([
 			expect.objectContaining({ id: 1, name: "Sample recipe", goal: "Sample goal", state: "Draft" })
@@ -43,7 +44,7 @@ describe("toRecipeSummaries", () => {
 	});
 
 	it("maps a Released Recipe's status to the 'Published' label", () => {
-		const summaries = toRecipeSummaries([sampleRecipe({ recipeStatusId: RecipeStatus.Released })]);
+		const summaries = toRecipeSummaries([sampleRecipe({ recipeStatusId: RecipeStatus.Released })], new Map());
 
 		expect(summaries).toEqual([expect.objectContaining({ state: "Published" })]);
 	});
@@ -51,14 +52,35 @@ describe("toRecipeSummaries", () => {
 	it("carries the Recipe's definition through unchanged", () => {
 		const definition = sampleDefinition();
 
-		const summaries = toRecipeSummaries([sampleRecipe({ definition })]);
+		const summaries = toRecipeSummaries([sampleRecipe({ definition })], new Map());
 
 		expect(summaries[0].definition).toBe(definition);
 	});
 
 	it("carries the Recipe's sourceTrainingRunId through unchanged", () => {
-		const summaries = toRecipeSummaries([sampleRecipe({ sourceTrainingRunId: "7" })]);
+		const summaries = toRecipeSummaries([sampleRecipe({ sourceTrainingRunId: "7" })], new Map());
 
 		expect(summaries[0].sourceTrainingRunId).toBe("7");
+	});
+
+	it("maps an Archived Recipe's status to the 'Archived' label", () => {
+		const summaries = toRecipeSummaries([sampleRecipe({ recipeStatusId: RecipeStatus.Archived })], new Map());
+
+		expect(summaries[0].state).toBe("Archived");
+	});
+
+	it("carries the qualifying Trial Job id and replaced Recipe id, or null when absent", () => {
+		const summaries = toRecipeSummaries([sampleRecipe({ id: 1, replacesRecipeId: 9 }), sampleRecipe({ id: 2 })], new Map([[1, 42]]));
+
+		expect(summaries.map(({ qualifiedByJobId, replacesRecipeId }) => ({ qualifiedByJobId, replacesRecipeId }))).toEqual([
+			{ qualifiedByJobId: 42, replacesRecipeId: 9 },
+			{ qualifiedByJobId: null, replacesRecipeId: null }
+		]);
+	});
+
+	it("never exposes raw* keys", () => {
+		const [summary] = toRecipeSummaries([sampleRecipe()], new Map());
+
+		expect(Object.keys(summary).filter((key) => key.startsWith("raw"))).toEqual([]);
 	});
 });

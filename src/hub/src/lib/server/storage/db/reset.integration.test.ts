@@ -59,7 +59,8 @@ describe("resetUserData", () => {
 		const recipeStatusRows = getDb().prepare("SELECT id, name FROM recipe_status ORDER BY id").all();
 		expect(recipeStatusRows).toEqual([
 			{ id: 1, name: "Draft" },
-			{ id: 2, name: "Released" }
+			{ id: 2, name: "Released" },
+			{ id: 3, name: "Archived" }
 		]);
 
 		const jobStatusRows = getDb().prepare("SELECT id, name FROM job_status ORDER BY id").all();

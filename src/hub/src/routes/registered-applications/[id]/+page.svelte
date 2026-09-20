@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
+	import PublishRecipeModal from "./_components/PublishRecipeModal.svelte";
 	import RecipesPanel from "./_components/RecipesPanel.svelte";
 	import RunnersPanel from "./_components/RunnersPanel.svelte";
 	import StartRecipeJobModal from "./_components/StartRecipeJobModal.svelte";
@@ -17,6 +18,7 @@
 	let trainingModalOpen = $state(false);
 	let recipeModalMode = $state<"Trial" | "Execute" | null>(null);
 	let recipeModalRecipeId = $state<number | null>(null);
+	let publishRecipeId = $state<number | null>(null);
 	let lastRefreshedOn = $state(new Date());
 
 	async function load() {
@@ -28,6 +30,8 @@
 			loadError = err instanceof Error ? err.message : "Failed to load registered application";
 		}
 	}
+
+	const publishingRecipe = $derived(recipes.find((recipe) => recipe.id === publishRecipeId) ?? null);
 
 	onMount(load);
 
@@ -52,6 +56,14 @@
 	function startTrial(recipeId: number) {
 		recipeModalRecipeId = recipeId;
 		recipeModalMode = "Trial";
+	}
+
+	function beginPublish(recipeId: number) {
+		publishRecipeId = recipeId;
+	}
+
+	function closePublishModal() {
+		publishRecipeId = null;
 	}
 
 	function startJob(recipeId: number) {
@@ -82,7 +94,16 @@
 			{lastRefreshedOn}
 			onRefresh={refresh}
 		/>
-		<RecipesPanel {recipes} registeredApplicationId={registeredApplication.id} onStartTrial={startTrial} onStartJob={startJob} />
+		<RecipesPanel {recipes} registeredApplicationId={registeredApplication.id} onStartTrial={startTrial} onStartJob={startJob} onPublish={beginPublish} />
+		{#if publishingRecipe}
+			<PublishRecipeModal
+				open
+				onClose={closePublishModal}
+				onPublished={refresh}
+				recipe={publishingRecipe}
+				publishedRecipes={recipes.filter((recipe) => recipe.state === "Published")}
+			/>
+		{/if}
 		<StartTrainingModal
 			open={trainingModalOpen}
 			onClose={closeTrainingModal}
