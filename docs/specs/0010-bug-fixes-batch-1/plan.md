@@ -5,4 +5,4 @@ This is the plan for [0010-bug-fixes-batch-1/spec.md](./spec.md).
 - [x] 3. Retry Job button
 - [x] 4. Runner-reported target description; structured Step transcript fields
 - [x] 5. Screenshot overlay: transcript icon and larger final screenshot
-- [ ] 6. Docs
+- [x] 6. Docs
