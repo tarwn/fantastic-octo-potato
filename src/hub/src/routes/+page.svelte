@@ -2,6 +2,12 @@
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 </script>
 
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
-<StatusBadge text="Hub status: ready" variant="success" />
+<div class="stuff">
+	<StatusBadge text="Hub status: ready" variant="success" />
+</div>
+
+<style lang="scss">
+	.stuff {
+		padding: 2rem;
+	}
+</style>

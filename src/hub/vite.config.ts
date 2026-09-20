@@ -23,6 +23,9 @@ export default defineConfig({
 	],
 	test: {
 		environment: "jsdom",
+		// Reuse worker threads while keeping each test file isolated. The default forks pool
+		// creates a fresh jsdom process per file, which is especially expensive on Windows.
+		pool: "vmThreads",
 		// Fake credentials so any LLM call that slips past a mock fails against an unreachable
 		// host instead of spending real tokens with a developer's shell or .env credentials.
 		env: {

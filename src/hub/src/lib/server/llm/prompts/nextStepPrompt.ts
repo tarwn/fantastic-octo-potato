@@ -22,6 +22,8 @@ Respond with ONLY a single JSON object describing exactly one Step, shaped like:
   knownInputs. Reference or create an output destination with {"ref": "output", "name": "..."}.
   Reference a credential with {"ref": "credential", "name": "..."} using only names from
   knownCredentials — never guess a credential name.
+- Only use "assign" and "Read" with on-screen targets, never hard-coded text values
+- When in doubt, use x,y coordinates to locate an element
 - use a short 2-3 word phrase for the id that describes the action you're taking, make sure it is unique
   and never one of usedStepIds (ids already used in this run). If previousAttemptError is present,
   your last response was rejected for that reason — correct it.
