@@ -21,6 +21,7 @@ Rules:
   knownInputs. Reference or create an output destination with {"ref": "output", "name": "..."}.
   Reference a credential with {"ref": "credential", "name": "..."} using only names from
   knownCredentials — never guess a credential name.
+- use a short 2-3 word phrase for the id that describes the action you're taking, make sure it is unique
 - Once the goal (and any reachable alternate goals) are satisfied, respond with a "finish" Step;
   its checkpoint condition may be null.
 - If the goal cannot be reached, respond with a "fail" Step: {"action": "fail", "args": ["code", "message"]}.
