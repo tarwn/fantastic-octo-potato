@@ -24,16 +24,18 @@ export function useIntegrationTestDb(): () => Database.Database {
 	beforeAll(() => {
 		mkdirSync(scratchDir, { recursive: true });
 		dbPath = join(scratchDir, `${randomUUID()}.db`);
-		execSync(`"${dbmateBin}" --env INTEGRATION_TEST_DATABASE_URL up`, {
+		// These databases are disposable. Avoid Windows FlushFileBuffers latency for every
+		// migration transaction and don't let parallel test workers contend on db/schema.sql.
+		const migrationUrl = `sqlite:${dbPath}?_journal_mode=MEMORY&_synchronous=OFF`;
+		execSync(`"${dbmateBin}" --no-dump-schema --env INTEGRATION_TEST_DATABASE_URL up`, {
 			cwd: hubRoot,
-			env: { ...process.env, INTEGRATION_TEST_DATABASE_URL: `sqlite:${dbPath}` }
+			env: { ...process.env, INTEGRATION_TEST_DATABASE_URL: migrationUrl }
 		});
 		db = openDb(`sqlite:${dbPath}`);
-		// Scratch db is thrown away after the run, so trade durability for speed: default
-		// rollback-journal + synchronous=FULL fsyncs on every write, which is very slow on
-		// Windows (FlushFileBuffers latency).
-		db.pragma("journal_mode = WAL");
-		db.pragma("synchronous = NORMAL");
+		// Each test file owns a private scratch db that is thrown away after the run. It does
+		// not need WAL concurrency or durable disk flushes.
+		db.pragma("journal_mode = MEMORY");
+		db.pragma("synchronous = OFF");
 	});
 
 	beforeEach(() => {
