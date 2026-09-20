@@ -60,6 +60,7 @@ interface CompiledSchema {
 
 export async function compileRecipe(context: RecipeCompilationContext): Promise<RecipeDefinition> {
 	const { maxCorrectionAttempts } = requireLlmConfig();
+	requireIntents(context.executedSteps);
 	let lastError: unknown;
 	for (let attempt = 1; attempt <= maxCorrectionAttempts; attempt++) {
 		const raw = await sendChatCompletion({ systemPrompt: RECIPE_COMPILATION_SYSTEM_PROMPT, userPrompt: buildUserPrompt(context) });
@@ -97,6 +98,16 @@ function buildUserPrompt(context: RecipeCompilationContext): string {
 		inputs: context.ingredients.map((ingredient) => ({ name: ingredient.fieldName, exampleValue: ingredient.safeValue })),
 		outputs: context.results.map((result) => ({ name: result.fieldName, observedValue: result.safeValue }))
 	});
+}
+
+// Operators read a Recipe through each Step's intent (transcript detail), so a compiled draft
+// must not carry Steps the Training run never described.
+function requireIntents(steps: ChildStep[]): void {
+	for (const step of steps) {
+		if (!step.intent) {
+			throw new RecipeCompilationInvalidResponseError(`Executed Step ${step.id} has no intent`);
+		}
+	}
 }
 
 function assembleDefinition(schema: CompiledSchema, context: RecipeCompilationContext): RecipeDefinition {
