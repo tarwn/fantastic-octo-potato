@@ -53,6 +53,7 @@ export interface RecipeSummary {
 	name: string;
 	goal: string;
 	state: string;
+	sourceTrainingRunId: string | null;
 	definition: {
 		inputs: Record<string, unknown>;
 		outputs: Record<string, unknown>;

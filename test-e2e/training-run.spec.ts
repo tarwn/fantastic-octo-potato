@@ -88,7 +88,7 @@ test.describe("training run against a real target application (spec 0009)", () =
 
 			await page.getByRole("link", { name: draftRecipe.name }).click();
 			await expect(page.getByText("invoiceNumber")).toBeVisible();
-			await expect(page.getByText("clientName")).toBeVisible();
+			await expect(page.getByText("clientName", { exact: true })).toBeVisible();
 			await expect(page.getByText("Copy the client name")).toBeVisible();
 		}
 		finally {

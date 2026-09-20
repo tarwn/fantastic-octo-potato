@@ -1,8 +1,25 @@
 <script lang="ts">
+	import RecipeStateBadge from "../../../_components/RecipeStateBadge.svelte";
+
+	import type { RecipeSummary } from "$lib/api/recipesApi";
 	import StepDescription from "$lib/components/step/StepDescription.svelte";
 	import type { FieldDeclaration, RecipeDefinition } from "$lib/types/recipeDefinition";
 
-	let { name: recipeName, goal, definition }: { name: string; goal: string; definition: RecipeDefinition } = $props();
+	let {
+		name: recipeName,
+		goal,
+		state,
+		qualifiedByJobId,
+		definition,
+		onPublish
+	}: {
+		name: string;
+		goal: string;
+		state: RecipeSummary["state"];
+		qualifiedByJobId: number | null;
+		definition: RecipeDefinition;
+		onPublish: () => void;
+	} = $props();
 
 	function fieldRows(fields: Record<string, FieldDeclaration>): [string, FieldDeclaration][] {
 		return Object.entries(fields);
@@ -10,7 +27,13 @@
 </script>
 
 <div class="page">
-	<h1>{recipeName}</h1>
+	<div class="page-header">
+		<h1>{recipeName}</h1>
+		<RecipeStateBadge {state} {qualifiedByJobId} />
+		{#if state === "Draft"}
+			<button type="button" class="btn btn-primary" disabled={qualifiedByJobId === null} onclick={onPublish}>Publish</button>
+		{/if}
+	</div>
 	<p class="goal">{goal}</p>
 
 	<div class="panel">
@@ -68,6 +91,23 @@
 		flex-direction: column;
 		gap: $space-m;
 		padding: $space-l;
+	}
+
+	.page-header {
+		display: flex;
+		align-items: center;
+		gap: $space-s;
+
+		.btn-primary {
+			margin-left: auto;
+		}
+	}
+
+	.btn-primary {
+		@include button-base;
+		@include button-variant-primary;
+
+		flex: none;
 	}
 
 	h1 {

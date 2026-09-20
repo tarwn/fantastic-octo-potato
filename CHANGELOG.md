@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 - 2026-09-20
+
+Qualify and Publish a draft Recipe (spec 0011): a draft Recipe is qualified once a Trial Job of that exact Recipe completes successfully, and the Registered Application Recipes panel and Recipe review screen show not-yet-qualified / Trial passed (linking the Trial Job) / Published / Archived state. An operator can then publish a qualified draft with a name, optionally replacing a published Recipe, which is archived and linked in one atomic transaction and drops out of the Start Job list. Jobs now carry a `name` assigned at creation (the Recipe name, or "Training Run") shown on the Job screen and Jobs listing, and Training → Trial → Publish → Execute with changed ingredients is proven end to end with zero LLM calls after training.
+
 ## 0.10.0 - 2026-09-20
 
 Bug Fixes Batch 1 (spec 0010): Job page status colors now cover every status (including Intervention-Requested and Completed-Error), Training Runs are titled "Training Run", and the Start Job modal shows a loading state instead of a false empty state. A duplicate Step id from the LLM is retried inside the bounded LLM loop, and a failed Training Run gets a "Retry Job" button that pre-fills the Start Training modal. The Runner now reports a masked English `targetDescription` per Step, which Hub stores with `stepId`/`outcome` as separate fields and renders as e.g. `click on button(label='Save')` (`navigate to URL` for `open`), and Transcript Steps with a screenshot open a viewer overlay that the final-screenshot panel reuses via "View larger".

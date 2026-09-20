@@ -95,6 +95,18 @@ describe("createTrainingRunJob", () => {
 		});
 	});
 
+	it("names the Job 'Training Run'", async () => {
+		const id = seedRegisteredApplication(getDb());
+
+		const result = await createTrainingRunJob(getDb(), String(id), {
+			goal: "Extract invoice total",
+			startingUrl: "https://example.com/start",
+			maxSteps: 5
+		});
+
+		expect(result.body).toEqual({ data: expect.objectContaining({ name: "Training Run" }) });
+	});
+
 	it("persists the fixed 'open starting URL' first Step at creation, before any Runner claims the Job", async () => {
 		const id = seedRegisteredApplication(getDb());
 

@@ -23,6 +23,13 @@ export default defineConfig({
 	],
 	test: {
 		environment: "jsdom",
+		// Fake credentials so any LLM call that slips past a mock fails against an unreachable
+		// host instead of spending real tokens with a developer's shell or .env credentials.
+		env: {
+			LLM_API_URL: "http://127.0.0.1:1/v1",
+			LLM_API_KEY: "test-fake-llm-key",
+			LLM_MODEL: "test-fake-llm-model"
+		},
 		include: ["src/**/*.test.ts"],
 		// Real-database integration tests (npm run guard:hub:test-integration) live in
 		// vite.integration.config.ts instead, so this run stays fast and resource-free.

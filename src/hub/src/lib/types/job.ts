@@ -21,6 +21,7 @@ export interface RecipeJob {
 }
 
 interface JobBase {
+	name: string;
 	id: number;
 	customerApplicationXrefId: number;
 	jobStatusId: JobStatus;

@@ -19,6 +19,8 @@ test("jobs list page links to a Job created via the API", async ({ page, request
 
 	await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
 	await expect(page.getByText(`job-ca${registeredApplication.id}-${job.id}`)).toBeVisible();
+	const jobLink = page.getByRole("link", { name: new RegExp(`job-ca${registeredApplication.id}-${job.id}\\b`) });
+	await expect(jobLink).toContainText("Training Run");
 	await expect(page.getByText("Acme — BambooInvoice").first()).toBeVisible();
 
 	// Cancel it so it doesn't linger Pending and get claimed ahead of other tests' Jobs

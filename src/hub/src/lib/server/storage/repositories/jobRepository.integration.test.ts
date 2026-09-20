@@ -36,6 +36,7 @@ function seedRunner(db: Database.Database, xrefId: number): number {
 function insertPendingTrainingRunJob(db: Database.Database, xrefId: number): number {
 	const job = insertJob(db, {
 		jobType: JobType.TrainingRun,
+		name: "Training Run",
 		customerApplicationXrefId: xrefId,
 		goal: "Extract invoice total",
 		startingUrl: "https://example.com/start",
@@ -58,6 +59,7 @@ describe("jobRepository", () => {
 
 			const job = insertJob(getDb(), {
 				jobType: JobType.TrainingRun,
+				name: "Training Run",
 				customerApplicationXrefId: 1,
 				goal: "Extract invoice total",
 				startingUrl: "https://example.com/start",
@@ -73,6 +75,7 @@ describe("jobRepository", () => {
 				id: job.id,
 				customerApplicationXrefId: 1,
 				jobType: JobType.TrainingRun,
+				name: "Training Run",
 				jobStatusId: JobStatus.Pending,
 				runnerId: null,
 				createdAt: new Date("2026-09-15T00:00:00.000Z"),
@@ -109,6 +112,7 @@ describe("jobRepository", () => {
 
 			const job = insertJob(getDb(), {
 				jobType: JobType.Recipe,
+				name: "Sample recipe",
 				customerApplicationXrefId: 1,
 				recipeId: null,
 				mode: "Trial",
@@ -121,6 +125,7 @@ describe("jobRepository", () => {
 				id: job.id,
 				customerApplicationXrefId: 1,
 				jobType: JobType.Recipe,
+				name: "Sample recipe",
 				jobStatusId: JobStatus.Pending,
 				runnerId: null,
 				createdAt: new Date("2026-09-15T00:00:00.000Z"),
@@ -157,6 +162,7 @@ describe("jobRepository", () => {
 			id: jobId,
 			customerApplicationXrefId: 1,
 			jobType: JobType.TrainingRun,
+			name: "Training Run",
 			jobStatusId: JobStatus.Running,
 			runnerId,
 			createdAt: new Date("2026-09-15T00:00:00.000Z"),

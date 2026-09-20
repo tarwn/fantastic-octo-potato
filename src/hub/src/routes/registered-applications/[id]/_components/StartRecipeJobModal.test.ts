@@ -32,6 +32,8 @@ const DRAFT_RECIPE: RecipeSummary = {
 	goal: "Goal",
 	state: "Draft",
 	sourceTrainingRunId: null,
+		qualifiedByJobId: null,
+		replacesRecipeId: null,
 	definition: {
 		schemaVersion: 1,
 		inputs: {
@@ -54,6 +56,8 @@ const TYPED_RECIPE: RecipeSummary = {
 	goal: "Goal",
 	state: "Draft",
 	sourceTrainingRunId: null,
+		qualifiedByJobId: null,
+		replacesRecipeId: null,
 	definition: {
 		schemaVersion: 1,
 		inputs: {
@@ -72,6 +76,8 @@ const BOOLEAN_RECIPE: RecipeSummary = {
 	goal: "Goal",
 	state: "Draft",
 	sourceTrainingRunId: null,
+		qualifiedByJobId: null,
+		replacesRecipeId: null,
 	definition: {
 		schemaVersion: 1,
 		inputs: { confirmed: { type: "boolean", description: "Confirm the search", required: true, nullable: false, sensitive: false } },
@@ -138,6 +144,7 @@ describe("StartRecipeJobModal", () => {
 			id: 42,
 			customerApplicationXrefId: 1,
 			jobType: JobType.Recipe,
+			name: "Draft recipe",
 			jobStatusId: 1,
 			details: { recipeId: 1, mode: "Trial", allowlist: "https://example.test", stepTimeoutMs: 15000 },
 			runnerId: null,

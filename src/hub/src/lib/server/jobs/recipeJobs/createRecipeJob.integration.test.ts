@@ -58,6 +58,33 @@ describe("createRecipeJob", () => {
 		expect(result).toEqual({ status: 404, body: { error: "Recipe 999 not found" } });
 	});
 
+	it("names an Execute Job after its published Recipe", () => {
+		const db = getDb();
+		const xrefId = seedRegisteredApplication(db);
+		const recipe = seedPublishedRecipe(db, xrefId);
+
+		const result = createRecipeJob(db, String(recipe.id), { mode: "Execute", ingredients: { accountQuery: "ACCT-1" } });
+
+		expect(result.body).toEqual({ data: expect.objectContaining({ name: "Sample recipe" }) });
+	});
+
+	it("names a Trial Job after its draft Recipe", () => {
+		const db = getDb();
+		const xrefId = seedRegisteredApplication(db);
+		const draft = createDraftRecipe(db, {
+			customerApplicationXrefId: xrefId,
+			name: "Draft recipe name",
+			goal: "Sample goal",
+			definition: sampleDefinition(),
+			sourceTrainingRunId: null,
+			createdAt: new Date("2026-09-17T00:00:00.000Z")
+		});
+
+		const result = createRecipeJob(db, String(draft.id), { mode: "Trial", ingredients: { accountQuery: "ACCT-1" } });
+
+		expect(result.body).toEqual({ data: expect.objectContaining({ name: "Draft recipe name" }) });
+	});
+
 	it("rejects an invalid mode", () => {
 		const db = getDb();
 		const xrefId = seedRegisteredApplication(db);

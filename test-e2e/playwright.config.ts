@@ -19,7 +19,9 @@ export default defineConfig({
 	globalSetup: "./globalSetup.ts",
 	globalTeardown: "./globalTeardown.ts",
 	webServer: {
-		command: "npm run build:hub && npm run preview:hub",
+		// db:reset first so Recipes/Jobs left behind by an earlier run (or the Hub e2e suite, which shares
+		// this sqlite file) cannot leak into specs that look up "the draft Recipe".
+		command: "npm run db:reset && npm run build:hub && npm run preview:hub",
 		cwd: "..",
 		port: HUB_PORT,
 		env: {

@@ -18,6 +18,8 @@ export interface TrainingRunJobActionResult {
 // per-Step override exists yet for either Job type.
 const TRAINING_RUN_JOB_STEP_TIMEOUT_MS = 15_000;
 
+const TRAINING_RUN_JOB_NAME = "Training Run";
+
 interface CreateTrainingRunJobBody {
 	goal?: unknown;
 	startingUrl?: unknown;
@@ -94,6 +96,7 @@ export async function createTrainingRunJob(
 	const job = db.transaction(() => {
 		const inserted = insertJob(db, {
 			jobType: JobType.TrainingRun,
+			name: TRAINING_RUN_JOB_NAME,
 			customerApplicationXrefId: registeredApplication.id,
 			goal,
 			startingUrl,

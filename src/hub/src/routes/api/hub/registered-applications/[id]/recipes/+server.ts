@@ -5,7 +5,7 @@ import type { RequestHandler } from "./$types";
 import { toRecipeSummaries } from "$lib/server/recipe/recipeActions";
 import { getDb } from "$lib/server/storage/db/db";
 import { getRegisteredApplicationById } from "$lib/server/storage/repositories/customerApplicationXrefRepository";
-import { listRecipesForApplication } from "$lib/server/storage/repositories/recipeRepository";
+import { getQualifyingTrialJobIds, listRecipesForApplication } from "$lib/server/storage/repositories/recipeRepository";
 
 export const GET: RequestHandler = ({ params }) => {
 	const db = getDb();
@@ -16,5 +16,6 @@ export const GET: RequestHandler = ({ params }) => {
 	}
 
 	const recipes = listRecipesForApplication(db, registeredApplication.id);
-	return json({ data: toRecipeSummaries(recipes) }, { status: 200 });
+	const qualifyingTrialJobIds = getQualifyingTrialJobIds(db, recipes.map((recipe) => recipe.id));
+	return json({ data: toRecipeSummaries(recipes, qualifyingTrialJobIds) }, { status: 200 });
 };
