@@ -4,7 +4,7 @@
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { SensitivityType } from "$lib/sensitivityType";
-	import type { JobTranscriptEntry, TranscriptFieldRef } from "$lib/types/job";
+	import type { JobTranscriptEntry, StepTranscriptText, TranscriptFieldRef } from "$lib/types/job";
 
 	let { entries }: { entries: JobTranscriptEntry[] } = $props();
 
@@ -29,6 +29,11 @@
 	}
 
 	const days = $derived(groupByDay(entries));
+
+	function stepMessage({ stepId, action, targetDescription }: StepTranscriptText): string {
+		const selector = targetDescription.selector === "" ? "" : `(${targetDescription.selector})`;
+		return `${stepId}: ${action} on ${targetDescription.component}${selector}`;
+	}
 
 	function kindName(kind: TranscriptKind): string {
 		return TranscriptKind[kind];
@@ -68,7 +73,7 @@
 					<span class={`transcript-kind-${kindName(entry.kind).toLowerCase()}`}>{kindName(entry.kind).toUpperCase()}</span>
 					<span class="transcript-text">
 						{#if entry.kind === TranscriptKind.Step}
-							<span class="transcript-step-message">{entry.text.message}</span>
+							<span class="transcript-step-message">{stepMessage(entry.text)}</span>
 							{#each entry.text.inputs as field (field.fieldName)}
 								{@render transcriptStepField("input", field)}
 							{/each}

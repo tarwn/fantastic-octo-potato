@@ -90,8 +90,8 @@ describe("runTrainingJobLoop: happy path", () => {
 
 		await runTrainingJobLoop(config, job);
 
-		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], credentialNames: [] });
-		expect(reportDslStep).toHaveBeenNthCalledWith(2, config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], credentialNames: [] });
+		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" }, credentialNames: [] });
+		expect(reportDslStep).toHaveBeenNthCalledWith(2, config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], targetDescription: { component: "button", selector: "id='go'" }, credentialNames: [] });
 		expect(uploadArtifact).toHaveBeenCalledTimes(3); // 2 Steps + 1 terminal-exit screenshot
 		expect(uploadArtifact).toHaveBeenNthCalledWith(3, config, "/api/runner/runners/1/jobs/42/artifacts", "terminal", expect.any(String));
 		expect(reportStatus).not.toHaveBeenCalled();
@@ -112,6 +112,7 @@ describe("runTrainingJobLoop: happy path", () => {
 			stepId: "read_value",
 			outcome: "succeeded",
 			extractions: [{ fieldName: "value", value: "42" }],
+			targetDescription: expect.anything(),
 			credentialNames: []
 		});
 	}, 20000);
@@ -182,7 +183,7 @@ describe("runTrainingJobLoop: terminal outcome mapping", () => {
 		await runTrainingJobLoop(config, job);
 
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go: blocked a disallowed-origin request to https://blocked.example.net/tracker.js");
-		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], credentialNames: [] });
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], targetDescription: { component: "button", selector: "id='go'" }, credentialNames: [] });
 	}, 20000);
 
 	it("reports a failed Step's outcome, still asking Hub for the next Step (Hub/the LLM decides how to recover)", async () => {
@@ -192,7 +193,7 @@ describe("runTrainingJobLoop: terminal outcome mapping", () => {
 		await runTrainingJobLoop(config, job);
 
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, expect.stringContaining("Step click_missing failed: TARGET_NOT_FOUND"));
-		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_missing", outcome: "failed", extractions: [], credentialNames: [] });
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_missing", outcome: "failed", extractions: [], targetDescription: { component: "element", selector: "" }, credentialNames: [] });
 	}, 20000);
 
 	it("reports Completed-Error on an unexpected technical error the DSL driver lets propagate", async () => {

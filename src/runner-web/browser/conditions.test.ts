@@ -16,7 +16,8 @@ function newContext(): ExecutionContext {
 		stepTimeoutMs: 1000,
 		resolveCredential: () => {
 			throw new Error("not used in this test");
-		}
+		},
+		secrets: []
 	};
 }
 

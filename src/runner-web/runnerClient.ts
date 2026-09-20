@@ -78,6 +78,7 @@ export interface ReportDslStepRequest {
 	outcome: "succeeded" | "failed";
 	parentStepId?: string;
 	extractions: Array<{ fieldName: string; value: string }>;
+	targetDescription: { component: string; selector: string };
 	credentialNames?: string[];
 }
 

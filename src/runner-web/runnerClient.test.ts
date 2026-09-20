@@ -72,12 +72,12 @@ describe("reportDslStep", () => {
 			})
 		);
 
-		const result = await reportDslStep(config, 42, { stepId: "s1", outcome: "succeeded", extractions: [] });
+		const result = await reportDslStep(config, 42, { stepId: "s1", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" } });
 
 		expect(fetchMock).toHaveBeenCalledWith("http://localhost:4173/api/runner/runners/1/jobs/42/steps", {
 			method: "POST",
 			headers: { authorization: "Bearer the-secret", "content-type": "application/json" },
-			body: JSON.stringify({ kind: "dslStep", stepId: "s1", outcome: "succeeded", extractions: [] })
+			body: JSON.stringify({ kind: "dslStep", stepId: "s1", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" } })
 		});
 		expect(result).toEqual({ jobStatusId: 2, nextStep: { id: "next", action: "click", args: [{ by: "css", value: "#go" }] } });
 	});
@@ -86,7 +86,7 @@ describe("reportDslStep", () => {
 		const fetchMock = vi.mocked(fetch);
 		fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: "not the owner" }), { status: 403 }));
 
-		const error = await reportDslStep(config, 42, { stepId: "s1", outcome: "succeeded", extractions: [] }).catch((err: unknown) => err);
+		const error = await reportDslStep(config, 42, { stepId: "s1", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" } }).catch((err: unknown) => err);
 
 		expect(error).toBeInstanceOf(RunnerHttpError);
 		expect((error as RunnerHttpError).status).toBe(403);

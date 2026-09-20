@@ -7,6 +7,7 @@ import type { ChildStep, ScalarValue } from "../dsl/types.ts";
 import { resolveStringValue, resolveValue } from "../dsl/valueResolver.ts";
 
 import { evaluateCondition } from "./conditions.ts";
+import { describeTarget, NO_TARGET_DESCRIPTION, type TargetDescription } from "./targetDescription.ts";
 import { isPointTarget, resolveElementAtPoint, resolveElementTarget, resolveViewportPoint } from "./targetResolver.ts";
 
 // A step reports exactly one of these; `kind: "businessFailure"` distinguishes the `fail` action's
@@ -20,7 +21,10 @@ export interface ActionOutcome {
 	gotoStepId?: string;
 	finished?: boolean;
 	error?: { code: string; message: string };
+	targetDescription: TargetDescription;
 }
+
+type ActionResult = Omit<ActionOutcome, "targetDescription">;
 
 const POLL_INTERVAL_MS = 100;
 
@@ -28,7 +32,8 @@ function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function resolveRequiredLocator(page: Page, target: Parameters<typeof resolveElementTarget>[1]): Promise<Locator> {
+// Described before the action runs — a click can navigate away, leaving nothing to describe.
+async function resolveRequiredLocator(page: Page, target: Parameters<typeof resolveElementTarget>[1], ctx: ExecutionContext, described: { value: TargetDescription }): Promise<Locator> {
 	const resolution = await resolveElementTarget(page, target);
 	if (resolution.status === "missing") {
 		throw new DslActionError("TARGET_NOT_FOUND", `No element matched {by: "${target.by}", value: "${target.value}"}`);
@@ -36,6 +41,7 @@ async function resolveRequiredLocator(page: Page, target: Parameters<typeof reso
 	if (resolution.status === "ambiguous") {
 		throw new DslActionError("TARGET_AMBIGUOUS", `${resolution.count} elements matched {by: "${target.by}", value: "${target.value}"}, expected exactly one`);
 	}
+	described.value = await describeTarget(resolution.locator, ctx.secrets);
 	return resolution.locator;
 }
 
@@ -98,7 +104,7 @@ async function readAtPoint(page: Page, point: { by: "point"; x: number; y: numbe
 	}
 }
 
-async function executeVerify(page: Page, step: Extract<ChildStep, { action: "verify" }>, ctx: ExecutionContext): Promise<ActionOutcome> {
+async function executeVerify(page: Page, step: Extract<ChildStep, { action: "verify" }>, ctx: ExecutionContext): Promise<ActionResult> {
 	const deadline = Date.now() + ctx.stepTimeoutMs;
 	for (;;) {
 		if (await evaluateCondition(page, step.args[0], ctx)) {
@@ -116,6 +122,12 @@ async function executeVerify(page: Page, step: Extract<ChildStep, { action: "ver
 // an unparsable number) are caught and returned as a `failed` outcome; anything else propagates
 // uncaught, since it's not a failure this driver knows how to characterize.
 export async function executeAction(page: Page, step: ChildStep, ctx: ExecutionContext): Promise<ActionOutcome> {
+	const described = { value: NO_TARGET_DESCRIPTION };
+	const result = await runAction(page, step, ctx, described);
+	return { ...result, targetDescription: described.value };
+}
+
+async function runAction(page: Page, step: ChildStep, ctx: ExecutionContext, described: { value: TargetDescription }): Promise<ActionResult> {
 	try {
 		switch (step.action) {
 			case "open": {
@@ -129,27 +141,27 @@ export async function executeAction(page: Page, step: ChildStep, ctx: ExecutionC
 					await page.mouse.click(viewportX, viewportY);
 				}
 				else {
-					await (await resolveRequiredLocator(page, target)).click();
+					await (await resolveRequiredLocator(page, target, ctx, described)).click();
 				}
 				return { outcome: "succeeded" };
 			}
 			case "focus": {
-				await (await resolveRequiredLocator(page, step.args[0])).focus();
+				await (await resolveRequiredLocator(page, step.args[0], ctx, described)).focus();
 				return { outcome: "succeeded" };
 			}
 			case "fill": {
-				const locator = await resolveRequiredLocator(page, step.args[0]);
+				const locator = await resolveRequiredLocator(page, step.args[0], ctx, described);
 				await locator.fill(resolveStringValue(step.args[1], ctx));
 				return { outcome: "succeeded" };
 			}
 			case "select": {
-				const locator = await resolveRequiredLocator(page, step.args[0]);
+				const locator = await resolveRequiredLocator(page, step.args[0], ctx, described);
 				const options = step.args[1].map((option) => ({ [option.by]: resolveStringValue(option.value, ctx) }));
 				await locator.selectOption(options);
 				return { outcome: "succeeded" };
 			}
 			case "scrollIntoView": {
-				await (await resolveRequiredLocator(page, step.args[0])).scrollIntoViewIfNeeded();
+				await (await resolveRequiredLocator(page, step.args[0], ctx, described)).scrollIntoViewIfNeeded();
 				return { outcome: "succeeded" };
 			}
 			case "scroll": {
@@ -162,7 +174,7 @@ export async function executeAction(page: Page, step: ChildStep, ctx: ExecutionC
 			}
 			case "read": {
 				const [target, mode, destination] = step.args;
-				const value = isPointTarget(target) ? await readAtPoint(page, target, mode) : await readElementValue(await resolveRequiredLocator(page, target), mode);
+				const value = isPointTarget(target) ? await readAtPoint(page, target, mode) : await readElementValue(await resolveRequiredLocator(page, target, ctx, described), mode);
 				setOutput(ctx.outputs, destination.name, value);
 				return { outcome: "succeeded", extraction: { fieldName: destination.name, value } };
 			}

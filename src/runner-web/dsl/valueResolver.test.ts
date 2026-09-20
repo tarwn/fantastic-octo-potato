@@ -11,6 +11,7 @@ function newContext(overrides: Partial<ExecutionContext> = {}): ExecutionContext
 		outputs: createOutputsState(),
 		stepTimeoutMs: 1000,
 		resolveCredential: vi.fn(() => "resolved-credential"),
+		secrets: [],
 		...overrides
 	};
 }

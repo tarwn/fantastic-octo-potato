@@ -8,4 +8,7 @@ export interface ExecutionContext {
 	outputs: OutputsState;
 	stepTimeoutMs: number;
 	resolveCredential: (name: string) => string;
+	// The Job's live known-secrets list (grows as sensitive outputs are extracted) — shared by
+	// reference so target descriptions are masked against every secret known at that moment.
+	secrets: string[];
 }

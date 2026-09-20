@@ -81,6 +81,7 @@ const dslStepBody = (stepId: string, extractions: Array<{ fieldName: string; val
 	kind: "dslStep" as const,
 	stepId,
 	outcome: "succeeded" as const,
+	targetDescription: { component: "element", selector: "" },
 	extractions
 });
 

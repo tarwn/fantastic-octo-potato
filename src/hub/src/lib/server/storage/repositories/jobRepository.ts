@@ -6,6 +6,7 @@ import { TranscriptKind } from "../db/jobTranscriptKind.ts";
 import { JobType } from "../db/jobType.ts";
 import { SensitivityType } from "../db/sensitivityType.ts";
 
+import type { StepTargetDescription } from "$lib/types/job";
 import type { ChildStep } from "$lib/types/recipeDefinition";
 
 // Intervention-Requested is a halted, non-terminal state (ARCHITECTURE.md's Core Loop) — it waits
@@ -107,8 +108,11 @@ export interface TranscriptFieldRef {
 	sensitivityType: SensitivityType;
 }
 
-interface StepTranscriptText {
-	message: string;
+export interface StepTranscriptText {
+	stepId: string;
+	outcome: "succeeded" | "failed";
+	parentStepId?: string;
+	targetDescription: StepTargetDescription;
 	inputs: TranscriptFieldRef[];
 	outputs: TranscriptFieldRef[];
 }

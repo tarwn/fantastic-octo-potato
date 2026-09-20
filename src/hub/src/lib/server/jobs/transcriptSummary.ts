@@ -14,7 +14,8 @@ export function summarizeTranscriptForLlm(entries: JobTranscriptEntry[]): string
 function summarizeEntry(entry: JobTranscriptEntry): string {
 	if (entry.kind === TranscriptKind.Step) {
 		const outputs = entry.text.outputs.map((output) => `${output.fieldName}=${output.safeValue}`).join(", ");
-		return `Step: ${entry.text.message}${outputs ? ` (extracted: ${outputs})` : ""}`;
+		const parent = entry.text.parentStepId ? `${entry.text.parentStepId} > ` : "";
+		return `Step: ${parent}${entry.text.stepId}: ${entry.text.outcome}${outputs ? ` (extracted: ${outputs})` : ""}`;
 	}
 	return `${TranscriptKind[entry.kind]}: ${entry.text}`;
 }

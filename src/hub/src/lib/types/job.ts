@@ -41,8 +41,17 @@ export interface TranscriptFieldRef {
 	sensitivityType: SensitivityType;
 }
 
+export interface StepTargetDescription {
+	component: string;
+	selector: string;
+}
+
 export interface StepTranscriptText {
-	message: string;
+	stepId: string;
+	outcome: "succeeded" | "failed";
+	action: string;
+	parentStepId?: string;
+	targetDescription: StepTargetDescription;
 	inputs: TranscriptFieldRef[];
 	outputs: TranscriptFieldRef[];
 }

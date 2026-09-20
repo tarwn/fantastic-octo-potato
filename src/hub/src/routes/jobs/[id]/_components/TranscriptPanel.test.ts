@@ -35,7 +35,10 @@ describe("TranscriptPanel", () => {
 				sequence: 1,
 				kind: TranscriptKind.Step,
 				text: {
-					message: "Filled in the invoice form",
+					stepId: "fill_invoice",
+					outcome: "succeeded",
+					action: "fill",
+					targetDescription: { component: "text input", selector: "label='Customer'" },
 					inputs: [{ fieldName: "customerName", safeValue: "Northwind", sensitivityType: SensitivityType.None }],
 					outputs: [{ fieldName: "ssn", safeValue: "••••••", sensitivityType: SensitivityType.PII }]
 				},
@@ -46,11 +49,29 @@ describe("TranscriptPanel", () => {
 
 		render(TranscriptPanel, { entries });
 
-		expect(screen.getByText("Filled in the invoice form")).toBeInTheDocument();
+		expect(screen.getByText("fill_invoice: fill on text input(label='Customer')")).toBeInTheDocument();
 		expect(screen.getByText("input: customerName")).toBeInTheDocument();
 		expect(screen.getByText("Northwind")).toBeInTheDocument();
 		expect(screen.getByText("output: ssn")).toBeInTheDocument();
 		expect(screen.getByText("••••••")).toBeInTheDocument();
+	});
+
+	it("drops the selector parentheses when the Step's target has no selector", () => {
+		const entries: JobTranscriptEntry[] = [
+			{
+				id: 3,
+				jobId: 1,
+				sequence: 1,
+				kind: TranscriptKind.Step,
+				text: { stepId: "open_home", outcome: "succeeded", action: "open", targetDescription: { component: "element", selector: "" }, inputs: [], outputs: [] },
+				createdAt: new Date(),
+				jobStatusId: null
+			}
+		];
+
+		render(TranscriptPanel, { entries });
+
+		expect(screen.getByText("open_home: open on element")).toBeInTheDocument();
 	});
 
 	it.each([

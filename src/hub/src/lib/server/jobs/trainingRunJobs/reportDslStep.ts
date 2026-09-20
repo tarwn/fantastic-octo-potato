@@ -55,8 +55,20 @@ export async function reportDslStep(
 		updateTrainingRunJobCredentialNames(db, job.id, step.credentialNames);
 	}
 
-	const message = `${step.parentStepId ? `${step.parentStepId} > ` : ""}${step.stepId}: ${step.outcome}`;
-	appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Step, { message, inputs: [], outputs }, now);
+	appendAutoSequencedTranscriptEntry(
+		db,
+		job.id,
+		TranscriptKind.Step,
+		{
+			stepId: step.stepId,
+			outcome: step.outcome,
+			...(step.parentStepId !== undefined ? { parentStepId: step.parentStepId } : {}),
+			targetDescription: step.targetDescription,
+			inputs: [],
+			outputs
+		},
+		now
+	);
 	updateJobHeartbeat(db, job.id, now);
 	updateRunnerHeartbeat(db, runnerId, now);
 

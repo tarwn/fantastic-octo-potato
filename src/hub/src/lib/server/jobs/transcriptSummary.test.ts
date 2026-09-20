@@ -12,7 +12,7 @@ function entry(overrides: Partial<JobTranscriptEntry> & Pick<JobTranscriptEntry,
 describe("summarizeTranscriptForLlm", () => {
 	it("renders a Step entry with its extracted outputs", () => {
 		const summary = summarizeTranscriptForLlm([
-			entry({ kind: TranscriptKind.Step, text: { message: "click_search: succeeded", inputs: [], outputs: [] } })
+			entry({ kind: TranscriptKind.Step, text: { stepId: "click_search", outcome: "succeeded", targetDescription: { component: "button", selector: "" }, inputs: [], outputs: [] } })
 		]);
 
 		expect(summary).toBe("Step: click_search: succeeded");
@@ -22,7 +22,13 @@ describe("summarizeTranscriptForLlm", () => {
 		const summary = summarizeTranscriptForLlm([
 			entry({
 				kind: TranscriptKind.Step,
-				text: { message: "read_total: succeeded", inputs: [], outputs: [{ fieldName: "total", safeValue: "42", sensitivityType: 1 }] }
+				text: {
+					stepId: "read_total",
+					outcome: "succeeded",
+					targetDescription: { component: "element", selector: "" },
+					inputs: [],
+					outputs: [{ fieldName: "total", safeValue: "42", sensitivityType: 1 }]
+				}
 			})
 		]);
 

@@ -94,6 +94,7 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 			stepId: "copy_number",
 			parentStepId: "copy_summary",
 			outcome: "succeeded",
+			targetDescription: { component: "text input", selector: "label='Account number'" },
 			extractions: [{ fieldName: "accountNumber", value: "ACCT-9999-SECRET" }]
 		});
 
@@ -105,7 +106,10 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 		expect(stepEntry).toEqual(
 			expect.objectContaining({
 				text: expect.objectContaining({
-					message: expect.stringContaining("copy_summary"),
+					stepId: "copy_number",
+					parentStepId: "copy_summary",
+					outcome: "succeeded",
+					targetDescription: { component: "text input", selector: "label='Account number'" },
 					inputs: [],
 					outputs: [{ fieldName: "accountNumber", safeValue: "••••••", sensitivityType: SensitivityType.Other }]
 				})
@@ -122,6 +126,7 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 			kind: "dslStep",
 			stepId: "mark_found",
 			outcome: "succeeded",
+			targetDescription: { component: "element", selector: "" },
 			extractions: [{ fieldName: "status", value: "found" }]
 		});
 
@@ -137,6 +142,7 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 			kind: "dslStep",
 			stepId: "bogus_step",
 			outcome: "succeeded",
+			targetDescription: { component: "element", selector: "" },
 			extractions: [{ fieldName: "notDeclared", value: "x" }]
 		});
 
