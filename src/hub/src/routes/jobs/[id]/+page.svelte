@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
+	import StartTrainingModal from "../../registered-applications/[id]/_components/StartTrainingModal.svelte";
+
 	import CompiledRecipeLink from "./_components/CompiledRecipeLink.svelte";
 	import GoalsPanel from "./_components/GoalsPanel.svelte";
 	import JobStrip from "./_components/JobStrip.svelte";
@@ -15,7 +17,7 @@
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
-	import { isTerminalJobStatus } from "$lib/jobStatus";
+	import { isTerminalJobStatus, JobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { JOB_TYPE_LABELS, JobType } from "$lib/jobType";
 	import type { JobDetail } from "$lib/types/job";
@@ -28,6 +30,7 @@
 	let compiledRecipe = $state<RecipeSummary | null>(null);
 	let loadError = $state<string | null>(null);
 	let cancelError = $state<string | null>(null);
+	let retryModalOpen = $state(false);
 	let lastRefreshedOn = $state(new Date());
 
 	const jobId = $derived(Number(page.params.id));
@@ -102,6 +105,9 @@
 						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
 					{/if}
 					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
+					{#if job.jobStatusId === JobStatus.CompletedFailed || job.jobStatusId === JobStatus.CompletedError}
+						<button type="button" class="btn" onclick={() => (retryModalOpen = true)}>Retry Job</button>
+					{/if}
 				</div>
 			</div>
 			{#if cancelError}
@@ -124,6 +130,12 @@
 					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
 				</div>
 			</div>
+			<StartTrainingModal
+				open={retryModalOpen}
+				onClose={() => (retryModalOpen = false)}
+				registeredApplicationId={job.customerApplicationXrefId}
+				initialValues={job.details}
+			/>
 		</div>
 	{:else if job && registeredApplication && job.jobType === JobType.Recipe}
 		<div class="job-page-content">

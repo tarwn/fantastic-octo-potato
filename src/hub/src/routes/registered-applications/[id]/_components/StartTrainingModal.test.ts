@@ -161,4 +161,35 @@ describe("StartTrainingModal", () => {
 
 		expect(onClose).toHaveBeenCalledOnce();
 	});
+
+	it("pre-fills every field from initialValues when given", () => {
+		render(StartTrainingModal, {
+			open: true,
+			onClose: vi.fn(),
+			registeredApplicationId: 1,
+			initialValues: {
+				goal: "Extract invoices",
+				startingUrl: "https://example.com/start",
+				maxSteps: 12,
+				alternateGoals: ["Find totals", "List clients"],
+				syntheticDataConfirmed: true
+			}
+		});
+
+		expect(screen.getByLabelText(/primary goal/i)).toHaveValue("Extract invoices");
+		expect(screen.getByLabelText(/starting url/i)).toHaveValue("https://example.com/start");
+		expect(screen.getByLabelText(/maximum steps/i)).toHaveValue("12");
+		expect(screen.getByLabelText(/alternate goals/i)).toHaveValue("Find totals\nList clients");
+		expect(screen.getByLabelText(/synthetic/i)).toBeChecked();
+	});
+
+	it("leaves every field blank when no initialValues are given", () => {
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
+
+		expect(screen.getByLabelText(/primary goal/i)).toHaveValue("");
+		expect(screen.getByLabelText(/starting url/i)).toHaveValue("");
+		expect(screen.getByLabelText(/maximum steps/i)).toHaveValue("");
+		expect(screen.getByLabelText(/alternate goals/i)).toHaveValue("");
+		expect(screen.getByLabelText(/synthetic/i)).not.toBeChecked();
+	});
 });
