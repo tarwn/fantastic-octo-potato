@@ -54,7 +54,7 @@ An application that can learn how to navigate an application interface to achiev
 Masking:
 - Values on Job screen and JSON Export of job are masked if sensitive.
 - Screenshots for Training or failed Jobs are masked where sensitive data is detected.
-- Raw, unmasked values are in the database and lightly partitioned from masked values, waiting for an integration to be shipped to
+- Raw, unmasked values are in the database and lightly partitioned from masked values, waiting for an integration that they will be shipped to or retrieved from, plus an option of encrypting them from the runner with a key hub does not have access to
 
 # Making Changes
 
