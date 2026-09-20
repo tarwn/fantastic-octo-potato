@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0 - 2026-09-20
+
+Live Human Intervention (spec 0013): an operator can Take Control of a Recipe Job stuck in `Intervention-Requested`, see its masked screenshot and Transcript in an owner-locked overlay, and direct the still-open Runner browser with a click on the screenshot, an output assignment, or a prompt that Hub converts into one atomic Step. The operator then hands control back to resume at a chosen Recipe Step, or ends the Job. Commands travel over a Hub-persisted single pending command that the Runner pulls, and run through the normal allowlist and masking path.
+
 ## 0.12.0 - 2026-09-20
 
 Transcript nits (spec 0012): Target values can carry a ValueRef, the Job screen labels Job type by mode and exports the Job with its definition, and Transcript rows show the Step intent with a screenshot button and a step-detail toggle. LLM-compiled draft Recipes now require an intent per Step, and the Runner reports every executed Step, including one that fails on an allowlist violation or an unexpected error, before the status change, so failures always appear in the Transcript.
