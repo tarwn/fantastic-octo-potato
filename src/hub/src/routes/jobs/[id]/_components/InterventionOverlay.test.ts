@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import InterventionOverlay from "./InterventionOverlay.svelte";
@@ -66,6 +66,7 @@ function renderOverlay(
 		onHandBack?: (resumeStepId: string) => void;
 		onClickCommand?: (x: number, y: number) => Promise<number>;
 		onAssignCommand?: (name: string, value: string) => Promise<number>;
+		onPromptCommand?: (prompt: string) => Promise<number>;
 	} = {}
 ) {
 	return render(InterventionOverlay, {
@@ -74,6 +75,7 @@ function renderOverlay(
 		endError: null,
 		onClickCommand: overrides.onClickCommand ?? vi.fn().mockResolvedValue(1),
 		onAssignCommand: overrides.onAssignCommand ?? vi.fn().mockResolvedValue(1),
+		onPromptCommand: overrides.onPromptCommand ?? vi.fn().mockResolvedValue(1),
 		onEndJob: overrides.onEndJob ?? vi.fn(),
 		onHandBack: overrides.onHandBack ?? vi.fn(),
 		onClose: overrides.onClose ?? vi.fn()
@@ -272,6 +274,42 @@ describe("InterventionOverlay", () => {
 			renderOverlay({ operatorId: "op-2" });
 
 			expect(screen.queryByTestId("assign-input")).not.toBeInTheDocument();
+		});
+	});
+
+	describe("prompt command", () => {
+		const enter = (text: string) => fireEvent.input(screen.getByTestId("prompt-input"), { target: { value: text } });
+
+		it("submits the prompt, blocks input while it converts, then clears it and shows the loading state", async () => {
+			let resolveSend: (id: number) => void = () => {};
+			const onPromptCommand = vi.fn().mockReturnValue(new Promise<number>((resolve) => (resolveSend = resolve)));
+			renderOverlay({ onPromptCommand });
+			await enter("Click the Save button");
+
+			await fireEvent.click(screen.getByRole("button", { name: "Prompt" }));
+
+			expect(onPromptCommand).toHaveBeenCalledWith("Click the Save button");
+			expect(screen.getByTestId("prompt-input")).toBeDisabled();
+			resolveSend(4);
+			expect(await screen.findByTestId("command-loading")).toBeInTheDocument();
+			await waitFor(() => expect(screen.getByTestId("prompt-input")).toHaveValue(""));
+		});
+
+		it("shows Hub's rejection and keeps the typed text", async () => {
+			renderOverlay({ onPromptCommand: vi.fn().mockRejectedValue(new Error("LLM did not return a valid next Step")) });
+			await enter("Do something odd");
+
+			await fireEvent.click(screen.getByRole("button", { name: "Prompt" }));
+
+			expect(await screen.findByTestId("command-error")).toHaveTextContent("did not return a valid");
+			expect(screen.getByTestId("prompt-input")).toHaveValue("Do something odd");
+			expect(screen.getByTestId("prompt-input")).not.toBeDisabled();
+		});
+
+		it("offers no prompt input to a non-owner", () => {
+			renderOverlay({ operatorId: "op-2" });
+
+			expect(screen.queryByTestId("prompt-input")).not.toBeInTheDocument();
 		});
 	});
 

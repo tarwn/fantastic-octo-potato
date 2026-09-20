@@ -200,6 +200,7 @@ export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string,
 export type PendingCommand = { id: number; stepId: string } & (
 	| { kind: "click"; payload: { x: number; y: number } }
 	| { kind: "assign"; payload: { name: string; value: string | number | boolean } }
+	| { kind: "prompt"; payload: { step: ChildStep } }
 );
 
 export interface CommandResult {

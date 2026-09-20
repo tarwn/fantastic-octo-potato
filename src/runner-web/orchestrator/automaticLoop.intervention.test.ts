@@ -205,6 +205,26 @@ describe("runRecipeJobLoop: operator commands", () => {
 		expect(uploadArtifact).toHaveBeenCalledWith(config, job.comms.artifactsUrl, "intervention-8", expect.any(String));
 	}, 20000);
 
+	it("runs a prompt command's Step under the command's Step id and reports its result", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce({
+			id: 9,
+			stepId: "intervention-9",
+			kind: "prompt",
+			payload: { step: { id: "llm_chosen_id", action: "click", args: [{ by: "point", x: 30, y: 40 }], intent: "Click the button" } }
+		});
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 0.3);
+
+		expect(executeAction).toHaveBeenCalledWith(
+			expect.anything(),
+			{ id: "intervention-9", action: "click", args: [{ by: "point", x: 30, y: 40 }], intent: "Click the button" },
+			expect.anything()
+		);
+		expect(reportCommandResult).toHaveBeenCalledWith(config, 42, 9, { outcome: "succeeded", targetDescription: expect.any(Object) });
+		expect(uploadArtifact).toHaveBeenCalledWith(config, job.comms.artifactsUrl, "intervention-9", expect.any(String));
+	}, 20000);
+
 	it("resets the idle timeout after each command", async () => {
 		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
 		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);

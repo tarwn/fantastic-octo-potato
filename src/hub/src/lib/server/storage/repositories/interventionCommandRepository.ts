@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { toDbDate } from "../db/dates.ts";
 import { JobStatus } from "../db/jobStatus.ts";
 
-export type InterventionCommandKind = "click" | "assign";
+export type InterventionCommandKind = "click" | "assign" | "prompt";
 
 export interface InterventionCommand {
 	id: number;
@@ -71,4 +71,8 @@ export function completeInterventionCommand(db: Database.Database, jobId: number
 
 export function voidPendingInterventionCommands(db: Database.Database, jobId: number): void {
 	db.prepare("UPDATE intervention_command SET status = 'Voided' WHERE job_id = ? AND status = 'Pending'").run(jobId);
+}
+
+export function getInterventionCommandByKey(db: Database.Database, jobId: number, commandKey: string): InterventionCommand | undefined {
+	return db.prepare(`SELECT ${COLUMNS} FROM intervention_command WHERE job_id = ? AND command_key = ?`).get(jobId, commandKey) as InterventionCommand | undefined;
 }

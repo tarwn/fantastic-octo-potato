@@ -4,5 +4,5 @@ This is the plan for [0012-human-intervention/spec.md](./spec.md).
 - [x] 2. Hand back and resume
 - [x] 3. Click command
 - [x] 4. Assign command
-- [ ] 5. Prompt command
+- [x] 5. Prompt command
 - [ ] 6. Docs

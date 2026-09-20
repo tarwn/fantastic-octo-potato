@@ -166,3 +166,7 @@ export function submitClickCommand(id: number, operatorId: string, commandKey: s
 export function submitAssignCommand(id: number, operatorId: string, commandKey: string, name: string, value: string): Promise<number> {
 	return submitCommand(id, { operatorId, commandKey, kind: "assign", name, value });
 }
+
+export function submitPromptCommand(id: number, operatorId: string, commandKey: string, prompt: string): Promise<number> {
+	return submitCommand(id, { operatorId, commandKey, kind: "prompt", prompt });
+}

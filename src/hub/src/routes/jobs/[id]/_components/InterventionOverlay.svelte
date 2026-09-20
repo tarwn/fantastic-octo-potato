@@ -17,6 +17,7 @@
 		endError,
 		onClickCommand,
 		onAssignCommand,
+		onPromptCommand,
 		onHandBack,
 		onEndJob,
 		onClose
@@ -26,6 +27,7 @@
 		endError: string | null;
 		onClickCommand: (x: number, y: number) => Promise<number>;
 		onAssignCommand: (name: string, value: string) => Promise<number>;
+		onPromptCommand: (prompt: string) => Promise<number>;
 		onHandBack: (resumeStepId: string) => void;
 		onEndJob: () => void;
 		onClose: (notice: string | null) => void;
@@ -47,6 +49,9 @@
 	let pendingStepId = $state<string | null>(null);
 	let commandError = $state<string | null>(null);
 	let assignText = $state("");
+	let promptText = $state("");
+	// A prompt waits on the LLM before Hub accepts it, so input stays blocked until the submit returns.
+	let submitting = $state(false);
 	const commandPending = $derived(
 		pendingStepId !== null &&
 		!(
@@ -54,7 +59,7 @@
 			job.artifacts.some((artifact) => artifact.stepId === pendingStepId)
 		)
 	);
-	const busy = $derived(handingBack || commandPending);
+	const busy = $derived(handingBack || commandPending || submitting);
 
 	$effect(() => {
 		dialogEl?.showModal();
@@ -83,11 +88,15 @@
 
 	async function submit(send: () => Promise<number>) {
 		commandError = null;
+		submitting = true;
 		try {
 			pendingStepId = interventionStepId(await send());
 		}
 		catch (err) {
 			commandError = err instanceof Error ? err.message : "Failed to send command";
+		}
+		finally {
+			submitting = false;
 		}
 	}
 
@@ -101,6 +110,14 @@
 		await submit(() => onAssignCommand(assignText.slice(0, separator).trim(), assignText.slice(separator + 1)));
 		if (commandError === null) {
 			assignText = "";
+		}
+	}
+
+	async function handlePrompt(event: SubmitEvent) {
+		event.preventDefault();
+		await submit(() => onPromptCommand(promptText.trim()));
+		if (commandError === null) {
+			promptText = "";
 		}
 	}
 
@@ -161,6 +178,10 @@
 			<form class="assign-form" onsubmit={handleAssign}>
 				<input type="text" bind:value={assignText} disabled={busy} placeholder="name=value" aria-label="Assign an output" data-testid="assign-input" />
 				<button type="submit" class="btn" disabled={busy || assignText.trim() === ""}>Assign</button>
+			</form>
+			<form class="assign-form" onsubmit={handlePrompt}>
+				<input type="text" bind:value={promptText} disabled={busy} placeholder="Describe one action" aria-label="Prompt an action" data-testid="prompt-input" />
+				<button type="submit" class="btn" disabled={busy || promptText.trim() === ""}>Prompt</button>
 			</form>
 			<label class="resume-select">
 				Resume at

@@ -1,13 +1,16 @@
 import type Database from "better-sqlite3";
 
 import { collectResumableStepIds } from "../../recipeStepIds";
-import type { FieldDeclaration } from "../../types/recipeDefinition";
+import type { ChildStep, FieldDeclaration } from "../../types/recipeDefinition";
+import { NextStepInvalidResponseError } from "../llm/nextStep";
+import { JobStatus } from "../storage/db/jobStatus";
 import { JobType } from "../storage/db/jobType";
 import { SensitivityType } from "../storage/db/sensitivityType";
-import { insertInterventionCommand,type InterventionCommandKind } from "../storage/repositories/interventionCommandRepository";
+import { getInterventionCommandByKey, insertInterventionCommand, type InterventionCommand, type InterventionCommandKind } from "../storage/repositories/interventionCommandRepository";
 import { endJobAsOwner, getJobById, handBackJobAsOwner, type Job, maskValue, takeJobControl } from "../storage/repositories/jobRepository";
 import { getRecipeById } from "../storage/repositories/recipeRepository";
 
+import { convertPromptToStep, isCommandAction } from "./interventionPrompt";
 import { isRecord, type JobActionResult } from "./types";
 
 function findRecipeJob(db: Database.Database, rawId: string): Extract<Job, { jobType: JobType.Recipe }> | JobActionResult {
@@ -147,6 +150,30 @@ function buildCommandPayloads(
 	return parseAssignPayload(recipe.definition.outputs, body);
 }
 
+function persistCommand(
+	db: Database.Database,
+	job: Extract<Job, { jobType: JobType.Recipe }>,
+	operatorId: string,
+	commandKey: string,
+	kind: InterventionCommandKind,
+	payloads: { rawPayload: string; safePayload: string }
+): JobActionResult {
+	const result = insertInterventionCommand(db, { jobId: job.id, operatorId, commandKey, kind, ...payloads, now: new Date() });
+	if (!("command" in result)) {
+		const errors = {
+			busy: `Job ${job.id} already has a command pending`,
+			keyReused: "commandKey was already used for a different command",
+			notOwner: `Job ${job.id} is not currently owned by this operator`
+		};
+		return { status: 409, body: { error: errors[result.outcome] } };
+	}
+	return { status: 200, body: { data: toCommandResponse(result.command) } };
+}
+
+function toCommandResponse({ id, commandKey, kind, status, safePayload }: InterventionCommand) {
+	return { id, commandKey, kind, status, safePayload: JSON.parse(safePayload) as unknown };
+}
+
 // Validated before anything is persisted for the Runner: invalid input is returned to the overlay
 // and creates no command. The response only ever carries the safe form of the command.
 export function submitCommand(db: Database.Database, rawId: string, body: unknown): JobActionResult {
@@ -170,15 +197,56 @@ export function submitCommand(db: Database.Database, rawId: string, body: unknow
 		return { status: 400, body: { error: payloads } };
 	}
 
-	const result = insertInterventionCommand(db, { jobId: job.id, operatorId, commandKey: body.commandKey, kind, ...payloads, now: new Date() });
-	if (!("command" in result)) {
-		const errors = {
-			busy: `Job ${rawId} already has a command pending`,
-			keyReused: "commandKey was already used for a different command",
-			notOwner: `Job ${rawId} is not currently owned by this operator`
-		};
-		return { status: 409, body: { error: errors[result.outcome] } };
+	return persistCommand(db, job, operatorId, body.commandKey, kind, payloads);
+}
+
+// The only LLM call in Human Intervention: made after the cheap rejections, and nothing is persisted unless the Step is valid.
+export async function submitPromptCommand(db: Database.Database, rawId: string, body: unknown): Promise<JobActionResult> {
+	const operatorId = parseOperatorId(body);
+	if (operatorId === undefined || !isRecord(body)) {
+		return { status: 400, body: { error: "operatorId is required" } };
 	}
-	const { id, commandKey, status, safePayload } = result.command;
-	return { status: 200, body: { data: { id, commandKey, kind, status, safePayload: JSON.parse(safePayload) as unknown } } };
+	if (typeof body.commandKey !== "string" || body.commandKey.trim() === "") {
+		return { status: 400, body: { error: "commandKey is required" } };
+	}
+	if (typeof body.prompt !== "string" || body.prompt.trim() === "") {
+		return { status: 400, body: { error: "prompt is required" } };
+	}
+	const { commandKey, prompt } = body;
+	const job = findRecipeJob(db, rawId);
+	if (isJobActionResult(job)) {
+		return job;
+	}
+
+	if (job.jobStatusId !== JobStatus.InteractiveUser || job.interventionOwner !== operatorId) {
+		return { status: 409, body: { error: `Job ${rawId} is not currently owned by this operator` } };
+	}
+
+	const existing = getInterventionCommandByKey(db, job.id, commandKey);
+	if (existing) {
+		const samePrompt = existing.kind === "prompt" && (JSON.parse(existing.rawPayload) as { prompt: string }).prompt === prompt;
+		return samePrompt ? { status: 200, body: { data: toCommandResponse(existing) } } : { status: 409, body: { error: "commandKey was already used for a different command" } };
+	}
+
+	const recipe = job.details.recipeId === null ? undefined : getRecipeById(db, job.details.recipeId);
+	if (!recipe) {
+		throw new Error(`Job ${job.id} references a Recipe that no longer exists`);
+	}
+	let step: ChildStep;
+	try {
+		step = await convertPromptToStep(db, job.id, recipe.definition, prompt);
+	}
+	catch (err) {
+		if (!(err instanceof NextStepInvalidResponseError)) {
+			throw err;
+		}
+		return { status: 422, body: { error: err.message } };
+	}
+	if (!isCommandAction(step)) {
+		return { status: 422, body: { error: `The prompt was converted to a "${step.action}" Step, which can't be run as a command` } };
+	}
+
+	// Only the action and intent are safe to show: the Step's literal values can carry what the operator typed.
+	const safePayload = JSON.stringify({ action: step.action, intent: step.intent });
+	return persistCommand(db, job, operatorId, commandKey, "prompt", { rawPayload: JSON.stringify({ prompt, step }), safePayload });
 }

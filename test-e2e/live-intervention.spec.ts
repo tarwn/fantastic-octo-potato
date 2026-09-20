@@ -1,6 +1,7 @@
 import { type APIRequestContext, type Browser, expect, type Page, test } from "@playwright/test";
 import type { ChildProcess } from "node:child_process";
 
+import { getLlmRequestCount, resetLlmStub, scriptLlmResponses } from "./llm-stub/client.ts";
 import { fetchRecipes, findBambooInvoiceApp, spawnRunner } from "./training-run-helpers.ts";
 
 // End-to-end guards for spec 0013 Step 1: a blocked Recipe Job shows up in the Hub, one operator
@@ -243,6 +244,34 @@ test.describe("live human intervention shell (spec 0013 Step 1)", () => {
 		const detailText = await detailResponse.text();
 		expect(detailText).toContain("Paid in full");
 		expect(detailText).not.toContain("hunter2");
+	});
+
+	test("the owner prompts an action: the LLM converts it once, the Step runs, and hand back completes the Job", async ({ page, request, baseURL }) => {
+		const blocked = await createBlockedRecipeJob(request);
+		await resetLlmStub();
+		await scriptLlmResponses([{ content: JSON.stringify({ id: "click_corner", action: "click", args: [{ by: "point", x: 5, y: 5 }], intent: "Click the corner" }) }]);
+		try {
+			await page.goto(`/jobs/${blocked.jobId}`);
+			runner = spawnRunner(baseURL!, runnerOutput);
+
+			await page.getByRole("button", { name: "Take Control" }).click({ timeout: 60_000 });
+			const overlay = page.getByRole("dialog");
+			expect(await getLlmRequestCount()).toBe(0);
+
+			await overlay.getByTestId("prompt-input").fill("Click the top left corner");
+			await overlay.getByRole("button", { name: "Prompt" }).click();
+			await expect(overlay.getByRole("list", { name: "Recent transcript" })).toContainText(/intervention-d+: (succeeded|failed)/, { timeout: 30_000 });
+			await expect(overlay.getByTestId("command-loading")).toHaveCount(0);
+			expect(await getLlmRequestCount()).toBe(1);
+
+			await overlay.getByTestId("resume-step").selectOption("complete");
+			await overlay.getByRole("button", { name: "Hand Back" }).click();
+			await expect.poll(() => jobStatusOf(request, blocked.jobId), { timeout: 30_000 }).toBe(3);
+			expect(await getLlmRequestCount()).toBe(1);
+		}
+		finally {
+			await resetLlmStub();
+		}
 	});
 
 	test("cancelling a Job under human control closes the overlay and shows the new status", async ({ page, request, baseURL }) => {
