@@ -1,24 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runRecipeJobLoop } from "./orchestrator/automaticLoop.ts";
+import { runTrainingJobLoop } from "./orchestrator/trainingLoop.ts";
 import type { RunnerConfig } from "./config.ts";
 import { log } from "./logger.ts";
 import { startPollLoop } from "./pollLoop.ts";
-import { type ClaimedJob, pollRunner, reportStep, RunnerHttpError } from "./runnerClient.ts";
+import type { ClaimedJob } from "./runnerClient.ts";
+import { pollRunner } from "./runnerClient.ts";
 
 vi.mock("./runnerClient.ts", () => ({
 	pollRunner: vi.fn(),
-	reportStep: vi.fn(),
-	isRecipeJob: (job: unknown) => typeof job === "object" && job !== null && "recipe" in job,
-	RunnerHttpError: class RunnerHttpError extends Error {
-		status: number;
-		constructor(status: number, message: string) {
-			super(message);
-			this.status = status;
-		}
-	}
+	isRecipeJob: (job: unknown) => typeof job === "object" && job !== null && "recipe" in job
 }));
 vi.mock("./orchestrator/automaticLoop.ts", () => ({ runRecipeJobLoop: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("./orchestrator/trainingLoop.ts", () => ({ runTrainingJobLoop: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("./logger.ts", () => ({ log: vi.fn() }));
 
 const config: RunnerConfig = {
@@ -64,119 +59,57 @@ describe("startPollLoop", () => {
 		clearInterval(timer);
 	});
 
-	it("runs the claimed Job's step loop, reporting each step until a terminal response, then resumes polling", async () => {
-		const job: ClaimedJob = {
+	it("dispatches a claimed Training Run Job (no `recipe` field) to the Training loop", async () => {
+		const trainingJob: ClaimedJob = {
 			id: 7,
 			goal: "Learn the thing",
+			alternateGoals: [],
 			startingUrl: "https://example.com/start",
 			allowlist: "https://example.com",
 			maxSteps: 5,
-			nextStep: { sequence: 1, kind: "step", text: "navigate to starting URL" }
+			stepTimeoutMs: 15000,
+			syntheticDataConfirmed: false,
+			ingredients: { startingUrl: "https://example.com/start" },
+			sensitiveIngredientNames: [],
+			nextStep: { id: "open_starting_url", action: "open", args: [{ ref: "input", name: "startingUrl" }] }
 		};
-		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
-		vi.mocked(reportStep)
-			.mockResolvedValueOnce({
-				jobStatusId: 2,
-				nextStep: { sequence: 2, kind: "step", text: "extract sample_field", resultField: "sample_field", resultValue: "sample-value" }
-			})
-			.mockResolvedValueOnce({ jobStatusId: 3 });
+		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job: trainingJob }).mockResolvedValue({ hasWork: false });
 
 		const timer = startPollLoop(config, 30, 300);
 		await vi.advanceTimersByTimeAsync(30_000);
-		await vi.advanceTimersByTimeAsync(2_000); // flush the step-action delays between the two reported steps
 
-		expect(reportStep).toHaveBeenNthCalledWith(1, config, 7, {
-			kind: "step",
-			sequence: 1,
-			message: "navigate to starting URL",
-			inputs: [],
-			outputs: []
-		});
-		expect(reportStep).toHaveBeenNthCalledWith(2, config, 7, {
-			kind: "step",
-			sequence: 2,
-			message: "extract sample_field",
-			inputs: [],
-			outputs: [{ fieldName: "sample_field", value: "sample-value" }]
-		});
-		expect(log).toHaveBeenCalledWith("job 7: reached a terminal status, resuming polling");
-
-		await vi.advanceTimersByTimeAsync(30_000);
-		expect(pollRunner).toHaveBeenCalledTimes(2);
-
-		clearInterval(timer);
-	});
-
-	it("abandons the Job loop back to polling on a 403/404 from reportStep", async () => {
-		const job: ClaimedJob = {
-			id: 8,
-			goal: "Learn the thing",
-			startingUrl: "https://example.com/start",
-			allowlist: "https://example.com",
-			maxSteps: 5,
-			nextStep: { sequence: 1, kind: "step", text: "navigate to starting URL" }
-		};
-		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
-		vi.mocked(reportStep).mockRejectedValueOnce(new RunnerHttpError(403, "reportStep failed: 403 not the owner"));
-
-		const timer = startPollLoop(config, 30, 300);
-		await vi.advanceTimersByTimeAsync(30_000);
-		await vi.advanceTimersByTimeAsync(1_000); // flush the step-action delay before the rejected reportStep call
-
-		expect(log).toHaveBeenCalledWith("job 8: reportStep 403, abandoning job loop back to polling: reportStep failed: 403 not the owner");
-
-		await vi.advanceTimersByTimeAsync(30_000);
-		expect(pollRunner).toHaveBeenCalledTimes(2);
-
-		clearInterval(timer);
-	});
-
-	it("logs and abandons the Job loop back to polling on a non-HTTP reportStep failure, without an unhandled rejection", async () => {
-		const job: ClaimedJob = {
-			id: 10,
-			goal: "Learn the thing",
-			startingUrl: "https://example.com/start",
-			allowlist: "https://example.com",
-			maxSteps: 5,
-			nextStep: { sequence: 1, kind: "step", text: "navigate to starting URL" }
-		};
-		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
-		vi.mocked(reportStep).mockRejectedValueOnce(new Error("network down"));
-
-		const timer = startPollLoop(config, 30, 300);
-		await vi.advanceTimersByTimeAsync(30_000);
-		await vi.advanceTimersByTimeAsync(1_000); // flush the step-action delay before the rejected reportStep call
-
-		expect(log).toHaveBeenCalledWith("job 10: reportStep failed, abandoning job loop back to polling: network down");
-
-		await vi.advanceTimersByTimeAsync(30_000);
-		expect(pollRunner).toHaveBeenCalledTimes(2);
+		expect(runTrainingJobLoop).toHaveBeenCalledWith(config, trainingJob);
+		expect(runRecipeJobLoop).not.toHaveBeenCalled();
 
 		clearInterval(timer);
 	});
 
 	it("skips poll ticks while the Job loop is running, so it doesn't claim a second Job concurrently", async () => {
-		const job: ClaimedJob = {
+		const trainingJob: ClaimedJob = {
 			id: 9,
 			goal: "Learn the thing",
+			alternateGoals: [],
 			startingUrl: "https://example.com/start",
 			allowlist: "https://example.com",
 			maxSteps: 5,
-			nextStep: { sequence: 1, kind: "step", text: "navigate to starting URL" }
+			stepTimeoutMs: 15000,
+			syntheticDataConfirmed: false,
+			ingredients: {},
+			sensitiveIngredientNames: [],
+			nextStep: { id: "open_starting_url", action: "open", args: [{ ref: "input", name: "startingUrl" }] }
 		};
-		let resolveReportStep!: (value: { jobStatusId: number }) => void;
-		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job }).mockResolvedValue({ hasWork: false });
-		vi.mocked(reportStep).mockReturnValueOnce(new Promise((resolve) => (resolveReportStep = resolve)));
+		let resolveTrainingLoop!: () => void;
+		vi.mocked(pollRunner).mockResolvedValueOnce({ hasWork: true, job: trainingJob }).mockResolvedValue({ hasWork: false });
+		vi.mocked(runTrainingJobLoop).mockReturnValueOnce(new Promise((resolve) => (resolveTrainingLoop = resolve)));
 
 		const timer = startPollLoop(config, 30, 300);
 		await vi.advanceTimersByTimeAsync(30_000);
-		await vi.advanceTimersByTimeAsync(1_000); // flush the step-action delay so reportStep's pending promise is in flight
 		expect(pollRunner).toHaveBeenCalledTimes(1);
 
-		await vi.advanceTimersByTimeAsync(29_000);
+		await vi.advanceTimersByTimeAsync(30_000);
 		expect(pollRunner).toHaveBeenCalledTimes(1);
 
-		resolveReportStep({ jobStatusId: 3 });
+		resolveTrainingLoop();
 		await vi.advanceTimersByTimeAsync(0);
 
 		await vi.advanceTimersByTimeAsync(30_000);
@@ -185,7 +118,7 @@ describe("startPollLoop", () => {
 		clearInterval(timer);
 	});
 
-	it("dispatches a claimed Recipe Job (carrying a `recipe` field) to the Automatic Loop, not the Training step loop", async () => {
+	it("dispatches a claimed Recipe Job (carrying a `recipe` field) to the Automatic Loop, not the Training loop", async () => {
 		const recipeJob = {
 			id: 11,
 			mode: "execute",
@@ -203,7 +136,7 @@ describe("startPollLoop", () => {
 		await vi.advanceTimersByTimeAsync(30_000);
 
 		expect(runRecipeJobLoop).toHaveBeenCalledWith(config, recipeJob, 300);
-		expect(reportStep).not.toHaveBeenCalled();
+		expect(runTrainingJobLoop).not.toHaveBeenCalled();
 
 		clearInterval(timer);
 	});

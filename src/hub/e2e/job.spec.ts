@@ -5,8 +5,13 @@ test("Job detail page shows strip, stage, transcript, results, and goals from re
 	const registeredApplication = registeredApplications.data.find(
 		(item: { applicationName: string }) => item.applicationName === "BambooInvoice"
 	);
-	const createResponse = await request.post(`/api/hub/registered-applications/${registeredApplication.id}/jobs`, {
-		data: { goal: "Extract the closing balance", startingUrl: "https://example.com/detail-smoke", maxSteps: 5 }
+	const createResponse = await request.post("/api/hub/jobs/new/training", {
+		data: {
+			goal: "Extract the closing balance",
+			startingUrl: "https://example.com/detail-smoke",
+			maxSteps: 5,
+			registeredApplicationId: registeredApplication.id
+		}
 	});
 	const job = (await createResponse.json()).data;
 

@@ -1,4 +1,4 @@
-import type { RecipeDefinition } from "./dsl/types.ts";
+import type { ChildStep, RecipeDefinition } from "./dsl/types.ts";
 import type { RunnerConfig } from "./config.ts";
 
 export interface InitResult {
@@ -6,7 +6,7 @@ export interface InitResult {
 	interventionTimeoutSeconds: number;
 }
 
-// Mirrors src/hub/src/lib/server/db/jobStatus.ts's hardcoded ids — kept in sync manually, same as
+// Mirrors src/hub/src/lib/server/storage/db/jobStatus.ts's hardcoded ids — kept in sync manually, same as
 // the DSL type mirroring described in dsl/types.ts.
 export enum JobStatus {
 	Pending = 1,
@@ -44,20 +44,24 @@ export function isRecipeJob(job: ClaimedJob | ClaimedRecipeJob): job is ClaimedR
 	return "recipe" in job;
 }
 
-// resultField/resultValue are always sent as a pair (see Hub's toWireStep in runnerActions.ts) —
-// this type says so, rather than leaving callers to fall back on an unreachable default.
-export type JobStep = { sequence: number; kind: string; text: string } & (
-	| { resultField?: undefined; resultValue?: undefined }
-	| { resultField: string; resultValue: string }
-);
-
+// Mirrors buildTrainingRunJobPayload's wire shape in src/hub/src/lib/server/runner/runnerActions.ts.
+// `nextStep` is always a real atomic DSL Step — Hub's first Step is fixed (`open` on `startingUrl`),
+// every one after it LLM-generated — never the old scripted `{sequence,kind,text}` shape.
+// `sensitiveIngredientNames` names which `ingredients` entries need masking in Runner-local
+// screenshots/logs (mirrors ClaimedRecipeJob's recipe.inputs[name].sensitive check, which Training
+// has no upfront Recipe to make).
 export interface ClaimedJob {
 	id: number;
 	goal: string;
+	alternateGoals: string[];
 	startingUrl: string;
 	allowlist: string;
 	maxSteps: number;
-	nextStep: JobStep;
+	stepTimeoutMs: number;
+	syntheticDataConfirmed: boolean;
+	ingredients: Record<string, string>;
+	sensitiveIngredientNames: string[];
+	nextStep: ChildStep;
 }
 
 export interface PollResult {
@@ -65,20 +69,16 @@ export interface PollResult {
 	job?: ClaimedJob | ClaimedRecipeJob;
 }
 
-export interface ReportStepRequest {
-	kind: "step";
-	sequence: number;
-	message: string;
-	inputs: string[];
-	outputs: Array<{ fieldName: string; value: string }>;
-}
-
+// credentialNames is Training-only (jobs/types.ts) — the Runner's only chance to tell Hub what
+// `{ref:"credential"}` names its own RUNNER_CREDENTIAL_* env vars make available, since Hub has no
+// other way to learn them ahead of a next-Step prompt.
 export interface ReportDslStepRequest {
 	kind: "dslStep";
 	stepId: string;
 	outcome: "succeeded" | "failed";
 	parentStepId?: string;
 	extractions: Array<{ fieldName: string; value: string }>;
+	credentialNames?: string[];
 }
 
 export interface ReportStatusRequest {
@@ -94,7 +94,7 @@ export interface ReportInfoRequest {
 
 export interface ReportStepResult {
 	jobStatusId: number;
-	nextStep?: JobStep;
+	nextStep?: ChildStep;
 }
 
 // Carries the HTTP status so callers can distinguish an ownership/unknown-job rejection
@@ -141,7 +141,7 @@ export async function pollRunner(config: RunnerConfig): Promise<PollResult> {
 async function postJobStep(
 	config: RunnerConfig,
 	jobId: number,
-	request: ReportStepRequest | ReportDslStepRequest | ReportStatusRequest | ReportInfoRequest
+	request: ReportDslStepRequest | ReportStatusRequest | ReportInfoRequest
 ): Promise<ReportStepResult> {
 	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/steps`, {
 		method: "POST",
@@ -156,10 +156,6 @@ async function postJobStep(
 
 	const body = (await response.json()) as { data: ReportStepResult };
 	return body.data;
-}
-
-export async function reportStep(config: RunnerConfig, jobId: number, request: ReportStepRequest): Promise<ReportStepResult> {
-	return postJobStep(config, jobId, request);
 }
 
 // Reports one DSL Step's (or child Step's) outcome; extractions carry the raw resolved value to

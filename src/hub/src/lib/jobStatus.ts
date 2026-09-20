@@ -2,7 +2,7 @@ import type { StatusVariant } from "./components/statusVariants";
 
 // Values mirror the explicit, hardcoded ids seeded for job_status in
 // db/migrations/20260915234029_create_job_tables.sql — keep both in sync.
-// Client-safe copy of $lib/server/db/jobStatus.ts's JobStatus enum, since
+// Client-safe copy of $lib/server/storage/db/jobStatus.ts's JobStatus enum, since
 // server modules can't be imported from client-visible code.
 export enum JobStatus {
 	Pending = 1,

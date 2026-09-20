@@ -9,7 +9,7 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 	await page.getByRole("button", { name: "Begin a Training Run" }).click();
 
 	const dialog = page.getByRole("dialog");
-	await dialog.getByLabel(/goal/i).fill("Extract the invoice total");
+	await dialog.getByLabel(/primary goal/i).fill("Extract the invoice total");
 	await dialog.getByLabel(/starting url/i).fill("https://example.com/start");
 	await dialog.getByLabel(/maximum steps/i).fill("5");
 	await dialog.getByRole("button", { name: /start/i }).click();
@@ -32,11 +32,11 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 
 	const stepResponse = await request.post(`/api/runner/runners/${runnerId}/jobs/${jobId}/steps`, {
 		headers: { authorization: "Bearer change-me" },
-		data: { sequence: 1, kind: "step", message: "Open the starting URL", inputs: [], outputs: [] }
+		data: { kind: "dslStep", stepId: "open_starting_url", outcome: "succeeded", extractions: [] }
 	});
 	expect(stepResponse.status()).toBe(200);
 
 	// no page.reload() — the Job detail page's RefreshIndicator drives this refetch on its own.
 	await expect(page.getByText("Running", { exact: true }).first()).toBeVisible({ timeout: 8000 });
-	await expect(page.getByText("Open the starting URL")).toBeVisible();
+	await expect(page.getByText("open_starting_url: succeeded")).toBeVisible();
 });

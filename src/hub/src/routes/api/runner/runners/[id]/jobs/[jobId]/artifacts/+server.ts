@@ -2,9 +2,9 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
-import { uploadJobStepArtifact } from "$lib/server/runnerActions";
-import { requireRunnerSharedSecret } from "$lib/server/runnerConfig";
+import { uploadJobStepArtifact } from "$lib/server/runner/runnerActions";
+import { requireRunnerSharedSecret } from "$lib/server/runner/runnerConfig";
+import { getDb } from "$lib/server/storage/db/db";
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	const body = await request.json();

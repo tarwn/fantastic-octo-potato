@@ -8,8 +8,15 @@
 		open,
 		onClose,
 		registeredApplicationId,
-		mode
-	}: { open: boolean; onClose: () => void; registeredApplicationId: number; mode: "Trial" | "Execute" } = $props();
+		mode,
+		initialRecipeId = null
+	}: {
+		open: boolean;
+		onClose: () => void;
+		registeredApplicationId: number;
+		mode: "Trial" | "Execute";
+		initialRecipeId?: number | null;
+	} = $props();
 
 	const recipeState = $derived(mode === "Trial" ? "Draft" : "Published");
 	const title = $derived(mode === "Trial" ? "Start Trial" : "Start Job");
@@ -43,7 +50,8 @@
 		try {
 			const all = await fetchRecipes(registeredApplicationId);
 			recipes = all.filter((recipe) => recipe.state === recipeState);
-			selectedRecipeId = recipes[0]?.id ?? null;
+			const preselected = initialRecipeId !== null && recipes.some((recipe) => recipe.id === initialRecipeId) ? initialRecipeId : null;
+			selectedRecipeId = preselected ?? recipes[0]?.id ?? null;
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load Recipes";

@@ -2,10 +2,10 @@ import { json } from "@sveltejs/kit";
 
 import type { RequestHandler } from "./$types";
 
-import { getDb } from "$lib/server/db/db";
-import { getRegisteredApplicationById } from "$lib/server/repositories/customerApplicationXrefRepository";
-import { listRunningJobIdsByRunnerId } from "$lib/server/repositories/jobRepository";
-import { listRunnersByCustomerApplicationXrefId } from "$lib/server/repositories/runnerRepository";
+import { getDb } from "$lib/server/storage/db/db";
+import { getRegisteredApplicationById } from "$lib/server/storage/repositories/customerApplicationXrefRepository";
+import { listRunningJobIdsByRunnerId } from "$lib/server/storage/repositories/jobRepository";
+import { listRunnersByCustomerApplicationXrefId } from "$lib/server/storage/repositories/runnerRepository";
 import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
 
 export const GET: RequestHandler = ({ params }) => {

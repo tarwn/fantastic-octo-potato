@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
+	import CompiledRecipeLink from "./_components/CompiledRecipeLink.svelte";
 	import GoalsPanel from "./_components/GoalsPanel.svelte";
 	import JobStrip from "./_components/JobStrip.svelte";
 	import ResultsPanel from "./_components/ResultsPanel.svelte";
@@ -10,6 +11,7 @@
 
 	import { page } from "$app/state";
 	import { cancelJob, fetchJob } from "$lib/api/jobsApi";
+	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
@@ -23,6 +25,7 @@
 
 	let job = $state<JobDetail | null>(null);
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
+	let compiledRecipe = $state<RecipeSummary | null>(null);
 	let loadError = $state<string | null>(null);
 	let cancelError = $state<string | null>(null);
 	let lastRefreshedOn = $state(new Date());
@@ -34,6 +37,10 @@
 			const loadedJob = await fetchJob(jobId);
 			job = loadedJob;
 			registeredApplication = await fetchRegisteredApplication(loadedJob.customerApplicationXrefId);
+			if (loadedJob.jobType === JobType.TrainingRun) {
+				const recipes = await fetchRecipes(loadedJob.customerApplicationXrefId);
+				compiledRecipe = recipes.find((recipe) => recipe.sourceTrainingRunId === String(loadedJob.id)) ?? null;
+			}
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load Job";
@@ -80,7 +87,7 @@
 <div class="job-page">
 	{#if loadError}
 		<p class="job-page-message">{loadError}</p>
-	{:else if job && registeredApplication && job.jobType === JobType.Training}
+	{:else if job && registeredApplication && job.jobType === JobType.TrainingRun}
 		<div class="job-page-content">
 			<div class="job-page-eyebrow">
 				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>
@@ -108,6 +115,7 @@
 				jobStatusId={job.jobStatusId}
 			/>
 			<StageSummary {job} stepsTaken={job.transcript.filter((entry) => entry.kind === TranscriptKind.Step).length} />
+			<CompiledRecipeLink recipe={compiledRecipe} registeredApplicationId={job.customerApplicationXrefId} />
 
 			<div class="job-page-panels">
 				<TranscriptPanel entries={job.transcript} />

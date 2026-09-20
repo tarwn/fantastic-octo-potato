@@ -33,13 +33,16 @@ describe("StartTrainingModal", () => {
 		vi.mocked(startTrainingRun).mockResolvedValue({
 			id: 42,
 			customerApplicationXrefId: 1,
-			jobType: JobType.Training,
+			jobType: JobType.TrainingRun,
 			jobStatusId: 1,
 			details: {
 				goal: "Extract invoices",
 				startingUrl: "https://example.com",
 				allowlist: "https://example.com",
-				maxSteps: 10
+				maxSteps: 10,
+				alternateGoals: [],
+				syntheticDataConfirmed: false,
+				stepTimeoutMs: 15000
 			},
 			runnerId: null,
 			createdAt: new Date(),
@@ -52,7 +55,7 @@ describe("StartTrainingModal", () => {
 	it("shows goal, starting URL, and maximum steps fields when open", () => {
 		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
-		expect(screen.getByLabelText(/goal/i)).toBeInTheDocument();
+		expect(screen.getByLabelText(/primary goal/i)).toBeInTheDocument();
 		expect(screen.getByLabelText(/starting url/i)).toBeInTheDocument();
 		expect(screen.getByLabelText(/maximum steps/i)).toBeInTheDocument();
 	});
@@ -68,7 +71,7 @@ describe("StartTrainingModal", () => {
 	it("shows an invalid-URL message for a non-URL starting URL value", async () => {
 		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
-		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/primary goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "not-a-url" } });
 		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
 		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
@@ -79,7 +82,7 @@ describe("StartTrainingModal", () => {
 	it("shows a positive-integer message for a non-positive maximum steps value", async () => {
 		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
-		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/primary goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
 		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "0" } });
 		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
@@ -90,7 +93,7 @@ describe("StartTrainingModal", () => {
 	it("shows no validation messages once all fields are valid", async () => {
 		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1 });
 
-		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/primary goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
 		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
 		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
@@ -103,7 +106,7 @@ describe("StartTrainingModal", () => {
 	it("submits the Training Run and navigates to the new Job's detail page", async () => {
 		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 7 });
 
-		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/primary goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
 		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
 		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
@@ -111,16 +114,37 @@ describe("StartTrainingModal", () => {
 		expect(startTrainingRun).toHaveBeenCalledWith(7, {
 			goal: "Extract invoices",
 			startingUrl: "https://example.com",
-			maxSteps: 10
+			maxSteps: 10,
+			alternateGoals: [],
+			syntheticDataConfirmed: false
 		});
 		expect(goto).toHaveBeenCalledWith("/jobs/42");
+	});
+
+	it("includes alternate goals and the synthetic-data confirmation when submitted", async () => {
+		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 7 });
+
+		await fireEvent.input(screen.getByLabelText(/primary goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
+		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
+		await fireEvent.input(screen.getByLabelText(/alternate goals/i), { target: { value: "Also capture the due date\n\nAlso capture the vendor" } });
+		await fireEvent.click(screen.getByLabelText(/synthetic/i));
+		await fireEvent.click(screen.getByRole("button", { name: /start/i }));
+
+		expect(startTrainingRun).toHaveBeenCalledWith(7, {
+			goal: "Extract invoices",
+			startingUrl: "https://example.com",
+			maxSteps: 10,
+			alternateGoals: ["Also capture the due date", "Also capture the vendor"],
+			syntheticDataConfirmed: true
+		});
 	});
 
 	it("shows a server error inline instead of navigating when the submit call fails", async () => {
 		vi.mocked(startTrainingRun).mockRejectedValue(new Error("Registered Application 7 not found"));
 		render(StartTrainingModal, { open: true, onClose: vi.fn(), registeredApplicationId: 7 });
 
-		await fireEvent.input(screen.getByLabelText(/goal/i), { target: { value: "Extract invoices" } });
+		await fireEvent.input(screen.getByLabelText(/primary goal/i), { target: { value: "Extract invoices" } });
 		await fireEvent.input(screen.getByLabelText(/starting url/i), { target: { value: "https://example.com" } });
 		await fireEvent.input(screen.getByLabelText(/maximum steps/i), { target: { value: "10" } });
 		await fireEvent.click(screen.getByRole("button", { name: /start/i }));

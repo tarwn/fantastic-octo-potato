@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RunnerConfig } from "./config.ts";
-import { initRunner, pollRunner, reportStep, RunnerHttpError } from "./runnerClient.ts";
+import { initRunner, pollRunner, reportDslStep, RunnerHttpError } from "./runnerClient.ts";
 
 const config: RunnerConfig = {
 	hubUrl: "http://localhost:4173",
@@ -63,32 +63,30 @@ describe("pollRunner", () => {
 	});
 });
 
-describe("reportStep", () => {
-	it("posts to the steps endpoint with bearer auth and the reported step body", async () => {
+describe("reportDslStep", () => {
+	it("posts to the steps endpoint with bearer auth and the reported dslStep body", async () => {
 		const fetchMock = vi.mocked(fetch);
 		fetchMock.mockResolvedValue(
-			new Response(JSON.stringify({ data: { jobStatusId: 2, nextStep: { sequence: 2, kind: "step", text: "next" } } }), {
+			new Response(JSON.stringify({ data: { jobStatusId: 2, nextStep: { id: "next", action: "click", args: [{ by: "css", value: "#go" }] } } }), {
 				status: 200
 			})
 		);
 
-		const result = await reportStep(config, 42, { kind: "step", sequence: 1, message: "did it", inputs: [], outputs: [] });
+		const result = await reportDslStep(config, 42, { stepId: "s1", outcome: "succeeded", extractions: [] });
 
 		expect(fetchMock).toHaveBeenCalledWith("http://localhost:4173/api/runner/runners/1/jobs/42/steps", {
 			method: "POST",
 			headers: { authorization: "Bearer the-secret", "content-type": "application/json" },
-			body: JSON.stringify({ kind: "step", sequence: 1, message: "did it", inputs: [], outputs: [] })
+			body: JSON.stringify({ kind: "dslStep", stepId: "s1", outcome: "succeeded", extractions: [] })
 		});
-		expect(result).toEqual({ jobStatusId: 2, nextStep: { sequence: 2, kind: "step", text: "next" } });
+		expect(result).toEqual({ jobStatusId: 2, nextStep: { id: "next", action: "click", args: [{ by: "css", value: "#go" }] } });
 	});
 
 	it("throws a RunnerHttpError carrying the status when the response is not ok", async () => {
 		const fetchMock = vi.mocked(fetch);
 		fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: "not the owner" }), { status: 403 }));
 
-		const error = await reportStep(config, 42, { kind: "step", sequence: 1, message: "x", inputs: [], outputs: [] }).catch(
-			(err: unknown) => err
-		);
+		const error = await reportDslStep(config, 42, { stepId: "s1", outcome: "succeeded", extractions: [] }).catch((err: unknown) => err);
 
 		expect(error).toBeInstanceOf(RunnerHttpError);
 		expect((error as RunnerHttpError).status).toBe(403);

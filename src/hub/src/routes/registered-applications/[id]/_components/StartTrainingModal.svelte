@@ -11,6 +11,8 @@
 	let goal = $state("");
 	let startingUrl = $state("");
 	let maxSteps = $state("");
+	let alternateGoals = $state("");
+	let syntheticDataConfirmed = $state(false);
 
 	let goalError = $state<string | null>(null);
 	let startingUrlError = $state<string | null>(null);
@@ -33,10 +35,19 @@
 		goal = "";
 		startingUrl = "";
 		maxSteps = "";
+		alternateGoals = "";
+		syntheticDataConfirmed = false;
 		goalError = null;
 		startingUrlError = null;
 		maxStepsError = null;
 		submitError = null;
+	}
+
+	function parseAlternateGoals(value: string): string[] {
+		return value
+			.split("\n")
+			.map((line) => line.trim())
+			.filter((line) => line !== "");
 	}
 
 	function isValidUrl(value: string): boolean {
@@ -71,7 +82,9 @@
 			const job = await startTrainingRun(registeredApplicationId, {
 				goal,
 				startingUrl,
-				maxSteps: Number(maxSteps)
+				maxSteps: Number(maxSteps),
+				alternateGoals: parseAlternateGoals(alternateGoals),
+				syntheticDataConfirmed
 			});
 			dialogEl?.close();
 			await goto(resolve("/jobs/[id]", { id: String(job.id) }));
@@ -124,6 +137,16 @@
 				aria-describedby={maxStepsError ? "max-steps-error" : undefined}
 			/>
 			{#if maxStepsError}<span id="max-steps-error" class="field-error">{maxStepsError}</span>{/if}
+		</label>
+
+		<label class="field">
+			<span class="field-label">Alternate goals (optional, one per line)</span>
+			<textarea class="field-input" rows="2" bind:value={alternateGoals}></textarea>
+		</label>
+
+		<label class="field field-checkbox">
+			<input type="checkbox" bind:checked={syntheticDataConfirmed} />
+			<span class="field-label">This data is synthetic/non-sensitive</span>
 		</label>
 
 		{#if submitError}<span class="field-error">{submitError}</span>{/if}
@@ -193,6 +216,11 @@
 			outline: $button-all-focus-outline;
 			outline-offset: 1px;
 		}
+	}
+
+	.field-checkbox {
+		flex-direction: row;
+		align-items: center;
 	}
 
 	.field-error {

@@ -55,6 +55,26 @@ describe("takeMaskedScreenshot", () => {
 		}
 	});
 
+	it("skips the third-party PII pass when skipPiiPass is true, while still masking a known secret", async () => {
+		await fixture.page.evaluate(() => {
+			const el = document.createElement("div");
+			el.id = "__pii_skip_test_element__";
+			el.textContent = "jane.doe@example.com";
+			document.body.appendChild(el);
+		});
+		try {
+			const withoutMasking = await fixture.page.screenshot();
+			const masked = await takeMaskedScreenshot(fixture.page, [], true);
+			expect(masked.equals(withoutMasking)).toBe(true);
+
+			const maskedKnownSecret = await takeMaskedScreenshot(fixture.page, ["1234.50"], true);
+			expect(maskedKnownSecret.equals(withoutMasking)).toBe(false);
+		}
+		finally {
+			await fixture.page.evaluate(() => document.getElementById("__pii_skip_test_element__")?.remove());
+		}
+	});
+
 	it("leaves ordinary non-sensitive text unmasked", async () => {
 		await fixture.page.evaluate(() => {
 			const el = document.createElement("div");

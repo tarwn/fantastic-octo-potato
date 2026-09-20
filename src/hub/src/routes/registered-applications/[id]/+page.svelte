@@ -1,23 +1,28 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
+	import RecipesPanel from "./_components/RecipesPanel.svelte";
 	import RunnersPanel from "./_components/RunnersPanel.svelte";
 	import StartRecipeJobModal from "./_components/StartRecipeJobModal.svelte";
 	import StartTrainingModal from "./_components/StartTrainingModal.svelte";
 
 	import { page } from "$app/state";
+	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
 
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
+	let recipes = $state<RecipeSummary[]>([]);
 	let loadError = $state<string | null>(null);
 	let trainingModalOpen = $state(false);
 	let recipeModalMode = $state<"Trial" | "Execute" | null>(null);
+	let recipeModalRecipeId = $state<number | null>(null);
 	let lastRefreshedOn = $state(new Date());
 
 	async function load() {
 		try {
 			registeredApplication = await fetchRegisteredApplication(Number(page.params.id));
+			recipes = await fetchRecipes(registeredApplication.id);
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load registered application";
@@ -41,6 +46,17 @@
 
 	function closeRecipeModal() {
 		recipeModalMode = null;
+		recipeModalRecipeId = null;
+	}
+
+	function startTrial(recipeId: number) {
+		recipeModalRecipeId = recipeId;
+		recipeModalMode = "Trial";
+	}
+
+	function startJob(recipeId: number) {
+		recipeModalRecipeId = recipeId;
+		recipeModalMode = "Execute";
 	}
 </script>
 
@@ -57,8 +73,6 @@
 		<div class="page-header">
 			<h1>{registeredApplication.customerName} — {registeredApplication.applicationName}</h1>
 			<div class="page-actions">
-				<button type="button" class="btn btn-secondary" onclick={() => (recipeModalMode = "Trial")}>Start Trial</button>
-				<button type="button" class="btn btn-secondary" onclick={() => (recipeModalMode = "Execute")}>Start Job</button>
 				<button type="button" class="btn btn-primary" onclick={beginTrainingRun}>Begin a Training Run</button>
 			</div>
 		</div>
@@ -68,6 +82,7 @@
 			{lastRefreshedOn}
 			onRefresh={refresh}
 		/>
+		<RecipesPanel {recipes} registeredApplicationId={registeredApplication.id} onStartTrial={startTrial} onStartJob={startJob} />
 		<StartTrainingModal
 			open={trainingModalOpen}
 			onClose={closeTrainingModal}
@@ -78,6 +93,7 @@
 			onClose={closeRecipeModal}
 			registeredApplicationId={registeredApplication.id}
 			mode={recipeModalMode ?? "Trial"}
+			initialRecipeId={recipeModalRecipeId}
 		/>
 	{/if}
 </div>
@@ -122,13 +138,6 @@
 	.btn-primary {
 		@include button-base;
 		@include button-variant-primary;
-
-		flex: none;
-	}
-
-	.btn-secondary {
-		@include button-base;
-		@include button-variant-secondary;
 
 		flex: none;
 	}

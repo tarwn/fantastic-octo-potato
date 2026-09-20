@@ -3,4 +3,5 @@
 * [Runner Config & Startup](./runner-config.md)
 * [Runner HTTP Handling](./runner-http-handling.md)
 * [Recipe Automatic Loop](./recipe-automatic-loop.md)
+* [Runner Training Loop](./training-loop.md)
 * [Browser Process Cleanup](./browser-cleanup.md)

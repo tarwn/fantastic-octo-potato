@@ -5,8 +5,13 @@ test("jobs list page links to a Job created via the API", async ({ page, request
 	const registeredApplication = registeredApplications.data.find(
 		(item: { applicationName: string }) => item.applicationName === "BambooInvoice"
 	);
-	const createResponse = await request.post(`/api/hub/registered-applications/${registeredApplication.id}/jobs`, {
-		data: { goal: "List page smoke test goal", startingUrl: "https://example.com/list-smoke", maxSteps: 3 }
+	const createResponse = await request.post("/api/hub/jobs/new/training", {
+		data: {
+			goal: "List page smoke test goal",
+			startingUrl: "https://example.com/list-smoke",
+			maxSteps: 3,
+			registeredApplicationId: registeredApplication.id
+		}
 	});
 	const job = (await createResponse.json()).data;
 

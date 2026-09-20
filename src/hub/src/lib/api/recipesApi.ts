@@ -9,6 +9,7 @@ export interface RecipeSummary {
 	goal: string;
 	state: "Draft" | "Published";
 	definition: RecipeDefinition;
+	sourceTrainingRunId: string | null;
 }
 
 export async function fetchRecipes(registeredApplicationId: number): Promise<RecipeSummary[]> {
@@ -26,7 +27,7 @@ export interface StartRecipeJobRequested {
 }
 
 export async function startRecipeJob(recipeId: number, request: StartRecipeJobRequested): Promise<Job> {
-	const response = await fetch(`/api/hub/recipes/${recipeId}/jobs`, {
+	const response = await fetch(`/api/hub/jobs/new/recipes/${recipeId}`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify(request)

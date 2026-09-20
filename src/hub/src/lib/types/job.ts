@@ -3,11 +3,14 @@ import type { TranscriptKind } from "$lib/jobTranscriptKind";
 import type { JobType } from "$lib/jobType";
 import type { SensitivityType } from "$lib/sensitivityType";
 
-export interface TrainingJob {
+export interface TrainingRunJob {
 	goal: string;
 	startingUrl: string;
 	allowlist: string;
 	maxSteps: number;
+	alternateGoals: string[];
+	syntheticDataConfirmed: boolean;
+	stepTimeoutMs: number;
 }
 
 export interface RecipeJob {
@@ -29,7 +32,7 @@ interface JobBase {
 }
 
 export type Job =
-	| (JobBase & { jobType: JobType.Training; details: TrainingJob })
+	| (JobBase & { jobType: JobType.TrainingRun; details: TrainingRunJob })
 	| (JobBase & { jobType: JobType.Recipe; details: RecipeJob });
 
 export interface TranscriptFieldRef {
