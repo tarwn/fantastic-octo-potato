@@ -23,6 +23,10 @@ const RECIPE_JOB: Job = {
 	startedAt: null,
 	heartbeatOn: null,
 	completedAt: null,
+	interventionOwner: null,
+	blockedStepId: null,
+	blockedReason: null,
+	resumeStepId: null,
 	details: { recipeId: 1, mode: "Execute", allowlist: "https://example.test", stepTimeoutMs: 15000 }
 };
 

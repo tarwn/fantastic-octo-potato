@@ -15,7 +15,8 @@ export enum JobStatus {
 	CompletedFailed = 4,
 	CompletedCancelled = 5,
 	InterventionRequested = 6,
-	CompletedError = 7
+	CompletedError = 7,
+	InteractiveUser = 8
 }
 
 export const TERMINAL_JOB_STATUSES: readonly JobStatus[] = [
@@ -86,6 +87,7 @@ export interface ReportStatusRequest {
 	kind: "status";
 	status: JobStatus;
 	message: string;
+	blockedStepId?: string;
 }
 
 export interface ReportInfoRequest {
@@ -168,8 +170,8 @@ export async function reportDslStep(config: RunnerConfig, jobId: number, request
 
 // Directly changes a Job's status (e.g. Intervention-Requested, Completed-Error/-Failed/-Success)
 // — the same "status" report kind Hub's reportJobStep already accepts.
-export async function reportStatus(config: RunnerConfig, jobId: number, status: JobStatus, message: string): Promise<ReportStepResult> {
-	return postJobStep(config, jobId, { kind: "status", status, message });
+export async function reportStatus(config: RunnerConfig, jobId: number, status: JobStatus, message: string, blockedStepId?: string): Promise<ReportStepResult> {
+	return postJobStep(config, jobId, { kind: "status", status, message, ...(blockedStepId !== undefined ? { blockedStepId } : {}) });
 }
 
 // A non-fatal transcript note — e.g. a blocked subresource request that didn't fail the current
@@ -194,10 +196,62 @@ export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string,
 	return body.data;
 }
 
+// Mirrors src/hub/src/lib/server/runner/interventionCommandActions.ts's pending-command wire shape.
+export type PendingCommand = { id: number; stepId: string } & (
+	| { kind: "click"; payload: { x: number; y: number } }
+	| { kind: "assign"; payload: { name: string; value: string | number | boolean } }
+	| { kind: "prompt"; payload: { step: ChildStep } }
+);
+
+export interface CommandResult {
+	outcome: "succeeded" | "failed";
+	targetDescription: { component: string; selector: string };
+}
+
+// The operator command waiting for this Job, if any (Hub only ever serves one, and only while Interactive-User).
+export async function fetchPendingCommand(config: RunnerConfig, jobId: number): Promise<PendingCommand | null> {
+	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/commands/pending`, {
+		headers: { authorization: `Bearer ${config.runnerSharedSecret}` }
+	});
+
+	if (!response.ok) {
+		const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+		throw new RunnerHttpError(response.status, `fetchPendingCommand failed: ${response.status} ${body?.error ?? response.statusText}`);
+	}
+
+	const body = (await response.json()) as { data: PendingCommand | null };
+	return body.data;
+}
+
+// Returns false when Hub refused the result because the Job left Interactive-User while the command ran
+// (409): the caller discards it and follows the Job's new status.
+export async function reportCommandResult(config: RunnerConfig, jobId: number, commandId: number, result: CommandResult): Promise<boolean> {
+	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/commands/${commandId}/result`, {
+		method: "POST",
+		headers: { authorization: `Bearer ${config.runnerSharedSecret}`, "content-type": "application/json" },
+		body: JSON.stringify(result)
+	});
+
+	if (response.status === 409) {
+		return false;
+	}
+	if (!response.ok) {
+		const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+		throw new RunnerHttpError(response.status, `reportCommandResult failed: ${response.status} ${body?.error ?? response.statusText}`);
+	}
+	return true;
+}
+
+export interface JobState {
+	statusId: JobStatus;
+	// Set while an operator has handed control back and the Runner has not yet resumed there.
+	resumeStepId: string | null;
+}
+
 // Polls the Hub-side Job detail (no runner bearer-auth required, same endpoint the Hub UI uses)
-// for its current status — used during the Intervention-Requested wait to detect an externally
-// changed terminal status.
-export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): Promise<JobStatus> {
+// for its current state — used during the Intervention wait to follow Hub-owned changes (a
+// terminal status, or a hand-back naming where to resume).
+export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): Promise<JobState> {
 	const response = await fetch(`${config.hubUrl}${statusUrl}`);
 
 	if (!response.ok) {
@@ -205,6 +259,6 @@ export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): P
 		throw new Error(`fetchJobStatus failed: ${response.status} ${body?.error ?? response.statusText}`);
 	}
 
-	const body = (await response.json()) as { data: { jobStatusId: JobStatus } };
-	return body.data.jobStatusId;
+	const body = (await response.json()) as { data: { jobStatusId: JobStatus; resumeStepId: string | null } };
+	return { statusId: body.data.jobStatusId, resumeStepId: body.data.resumeStepId };
 }

@@ -11,7 +11,8 @@ export enum JobStatus {
 	CompletedFailed = 4,
 	CompletedCancelled = 5,
 	InterventionRequested = 6,
-	CompletedError = 7
+	CompletedError = 7,
+	InteractiveUser = 8
 }
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -21,7 +22,8 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
 	[JobStatus.CompletedFailed]: "Completed-Failed",
 	[JobStatus.CompletedCancelled]: "Completed-Cancelled",
 	[JobStatus.InterventionRequested]: "Intervention-Requested",
-	[JobStatus.CompletedError]: "Completed-Error"
+	[JobStatus.CompletedError]: "Completed-Error",
+	[JobStatus.InteractiveUser]: "Interactive-User"
 };
 
 export const JOB_STATUS_VARIANTS: Record<JobStatus, StatusVariant> = {
@@ -31,7 +33,8 @@ export const JOB_STATUS_VARIANTS: Record<JobStatus, StatusVariant> = {
 	[JobStatus.CompletedFailed]: "failed",
 	[JobStatus.CompletedCancelled]: "cancelled",
 	[JobStatus.InterventionRequested]: "intervention",
-	[JobStatus.CompletedError]: "error"
+	[JobStatus.CompletedError]: "error",
+	[JobStatus.InteractiveUser]: "interactive"
 };
 
 // Intervention-Requested is a halted, non-terminal state (ARCHITECTURE.md's Core Loop) — it waits

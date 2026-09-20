@@ -119,3 +119,54 @@ export async function cancelJob(id: number): Promise<Job> {
 	}
 	return parseJob(body.data);
 }
+
+async function postIntervention(id: number, action: "take-control" | "end" | "hand-back", request: Record<string, string>): Promise<Job> {
+	const response = await fetch(`/api/hub/jobs/${id}/${action}`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(request)
+	});
+	const body = (await response.json()) as { data: JobResponse } | { error: string };
+	if ("error" in body) {
+		throw new Error(body.error);
+	}
+	return parseJob(body.data);
+}
+
+export function takeControl(id: number, operatorId: string): Promise<Job> {
+	return postIntervention(id, "take-control", { operatorId });
+}
+
+export function endJob(id: number, operatorId: string): Promise<Job> {
+	return postIntervention(id, "end", { operatorId });
+}
+
+export function handBackJob(id: number, operatorId: string, resumeStepId: string): Promise<Job> {
+	return postIntervention(id, "hand-back", { operatorId, resumeStepId });
+}
+
+async function submitCommand(id: number, command: Record<string, unknown>): Promise<number> {
+	const response = await fetch(`/api/hub/jobs/${id}/commands`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(command)
+	});
+	const body = (await response.json()) as { data: { id: number } } | { error: string };
+	if ("error" in body) {
+		throw new Error(body.error);
+	}
+	return body.data.id;
+}
+
+// Command submits resolve with the command's id, which is all the overlay needs to find its Transcript entry and screenshot.
+export function submitClickCommand(id: number, operatorId: string, commandKey: string, x: number, y: number): Promise<number> {
+	return submitCommand(id, { operatorId, commandKey, kind: "click", x, y });
+}
+
+export function submitAssignCommand(id: number, operatorId: string, commandKey: string, name: string, value: string): Promise<number> {
+	return submitCommand(id, { operatorId, commandKey, kind: "assign", name, value });
+}
+
+export function submitPromptCommand(id: number, operatorId: string, commandKey: string, prompt: string): Promise<number> {
+	return submitCommand(id, { operatorId, commandKey, kind: "prompt", prompt });
+}

@@ -13,3 +13,4 @@ Deferred features, capabilities, or decisions.
 | 7 | [Pretty 404/500 pages and API 404 messaging](./0007-pretty-error-pages.md) |
 | 8 | [`plan` transcript kind](./0008-plan-transcript-kind.md) |
 | 9 | [`observe` transcript kind](./0009-observe-transcript-kind.md) |
+| 10 | [Human Intervention for Training Jobs](./0010-training-job-intervention.md) |

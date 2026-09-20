@@ -6,7 +6,7 @@
 	import { fetchRegisteredApplications } from "$lib/api/registeredApplicationsApi";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
-	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
+	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS, JobStatus } from "$lib/jobStatus";
 	import { JOB_TYPE_LABELS } from "$lib/jobType";
 	import type { Job } from "$lib/types/job";
 	import type { RegisteredApplication } from "$lib/types/registeredApplication";
@@ -55,6 +55,12 @@
 						</a>
 						<span class="job-mode">{JOB_TYPE_LABELS[job.jobType]}</span>
 						<StatusBadge text={JOB_STATUS_LABELS[job.jobStatusId]} variant={JOB_STATUS_VARIANTS[job.jobStatusId]} />
+						{#if job.jobStatusId === JobStatus.InterventionRequested || job.jobStatusId === JobStatus.InteractiveUser}
+							<span class="job-owner">
+								<a href={resolve("/jobs/[id]", { id: String(job.id) })}>Intervene</a>
+								· {job.interventionOwner === null ? "Unowned" : `Owner: ${job.interventionOwner}`}
+							</span>
+						{/if}
 						<span class="job-time">{(job.startedAt ?? job.createdAt).toLocaleString()}</span>
 					</li>
 				{/each}
@@ -128,6 +134,15 @@
 	.job-context {
 		font-size: $text-small-size;
 		color: $text-color-muted;
+	}
+
+	.job-owner {
+		font-size: $text-small-size;
+		color: $text-color-muted;
+
+		a {
+			color: $anchor-default-color;
+		}
 	}
 
 	.job-mode {

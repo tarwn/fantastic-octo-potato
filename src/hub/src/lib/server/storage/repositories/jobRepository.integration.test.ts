@@ -82,6 +82,10 @@ describe("jobRepository", () => {
 				startedAt: null,
 				heartbeatOn: null,
 				completedAt: null,
+				interventionOwner: null,
+				blockedStepId: null,
+				blockedReason: null,
+				resumeStepId: null,
 				details: {
 					goal: "Extract invoice total",
 					startingUrl: "https://example.com/start",
@@ -132,6 +136,10 @@ describe("jobRepository", () => {
 				startedAt: null,
 				heartbeatOn: null,
 				completedAt: null,
+				interventionOwner: null,
+				blockedStepId: null,
+				blockedReason: null,
+				resumeStepId: null,
 				details: { recipeId: null, mode: "Trial", allowlist: "https://example.com", stepTimeoutMs: 15_000 }
 			});
 			expect(getJobById(getDb(), job.id)).toEqual(job);
@@ -169,6 +177,10 @@ describe("jobRepository", () => {
 			startedAt: now,
 			heartbeatOn: now,
 			completedAt: null,
+			interventionOwner: null,
+			blockedStepId: null,
+			blockedReason: null,
+			resumeStepId: null,
 			details: {
 				goal: "Extract invoice total",
 				startingUrl: "https://example.com/start",

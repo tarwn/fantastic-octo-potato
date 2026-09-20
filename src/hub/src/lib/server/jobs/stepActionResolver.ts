@@ -1,6 +1,8 @@
 import type Database from "better-sqlite3";
 
+import { interventionStepId } from "../../interventionCommand";
 import { JobType } from "../storage/db/jobType";
+import { listInterventionCommandSafeSummaries } from "../storage/repositories/interventionCommandRepository";
 import { type Job, listTrainingRunJobSteps } from "../storage/repositories/jobRepository";
 import { getRecipeById } from "../storage/repositories/recipeRepository";
 
@@ -26,6 +28,16 @@ function collectRecipeStepActions(definition: RecipeDefinition): Map<string, str
 	return actions;
 }
 
+// Operator commands aren't Recipe Steps: click and assign are their own action, and a prompt's safe payload names its action.
+function collectInterventionCommandActions(db: Database.Database, jobId: number): Map<string, string> {
+	return new Map(
+		listInterventionCommandSafeSummaries(db, jobId).map(({ id, kind, safePayload }) => [
+			interventionStepId(id),
+			kind === "prompt" ? (JSON.parse(safePayload) as { action: string }).action : kind
+		])
+	);
+}
+
 // Transcript rows only store the Step id the Runner reported; the Step's action lives on its
 // definition (Training: training_job_step, Recipe: the Recipe's Steps incl. children/recoveries).
 // An id that resolves to no Step is a data-integrity bug, so it crashes rather than falling back.
@@ -33,7 +45,7 @@ export function createStepActionResolver(db: Database.Database, job: Job): (step
 	const actions =
 		job.jobType === JobType.TrainingRun
 			? new Map(listTrainingRunJobSteps(db, job.id).map((step) => [step.stepId, step.definition.action]))
-			: collectRecipeStepActions(requireRecipeDefinition(db, job));
+			: new Map([...collectRecipeStepActions(requireRecipeDefinition(db, job)), ...collectInterventionCommandActions(db, job.id)]);
 
 	return (stepId) => {
 		const action = actions.get(stepId);

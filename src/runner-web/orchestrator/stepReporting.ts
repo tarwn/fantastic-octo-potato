@@ -25,14 +25,16 @@ export interface StepReportingDeps {
 // the durable record; the screenshot is best-effort context. `skipPiiPass` is Training-only
 // (Recipe never sets it): disables the third-party PII-detection pass while the known-secrets
 // scrub still always applies (screenshotMasking.ts).
-export async function captureAndUploadArtifact(deps: StepReportingDeps, stepId: string, skipPiiPass = false): Promise<void> {
+export async function captureAndUploadArtifact(deps: StepReportingDeps, stepId: string, skipPiiPass = false): Promise<boolean> {
 	try {
 		const screenshot = await takeMaskedScreenshot(deps.page, deps.secrets, skipPiiPass);
 		await uploadArtifact(deps.config, deps.artifactsUrl, stepId, screenshot.toString("base64"));
+		return true;
 	}
 	catch (err: unknown) {
 		const rawMessage = err instanceof Error ? err.message : String(err);
 		log(redactKnownSecrets(`job ${deps.jobId}: failed to capture/upload artifact for step ${stepId}: ${rawMessage}`, deps.secrets));
+		return false;
 	}
 }
 

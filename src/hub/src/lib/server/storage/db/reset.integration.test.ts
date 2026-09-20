@@ -71,7 +71,8 @@ describe("resetUserData", () => {
 			{ id: 4, name: "Completed-Failed" },
 			{ id: 5, name: "Completed-Cancelled" },
 			{ id: 6, name: "Intervention-Requested" },
-			{ id: 7, name: "Completed-Error" }
+			{ id: 7, name: "Completed-Error" },
+			{ id: 8, name: "Interactive-User" }
 		]);
 	});
 });
