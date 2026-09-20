@@ -1,67 +1,65 @@
-# Step 3: Profit
+# Final project stages
 
-Use the [Architecture doc](../../ARCHITECTURE.md) to fill in more of the detail as you plan. Also:
-- [recipe.md](./supporting-docs/recipe.md)
-- [examples.json](./supporting-docs/examples.json)
+Complete the remaining POC workflow on top of the Training and Recipe execution built in specs 0001–0009.
 
-Include `write-adr` and `write-agent-context` where relevant to each of these tasks goals, using context from the architecture doc.
+Use [ARCHITECTURE.md](../../ARCHITECTURE.md) to fill in details while planning. Follow the relevant indexes under `docs/context/`, and use [recipe.md](./supporting-docs/recipe.md), [steps-dsl.md](./supporting-docs/steps-dsl.md), and [examples.json](./supporting-docs/examples.json) when Recipe or DSL details are needed. Do not repeat those documents in the spec.
 
-Use `write-defer` when completing a task here that has an explicit, relevant defer in the architecture doc for future-looking behavior for this item.
+Create or update ADRs, agent context, and defers for lasting decisions, reusable patterns, and intentionally postponed behavior.
 
+## 1. Qualify and publish a draft Recipe
 
-## M5 — Review, Trial, Publish, and replay of the discovered recipe
+**Outcome:** An operator can publish a draft after that Recipe revision passes a Trial, then use it in an Execute Job.
 
-**Outcome:** A person can go through successful trial, separate human publication, and deterministic execution with new inputs using the Hub screens.
+Scope:
 
-Deliverables:
+- Track the immutable Recipe revision used by a Trial. Only a successful Trial qualifies that revision for publication.
+- Add the Architecture doc's publish flow: name the Recipe and optionally replace a published Recipe. Replaced Recipes disappear from new Execute Jobs, but remain attached to historical Jobs.
+- Show publication eligibility and actions in the existing Recipe review and Registered Application screens. Keep the current ordering and ingredient validation.
+- Make Trial success and publication state clear in the Hub without requiring log or database inspection.
+- Complete the path from a training-produced Recipe through Trial, publication, and Execute with changed inputs and no model decisions during Trial or Execute.
+- Job names are assigned from the Recipe name (Trial, Execute) or explicitly "Training Run" and displayed as the title on the Job screen and in the Jobs listing next to the job id.
 
-- Functional review/Start Trial modal shows the particular revision, targets, inputs/outputs, policy, and irreversible steps; acknowledgment and validated ingredients create a real Trial job.
-- Successful trial notifies the user and enables Publish for that revision. Failed/interrupted trial cannot qualify as successful. Publish separately changes draft to published.
-- Registered Application shows draft/published lists in planned order. Start Job creates a Pending job using the selected/latest published recipe, records the chosen Recipe revision so that later changes do not alter this job, and validates supplied ingredients.
-- Trial/Execute share the engine, verify checkpoints, and return outputs and values for expected outcomes such as a missing record, or structured details for business failures, technical errors, and policy violations in Job screen/export.
-- Actual training-produced recipe runs successfully with changed inputs and no model decisions during ordinary trial/replay.
+Recipe review, Start Trial/Start Job, immutable definitions, deterministic execution, results, screenshots, and export already exist. Extend them rather than rebuilding them.
 
-**Demonstrate completion:** Review draft → Trial → Publish → Start Job with new input; inspect results/checkpoint. Verify failed trial cannot enable publication as if successful.
+## 2. Add live Human Intervention
 
-## M6 — Human Intervention overlay controls and resumes the live session
+**Outcome:** One operator can take control of a blocked Job, use its current browser session, and safely resume or end it.
 
-**Outcome:** A human recovers a blocked run on the same browser session, with one operator in control and their actions recorded in the Transcript.
+Scope:
 
-Deliverables:
+- Add intervention links and status/ownership to the relevant Customer, Registered Application, Jobs, and Job views. Open the Architecture doc's intervention overlay from the Job view.
+- Acquire control atomically and allow only the owner to submit commands or return control. Handle competing takeovers, stale or duplicate commands, cancellation, and status changes without reviving a Job.
+- Keep the Runner's current browser session open. Show the latest safe screenshot, the blocked step and reason, recent transcript, desired resume point, and current owner.
+- Support coordinate clicks, prompt-to-DSL actions, and direct output assignment. Validate actions and values against existing DSL, policy, and output declarations, and record actions and results in the Transcript.
+- Return control at a valid Recipe position and confirm the application is ready. Otherwise, request intervention again.
+- Define timeout behavior before and after takeover. Abort, timeout, cancellation, and terminal errors must clean up and return the Runner to polling without silently discarding active control.
+- Cover both Training and Recipe Jobs where their authority models differ. Do not add automatic Recipe revision from intervention; that remains deferred.
 
-- Real intervention links/states on Customer, Registered Application, Jobs list, and Job screens; Take Control opens the functional overlay.
-- Atomic takeover only from Intervention-Requested with no operator owner sets Interactive-User/user id. Automation stops before manual actions are accepted; the same session remains open.
-- Overlay shows latest safe screenshot, goal/recipe, stopped step/reason, recent transcript, and current owner.
-- Clicking the displayed screenshot acts at the corresponding position in the browser. Hub converts human prompts into DSL actions and validates them against the policy. Direct output assignment checks the value against the declared output type. Refresh observations and record human actions/results in transcript.
-- Hub checks the job status and operator id when adding a manual command, using an atomic operation so another status or ownership change cannot occur between the check and adding the command. Reject/handle stale and duplicate commands; cancelled jobs cannot revive from an old overlay.
-- Return-control action supplies resume step when needed, clears ownership, validates expected resume state, updates automatic step tracking, and returns Runner to Running/Automatic Loop. If the application is not in the expected state for the selected step, request intervention again.
-- Working abort and intervention timeout behavior cleans up and returns to polling. Specify whether/how timeout applies after takeover to avoid discarding an actively controlled session.
-- Blocked training and replay both reach manual control; at least one manual recovery resumes to completion with safe evidence.
+Build on the existing intervention wait, ownership rules, masking, artifact reporting, and browser cleanup. The spec should add only the wire protocol and persistence needed for interactive commands.
 
-**Demonstrate completion:** Block a live run, take control, act, and resume to completion without a new session. Exercise coordinate clicks, prompt actions, and output assignment in suitable cases; verify competing takeover/stale command rejection, abort, and timeout cleanup.
+## 3. Complete structured failure reporting
 
-## M7 — Exceptional outcomes and recovery demonstrated through the application
+**Outcome:** When a Job fails or errors, the Hub clearly explains what happened.
 
-**Outcome:** Operators can exercise missing records, recoverable problems, and failures and see deliberate outcomes, recovery with a limit on attempts, clear failures, and human escalation.
+Scope:
 
-Deliverables:
+- Carry structured failure details from Runner to Hub: outcome category, step, reason, expected and observed state when available, and the related safe screenshot.
+- Show the same masked failure details on the Job screen and in its JSON export, alongside the existing Transcript and Results.
+- Keep business failures, technical errors, policy violations, and intervention requests distinct and understandable.
 
-- Executable expected not-found/business-outcome branch returns declared outcome/value and succeeds where intended.
-- Known interruption recovery runs deterministically with finite attempts and a check that the application is ready to continue the main steps. Failed-step/recovery ordering does not bypass available recovery.
-- Hard failures stop with step, expected/observed state, reason, and a masked screenshot and other useful error details; unhandled problems that a human may be able to fix open the M6 intervention path.
-- Screens and JSON exports accurately show status, outcome, outputs, recovery transcript, and details needed to understand the problem.
-- Checks covers malformed payloads, policy rejection, checkpoint failure, slow/failed load, duplicate reports, and simultaneous cancellation and control requests against the running Hub, Runner, and Target Application.
-- Safe exceptional-state and handoff evidence joins discovery/replay evidence. Missing crash transcripts do not prove an irreversible action did not occur; automatic stale-job retry remains deferred.
+Outcome mapping, bounded recovery, artifacts, masking, and intervention routing already exist. Extend their reporting rather than rebuilding them. Automatic stale-job retry remains out of scope.
 
-**Demonstrate completion:** Reset and run happy path, not-found, automatic recovery with a limit on attempts, hard failure, and manual recovery from Hub. Inspect each result/transcript/export and verify replay makes no model decisions.
+## 4. Final verification and handoff
 
+**Outcome:** A human reviewer can set up the POC, exercise every required path, and collect clear evidence of what works.
 
-## Fin
+Scope:
 
-Fix the gaps. Verify:
+- Verify current screens and overlays against the available design and real state, including navigation, refresh, validation, loading, empty, error, intervention, and terminal states. Fix gaps found during use.
+- Provide repeatable setup, reset, startup, and demo instructions for training, review, Trial, publication, changed-input Execute, exceptional outcomes, and live takeover/resume.
+- Run the repository guards and relevant browser tests. Clearly distinguish stubbed-model automation from any manual real-model evidence.
+- Update README, Architecture, ADRs, defers, context indexes, and changelog so they describe the implemented system and its known limits consistently.
 
-- All planned current screens/modals/overlay are verified against available design with real state, complete navigation, refresh, validation, loading/empty/error/terminal states, and corrections found through integrated use.
-- Repeatable setup/reset/startup and demo commands/operator steps: genuine training → draft review → Trial → Publish → changed-input Execute → exceptional outcome → live takeover/resume.
-- Required guards and relevant browser/manual real-model checks pass. Fixture/fake-model behavior is clearly distinguished from discovery evidence.
-- README covers install, keys/config, target reset, startup, guards, and exact demo path. Public architecture and ADR/DEFER records reflect actual behavior/limits.
-- All context files, ADRs, DEFERs, etc are consistent with the state we've reached
+## Completion demonstration
+
+From a clean reset, use the Hub to train, review, Trial, publish, and Execute a Recipe with changed inputs. Also exercise expected not-found handling, bounded recovery, business and technical failures, malformed and duplicate reports, policy and checkpoint failures, cancellation/takeover races, and a manual recovery in the same browser session. Inspect the visible evidence for each outcome and confirm Trial/Execute do not call the model.

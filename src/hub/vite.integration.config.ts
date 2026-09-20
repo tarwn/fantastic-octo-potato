@@ -12,6 +12,7 @@ export default defineConfig({
 		environment: "node",
 		include: ["src/**/*.integration.test.ts"],
 		// dbmate spawns a real subprocess per test file's beforeAll; give it room on slower machines.
-		testTimeout: 15000
+		testTimeout: 15000,
+		hookTimeout: 15000
 	}
 });
