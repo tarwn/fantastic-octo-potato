@@ -2,6 +2,7 @@
 	import { goto } from "$app/navigation";
 	import { resolve } from "$app/paths";
 	import { fetchRecipes, type RecipeSummary, startRecipeJob } from "$lib/api/recipesApi";
+	import StepDescription from "$lib/components/step/StepDescription.svelte";
 	import type { FieldDeclaration } from "$lib/types/recipeDefinition";
 
 	let {
@@ -192,6 +193,7 @@
 						{#each selectedRecipe.definition.steps as step (step.id)}
 							<li class="steps-item">
 								<span>{step.intent ?? step.id}</span>
+								<StepDescription {step} />
 								{#if step.irreversible}<span class="badge-irreversible">Irreversible</span>{/if}
 							</li>
 						{/each}
@@ -217,7 +219,7 @@
 		@include panel;
 
 		box-shadow: $box-shadow-overlay;
-		width: 480px;
+		width: 600px;
 		max-width: calc(100vw - #{$space-xl});
 		padding: 0;
 

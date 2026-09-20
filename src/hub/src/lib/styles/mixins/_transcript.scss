@@ -47,7 +47,10 @@
   align-items: center;
 }
 
-@mixin transcript-cell-time { color: $transcript-time-color; }
+@mixin transcript-cell-time {
+	color: $transcript-time-color; 
+	white-space: nowrap;
+}
 
 @mixin transcript-cell-kind($color) {
   font-weight: $transcript-kind-font-weight;

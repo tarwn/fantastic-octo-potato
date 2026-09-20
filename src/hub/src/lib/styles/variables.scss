@@ -253,7 +253,7 @@ $panel-row-padding-x: $space-m;
 // == transcript
 // a grid, not a table: [status rail] [time] [kind] [text] [affordance].
 // the last track is auto so it can hold either a status badge or an icon button.
-$transcript-grid-columns: 16px 64px 72px minmax(0, 1fr) auto;
+$transcript-grid-columns: 16px 80px 72px minmax(0, 1fr) auto;
 $transcript-grid-gap: 12px;
 $transcript-row-padding-y: 7px;
 $transcript-row-padding-x: $space-m;

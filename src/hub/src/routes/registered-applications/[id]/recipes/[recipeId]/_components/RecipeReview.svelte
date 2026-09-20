@@ -1,4 +1,5 @@
 <script lang="ts">
+	import StepDescription from "$lib/components/step/StepDescription.svelte";
 	import type { FieldDeclaration, RecipeDefinition } from "$lib/types/recipeDefinition";
 
 	let { name: recipeName, goal, definition }: { name: string; goal: string; definition: RecipeDefinition } = $props();
@@ -20,6 +21,7 @@
 			{#each definition.steps as step (step.id)}
 				<div class="panel-row">
 					<span class="panel-label">{step.intent ?? step.id}</span>
+					<StepDescription {step} class="panel-value" />
 					{#if step.irreversible}<span class="badge-irreversible">Irreversible</span>{/if}
 				</div>
 			{/each}
@@ -98,15 +100,20 @@
 	.panel-row {
 		@include panel-row;
 
-		justify-content: space-between;
+		justify-content: flex-start;
+
+		.panel-label:nth-child(1) {
+			color: $text-color-default;
+			width: 18rem;
+		}
 	}
 
 	.panel-label {
 		@include panel-row-label;
 	}
 
-	.panel-value {
-		@include panel-row-value;
+	:global(.panel-value) {
+		color: $text-color-light;
 	}
 
 	.badge-irreversible {
