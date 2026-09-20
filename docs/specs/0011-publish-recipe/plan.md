@@ -1,0 +1,5 @@
+This is the plan for [0011-publish-recipe/spec.md](./spec.md).
+
+- [ ] 1. Job names
+- [ ] 2. Qualify and publish
+- [ ] 3. Docs
