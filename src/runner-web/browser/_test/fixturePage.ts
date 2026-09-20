@@ -10,6 +10,10 @@ export const FIXTURE_HTML = `<!doctype html>
 	<label for="accountNumber">Account number</label>
 	<input id="accountNumber" value="ACCT-1042" />
 	<div id="balance">1234.50</div>
+	<p id="invoiceAmount">Amount:   $1200.00</p>
+	<p id="invoiceTax">Sales Tax: $75.00</p>
+	<p id="invoiceTotal">Total: $0.00</p>
+	<p id="twoLines">Ref: A-77<br>Owner: Pat</p>
 	<div contenteditable="true" id="notes"></div>
 	<select id="accountType">
 		<option value="checking">Checking</option>

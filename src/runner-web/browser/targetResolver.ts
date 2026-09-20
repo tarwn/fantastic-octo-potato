@@ -8,12 +8,13 @@ import { resolveStringValue } from "../dsl/valueResolver.ts";
 // matches) are distinct, reported outcomes, never a silent first-match pick.
 export type TargetResolution = { status: "found"; locator: Locator } | { status: "missing" } | { status: "ambiguous"; count: number };
 
-export type ResolvedTargetElement = { by: TargetElement["by"]; value: string };
+export type ResolvedTargetElement = { by: TargetElement["by"]; value: string; exact?: boolean };
 
 // A ref'd value may be a sensitive input, so the resolved value must only reach a locator —
 // callers that put it in a message redact it against ctx.secrets first.
 export function resolveTargetValue(target: TargetElement, ctx: ExecutionContext): ResolvedTargetElement {
-	return { by: target.by, value: resolveStringValue(target.value, ctx) };
+	const value = resolveStringValue(target.value, ctx);
+	return target.by === "text" && target.exact !== undefined ? { by: target.by, value, exact: target.exact } : { by: target.by, value };
 }
 
 export function isPointTarget(target: Target): target is TargetPoint {
@@ -31,7 +32,7 @@ function labelPattern(value: string): RegExp {
 function toLocator(page: Page, target: ResolvedTargetElement): Locator {
 	switch (target.by) {
 		case "text":
-			return page.getByText(target.value, { exact: true });
+			return page.getByText(target.value, { exact: target.exact ?? true });
 		case "label":
 			return page.getByLabel(labelPattern(target.value));
 		case "placeholder":

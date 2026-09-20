@@ -69,6 +69,13 @@ function identifierOf(el: Element, kind: IdentifierKind): string {
 	}
 }
 
+// A substring target reports what was asked for, never the matched element's full (dynamic, possibly sensitive) text.
+export async function describeSubstringTextTarget(locator: Locator, requestedValue: string, secrets: string[]): Promise<TargetDescription> {
+	const component = await locator.evaluate(componentOf);
+	const isSafe = requestedValue !== "" && redactKnownSecrets(requestedValue, secrets) === requestedValue;
+	return { component, selector: isSafe ? `text contains '${requestedValue.slice(0, MAX_SELECTOR_VALUE_LENGTH)}'` : "" };
+}
+
 // Page-derived text can carry PII, so a value the Runner's text masking would change is skipped
 // rather than reported — the chain continues to the next identifier, ending empty.
 export async function describeTarget(locator: Locator, secrets: string[]): Promise<TargetDescription> {

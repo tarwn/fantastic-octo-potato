@@ -92,6 +92,23 @@ describe("resolveElementTarget", () => {
 		});
 	});
 
+	describe("text substring (exact: false)", () => {
+		it("finds one element by a case-insensitive, whitespace-normalized substring", async () => {
+			const resolved = resolveTargetValue({ by: "text", value: "sales   TAX", exact: false }, { ingredients: {}, outputs: createOutputsState(), stepTimeoutMs: 300, resolveCredential: () => "unused", secrets: [] });
+			expect(resolved).toEqual({ by: "text", value: "sales   TAX", exact: false });
+			expect((await resolveElementTarget(fixture.page, resolved)).status).toBe("found");
+		});
+
+		it("does not match a substring when exact is true or omitted", async () => {
+			expect((await resolveElementTarget(fixture.page, { by: "text", value: "Sales Tax" })).status).toBe("missing");
+			expect((await resolveElementTarget(fixture.page, { by: "text", value: "Sales Tax", exact: true })).status).toBe("missing");
+		});
+
+		it("reports ambiguous when the substring matches several elements", async () => {
+			expect((await resolveElementTarget(fixture.page, { by: "text", value: "$", exact: false })).status).toBe("ambiguous");
+		});
+	});
+
 	it("resolves a placeholder target with exactly one match", async () => {
 		const result = await resolveElementTarget(fixture.page, { by: "placeholder", value: "Search accounts" });
 		expect(result.status).toBe("found");

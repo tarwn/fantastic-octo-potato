@@ -2,13 +2,14 @@ import type { ElementHandle, Locator, Page } from "playwright";
 
 import { DslActionError } from "../dsl/errors.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
+import { extractFromText, validateReadSpec } from "../dsl/extraction.ts";
 import { setOutput } from "../dsl/outputsState.ts";
-import type { ChildStep, ScalarValue, TargetElement } from "../dsl/types.ts";
+import type { ChildStep, ReadSpec, ScalarValue, TargetElement } from "../dsl/types.ts";
 import { resolveStringValue, resolveValue } from "../dsl/valueResolver.ts";
 import { redactKnownSecrets } from "../textRedaction.ts";
 
 import { evaluateCondition } from "./conditions.ts";
-import { BROWSER_TARGET_DESCRIPTION, describeTarget, NO_TARGET_DESCRIPTION, type TargetDescription } from "./targetDescription.ts";
+import { BROWSER_TARGET_DESCRIPTION, describeSubstringTextTarget, describeTarget, NO_TARGET_DESCRIPTION, type TargetDescription } from "./targetDescription.ts";
 import { isPointTarget, resolveElementAtPoint, resolveElementTarget, resolveTargetValue, resolveViewportPoint } from "./targetResolver.ts";
 
 // A step reports exactly one of these; `kind: "businessFailure"` distinguishes the `fail` action's
@@ -44,11 +45,24 @@ async function resolveRequiredLocator(page: Page, element: TargetElement, ctx: E
 	if (resolution.status === "ambiguous") {
 		throw new DslActionError("TARGET_AMBIGUOUS", `${resolution.count} elements matched {by: "${target.by}", value: "${shownValue}"}, expected exactly one`);
 	}
-	described.value = await describeTarget(resolution.locator, ctx.secrets);
+	described.value = target.by === "text" && target.exact === false
+		? await describeSubstringTextTarget(resolution.locator, target.value, ctx.secrets)
+		: await describeTarget(resolution.locator, ctx.secrets);
 	return resolution.locator;
 }
 
-async function readElementValue(locator: Locator, mode: "text" | "value" | "number"): Promise<ScalarValue> {
+type ReadMode = "text" | "value" | "number" | ReadSpec;
+
+// The capture is deliberately never echoed on a bad number: it is page-derived text.
+function applyReadSpec(raw: string, spec: ReadSpec): ScalarValue {
+	const captured = extractFromText(raw, spec);
+	return spec.parse === "number" ? parseNumberText(captured, false) : captured;
+}
+
+async function readElementValue(locator: Locator, mode: ReadMode): Promise<ScalarValue> {
+	if (typeof mode !== "string") {
+		return applyReadSpec(mode.source === "text" ? await locator.innerText() : await locator.inputValue(), mode);
+	}
 	if (mode === "text") {
 		return locator.innerText();
 	}
@@ -60,14 +74,14 @@ async function readElementValue(locator: Locator, mode: "text" | "value" | "numb
 	return parseNumberText(raw);
 }
 
-function parseNumberText(raw: string): ScalarValue {
+function parseNumberText(raw: string, echoValue = true): ScalarValue {
 	const trimmed = raw.trim();
 	if (trimmed === "") {
 		return null;
 	}
 	const parsed = Number(trimmed);
 	if (!Number.isFinite(parsed)) {
-		throw new DslActionError("INVALID_NUMBER", `"${trimmed}" could not be converted to a number`);
+		throw new DslActionError("INVALID_NUMBER", echoValue ? `"${trimmed}" could not be converted to a number` : "The extracted value could not be converted to a number");
 	}
 	return parsed;
 }
@@ -81,18 +95,27 @@ function readControlValue(element: ElementHandle<Element>): Promise<string | und
 	});
 }
 
-async function readAtPoint(page: Page, point: { by: "point"; x: number; y: number }, mode: "text" | "value" | "number"): Promise<ScalarValue> {
+async function readRequiredControlValue(element: ElementHandle<Element>, point: { x: number; y: number }): Promise<string> {
+	const value = await readControlValue(element);
+	if (value === undefined) {
+		throw new DslActionError("TARGET_NOT_FOUND", `No value-bearing control at point (${point.x}, ${point.y})`);
+	}
+	return value;
+}
+
+// Point reads use textContent (no <br> newlines, unlike innerText): a known limit of extraction at a point.
+async function readAtPoint(page: Page, point: { by: "point"; x: number; y: number }, mode: ReadMode): Promise<ScalarValue> {
 	const element = await resolveElementAtPoint(page, point);
 	if (!element) {
 		throw new DslActionError("TARGET_NOT_FOUND", `No element at point (${point.x}, ${point.y})`);
 	}
 	try {
+		if (typeof mode !== "string") {
+			const raw = mode.source === "value" ? await readRequiredControlValue(element, point) : await element.evaluate((el) => el.textContent ?? "");
+			return applyReadSpec(raw, mode);
+		}
 		if (mode === "value") {
-			const value = await readControlValue(element);
-			if (value === undefined) {
-				throw new DslActionError("TARGET_NOT_FOUND", `No value-bearing control at point (${point.x}, ${point.y})`);
-			}
-			return value;
+			return await readRequiredControlValue(element, point);
 		}
 		// number: prefer the control's own value where the point resolved to one (an input/select
 		// showing "1234.50"), otherwise fall back to the element's displayed text.
@@ -179,8 +202,7 @@ async function runAction(page: Page, step: ChildStep, ctx: ExecutionContext, des
 			case "read": {
 				const [target, mode, destination] = step.args;
 				if (typeof mode !== "string") {
-					// Temporary until spec 0015 task 3 implements extraction.
-					throw new Error("Structured read is not yet supported");
+					validateReadSpec(mode);
 				}
 				const value = isPointTarget(target) ? await readAtPoint(page, target, mode) : await readElementValue(await resolveRequiredLocator(page, target, ctx, described), mode);
 				setOutput(ctx.outputs, destination.name, value);
