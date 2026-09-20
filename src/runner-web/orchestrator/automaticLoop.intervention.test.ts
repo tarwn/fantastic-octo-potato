@@ -192,6 +192,19 @@ describe("runRecipeJobLoop: operator commands", () => {
 		await expectBrowserClosed();
 	}, 20000);
 
+	it("runs an assign command as a DSL assign Step and reports its result", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce({ id: 8, stepId: "intervention-8", kind: "assign", payload: { name: "note", value: "hi" } });
+		const assigning = commandJob(clickableFixture);
+		assigning.recipe = { ...assigning.recipe, outputs: { note: { type: "string", description: "n", required: false, nullable: false, sensitive: false } } };
+
+		await runRecipeJobLoop(config, assigning, 0.3);
+
+		expect(executeAction).toHaveBeenCalledWith(expect.anything(), { id: "intervention-8", action: "assign", args: [{ ref: "output", name: "note" }, "hi"] }, expect.anything());
+		expect(reportCommandResult).toHaveBeenCalledWith(config, 42, 8, { outcome: "succeeded", targetDescription: expect.any(Object) });
+		expect(uploadArtifact).toHaveBeenCalledWith(config, job.comms.artifactsUrl, "intervention-8", expect.any(String));
+	}, 20000);
+
 	it("resets the idle timeout after each command", async () => {
 		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
 		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);

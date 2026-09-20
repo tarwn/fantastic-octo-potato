@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 
+import type { FieldDeclaration } from "../../types/recipeDefinition";
 import { getPendingCommand, reportCommandResult } from "../runner/interventionCommandActions";
 import { reportJobStep } from "../runner/runnerActions";
 import { useIntegrationTestDb } from "../storage/db/_test/integrationTestDb";
@@ -17,6 +18,14 @@ const AUTH = `Bearer ${SHARED_SECRET}`;
 const now = new Date("2026-09-15T00:00:00.000Z");
 const RESULT_BODY = { outcome: "succeeded", targetDescription: { component: "element", selector: "" } };
 
+const OUTPUTS: Record<string, FieldDeclaration> = {
+	status: { type: "string", description: "Status", required: false, nullable: false, sensitive: false },
+	total: { type: "number", description: "Total", required: false, nullable: false, sensitive: false },
+	paid: { type: "boolean", description: "Paid", required: false, nullable: false, sensitive: false },
+	stage: { type: "string", description: "Stage", required: false, nullable: false, sensitive: false, enum: ["open", "closed"] },
+	secret: { type: "string", description: "Secret", required: false, nullable: false, sensitive: true }
+};
+
 function seedRecipeJob(db: Database.Database): number {
 	db.exec(`
 		INSERT INTO customer (id, name) VALUES (1, 'Acme');
@@ -29,7 +38,7 @@ function seedRecipeJob(db: Database.Database): number {
 		customerApplicationXrefId: 1,
 		name: "Recipe",
 		goal: "Goal",
-		definition: { schemaVersion: 1, inputs: {}, outputs: {}, steps: [{ id: "open_home", action: "open", args: ["https://example.com"] }], recoveries: [] },
+		definition: { schemaVersion: 1, inputs: {}, outputs: { ...OUTPUTS }, steps: [{ id: "open_home", action: "open", args: ["https://example.com"] }], recoveries: [] },
 		sourceTrainingRunId: null,
 		createdAt: now
 	});
@@ -60,6 +69,7 @@ async function seedInteractiveJob(db: Database.Database): Promise<number> {
 	return jobId;
 }
 
+const assign = (overrides: Record<string, unknown> = {}) => ({ operatorId: "op-1", commandKey: "key-1", kind: "assign", name: "status", value: "shipped", ...overrides });
 const click = (overrides: Record<string, unknown> = {}) => ({ operatorId: "op-1", commandKey: "key-1", kind: "click", x: 10, y: 20, ...overrides });
 
 describe("interventionCommands", () => {
@@ -142,6 +152,72 @@ describe("interventionCommands", () => {
 			submitCommand(getDb(), String(jobId), click());
 
 			expect(JSON.stringify(getJobDetail(getDb(), String(jobId)).body)).not.toContain("rawPayload");
+		});
+	});
+
+	describe("submitCommand assign", () => {
+		it("persists the typed value for the Runner and returns only the safe form", async () => {
+			const jobId = await seedInteractiveJob(getDb());
+
+			const result = submitCommand(getDb(), String(jobId), assign({ name: "total", value: "12.5" }));
+
+			expect(result.status).toBe(200);
+			const { id, safePayload } = (result.body as { data: { id: number; safePayload: unknown } }).data;
+			expect(safePayload).toEqual({ name: "total", value: "12.5" });
+			expect(getPendingCommand(getDb(), "1", String(jobId), AUTH, SHARED_SECRET).body).toEqual({
+				data: { id, stepId: `intervention-${id}`, kind: "assign", payload: { name: "total", value: 12.5 } }
+			});
+		});
+
+		it("converts a boolean value and masks a sensitive value in the response and stored safe payload", async () => {
+			const jobId = await seedInteractiveJob(getDb());
+			const paid = submitCommand(getDb(), String(jobId), assign({ commandKey: "a", name: "paid", value: "true" }));
+			expect(getPendingCommand(getDb(), "1", String(jobId), AUTH, SHARED_SECRET).body).toMatchObject({ data: { payload: { name: "paid", value: true } } });
+			getDb().prepare("UPDATE intervention_command SET status = 'Completed'").run();
+
+			const result = submitCommand(getDb(), String(jobId), assign({ commandKey: "b", name: "secret", value: "hunter2" }));
+
+			expect(paid.status).toBe(200);
+			expect(JSON.stringify(result.body)).not.toContain("hunter2");
+			expect(getDb().prepare("SELECT safe_payload AS safePayload FROM intervention_command WHERE command_key = 'b'").get()).toEqual({
+				safePayload: expect.not.stringContaining("hunter2")
+			});
+		});
+
+		it.each([
+			["an undeclared output", { name: "nope" }],
+			["a prototype property name", { name: "constructor" }],
+			["a non-numeric number", { name: "total", value: "abc" }],
+			["an empty number", { name: "total", value: " " }],
+			["a non-boolean boolean", { name: "paid", value: "yes" }],
+			["a value outside the enum", { name: "stage", value: "pending" }],
+			["a missing value", { value: undefined }]
+		])("rejects %s with 400 and creates no command", async (_label, overrides) => {
+			const jobId = await seedInteractiveJob(getDb());
+
+			const result = submitCommand(getDb(), String(jobId), assign(overrides));
+
+			expect(result.status).toBe(400);
+			expect(getDb().prepare("SELECT COUNT(*) AS n FROM intervention_command").get()).toEqual({ n: 0 });
+		});
+
+		it("writes the assigned value to Results on success, masking a sensitive one in the Transcript", async () => {
+			const jobId = await seedInteractiveJob(getDb());
+			const commandId = (submitCommand(getDb(), String(jobId), assign({ name: "secret", value: "hunter2" })).body as { data: { id: number } }).data.id;
+
+			reportCommandResult(getDb(), "1", String(jobId), String(commandId), AUTH, SHARED_SECRET, RESULT_BODY);
+
+			expect(getDb().prepare("SELECT field_name AS fieldName, raw_value AS rawValue FROM job_result").get()).toEqual({ fieldName: "secret", rawValue: "hunter2" });
+			expect(JSON.stringify(listTranscriptEntries(getDb(), jobId))).not.toContain("hunter2");
+		});
+
+		it("writes no Result when the command failed", async () => {
+			const jobId = await seedInteractiveJob(getDb());
+			const commandId = (submitCommand(getDb(), String(jobId), assign()).body as { data: { id: number } }).data.id;
+
+			reportCommandResult(getDb(), "1", String(jobId), String(commandId), AUTH, SHARED_SECRET, { ...RESULT_BODY, outcome: "failed" });
+
+			expect(getDb().prepare("SELECT COUNT(*) AS n FROM job_result").get()).toEqual({ n: 0 });
 		});
 	});
 

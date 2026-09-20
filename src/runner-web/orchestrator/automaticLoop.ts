@@ -318,7 +318,10 @@ async function runProgram(deps: LoopDeps, recipe: RecipeDefinition, startStepId?
 // false when the Job must end. A result Hub refuses (the Job left Interactive-User mid-command) is
 // discarded here, and the wait loop's next status read exits per the new status.
 async function runCommand(deps: LoopDeps, command: PendingCommand): Promise<boolean> {
-	const step: ChildStep = { id: command.stepId, action: "click", args: [{ by: "point", x: command.payload.x, y: command.payload.y }] };
+	const step: ChildStep =
+		command.kind === "click"
+			? { id: command.stepId, action: "click", args: [{ by: "point", x: command.payload.x, y: command.payload.y }] }
+			: { id: command.stepId, action: "assign", args: [{ ref: "output", name: command.payload.name }, command.payload.value] };
 	const failWithError = async (targetDescription: TargetDescription, message: string): Promise<false> => {
 		// A refused result means the Job already left Interactive-User; that newer status must not be overwritten.
 		if (await reportCommandResult(deps.config, deps.job.id, command.id, { outcome: "failed", targetDescription })) {

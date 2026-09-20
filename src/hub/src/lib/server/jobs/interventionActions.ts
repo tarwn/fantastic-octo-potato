@@ -1,9 +1,11 @@
 import type Database from "better-sqlite3";
 
 import { collectResumableStepIds } from "../../recipeStepIds";
+import type { FieldDeclaration } from "../../types/recipeDefinition";
 import { JobType } from "../storage/db/jobType";
-import { insertInterventionCommand } from "../storage/repositories/interventionCommandRepository";
-import { endJobAsOwner, getJobById, handBackJobAsOwner, type Job, takeJobControl } from "../storage/repositories/jobRepository";
+import { SensitivityType } from "../storage/db/sensitivityType";
+import { insertInterventionCommand,type InterventionCommandKind } from "../storage/repositories/interventionCommandRepository";
+import { endJobAsOwner, getJobById, handBackJobAsOwner, type Job, maskValue, takeJobControl } from "../storage/repositories/jobRepository";
 import { getRecipeById } from "../storage/repositories/recipeRepository";
 
 import { isRecord, type JobActionResult } from "./types";
@@ -95,6 +97,56 @@ function parseClickPayload(body: Record<string, unknown>): { x: number; y: numbe
 	return typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0 ? { x, y } : undefined;
 }
 
+function parseAssignPayload(declarations: Record<string, FieldDeclaration>, body: Record<string, unknown>): { rawPayload: string; safePayload: string } | string {
+	const { name, value } = body;
+	if (typeof name !== "string" || typeof value !== "string") {
+		return "assign requires a name and a value";
+	}
+	if (!Object.hasOwn(declarations, name)) {
+		return `${name} is not an output declared by this Recipe`;
+	}
+	const declaration = declarations[name];
+	let typedValue: string | number | boolean = value;
+	if (declaration.type === "number") {
+		typedValue = Number(value);
+		if (value.trim() === "" || !Number.isFinite(typedValue)) {
+			return `${name} must be a number`;
+		}
+	}
+	else if (declaration.type === "boolean") {
+		if (value !== "true" && value !== "false") {
+			return `${name} must be true or false`;
+		}
+		typedValue = value === "true";
+	}
+	if (declaration.enum && !declaration.enum.includes(value)) {
+		return `${name} must be one of: ${declaration.enum.join(", ")}`;
+	}
+	const safeValue = maskValue(value, declaration.sensitive ? SensitivityType.Other : SensitivityType.None);
+	return { rawPayload: JSON.stringify({ name, value: typedValue }), safePayload: JSON.stringify({ name, value: safeValue }) };
+}
+
+function buildCommandPayloads(
+	db: Database.Database,
+	job: Extract<Job, { jobType: JobType.Recipe }>,
+	kind: InterventionCommandKind,
+	body: Record<string, unknown>
+): { rawPayload: string; safePayload: string } | string {
+	if (kind === "click") {
+		const click = parseClickPayload(body);
+		if (click === undefined) {
+			return "click requires non-negative numeric x and y";
+		}
+		const serialized = JSON.stringify(click);
+		return { rawPayload: serialized, safePayload: serialized };
+	}
+	const recipe = job.details.recipeId === null ? undefined : getRecipeById(db, job.details.recipeId);
+	if (!recipe) {
+		throw new Error(`Job ${job.id} references a Recipe that no longer exists`);
+	}
+	return parseAssignPayload(recipe.definition.outputs, body);
+}
+
 // Validated before anything is persisted for the Runner: invalid input is returned to the overlay
 // and creates no command. The response only ever carries the safe form of the command.
 export function submitCommand(db: Database.Database, rawId: string, body: unknown): JobActionResult {
@@ -105,28 +157,20 @@ export function submitCommand(db: Database.Database, rawId: string, body: unknow
 	if (typeof body.commandKey !== "string" || body.commandKey.trim() === "") {
 		return { status: 400, body: { error: "commandKey is required" } };
 	}
-	if (body.kind !== "click") {
-		return { status: 400, body: { error: "kind must be click" } };
+	if (body.kind !== "click" && body.kind !== "assign") {
+		return { status: 400, body: { error: "kind must be click or assign" } };
 	}
-	const payload = parseClickPayload(body);
-	if (payload === undefined) {
-		return { status: 400, body: { error: "click requires non-negative numeric x and y" } };
-	}
+	const kind: InterventionCommandKind = body.kind;
 	const job = findRecipeJob(db, rawId);
 	if (isJobActionResult(job)) {
 		return job;
 	}
+	const payloads = buildCommandPayloads(db, job, kind, body);
+	if (typeof payloads === "string") {
+		return { status: 400, body: { error: payloads } };
+	}
 
-	const serialized = JSON.stringify(payload);
-	const result = insertInterventionCommand(db, {
-		jobId: job.id,
-		operatorId,
-		commandKey: body.commandKey,
-		kind: "click",
-		rawPayload: serialized,
-		safePayload: serialized,
-		now: new Date()
-	});
+	const result = insertInterventionCommand(db, { jobId: job.id, operatorId, commandKey: body.commandKey, kind, ...payloads, now: new Date() });
 	if (!("command" in result)) {
 		const errors = {
 			busy: `Job ${rawId} already has a command pending`,
@@ -135,6 +179,6 @@ export function submitCommand(db: Database.Database, rawId: string, body: unknow
 		};
 		return { status: 409, body: { error: errors[result.outcome] } };
 	}
-	const { id, commandKey, kind, status, safePayload } = result.command;
+	const { id, commandKey, status, safePayload } = result.command;
 	return { status: 200, body: { data: { id, commandKey, kind, status, safePayload: JSON.parse(safePayload) as unknown } } };
 }

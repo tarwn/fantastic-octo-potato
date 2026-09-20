@@ -80,7 +80,11 @@ function failingDefinition(): RecipeDefinition {
 	return {
 		schemaVersion: 1,
 		inputs: INVOICE_NUMBER_INPUT,
-		outputs: {},
+		// Declared so an operator can assign them during intervention.
+		outputs: {
+			invoiceStatus: { type: "string", description: "Status an operator read from the invoice", required: false, nullable: false, sensitive: false },
+			accountNote: { type: "string", description: "Private note an operator read from the account", required: false, nullable: false, sensitive: true }
+		},
 		steps: [
 			...LOGIN_STEPS,
 			{

@@ -65,6 +65,7 @@ function renderOverlay(
 		onEndJob?: () => void;
 		onHandBack?: (resumeStepId: string) => void;
 		onClickCommand?: (x: number, y: number) => Promise<number>;
+		onAssignCommand?: (name: string, value: string) => Promise<number>;
 	} = {}
 ) {
 	return render(InterventionOverlay, {
@@ -72,6 +73,7 @@ function renderOverlay(
 		operatorId: overrides.operatorId ?? "op-1",
 		endError: null,
 		onClickCommand: overrides.onClickCommand ?? vi.fn().mockResolvedValue(1),
+		onAssignCommand: overrides.onAssignCommand ?? vi.fn().mockResolvedValue(1),
 		onEndJob: overrides.onEndJob ?? vi.fn(),
 		onHandBack: overrides.onHandBack ?? vi.fn(),
 		onClose: overrides.onClose ?? vi.fn()
@@ -226,6 +228,50 @@ describe("InterventionOverlay", () => {
 
 			expect(screen.queryByTestId("screenshot-target")).not.toBeInTheDocument();
 			expect(screen.getByRole("img")).toBeInTheDocument();
+		});
+	});
+
+	describe("assign command", () => {
+		const enter = (text: string) => fireEvent.input(screen.getByTestId("assign-input"), { target: { value: text } });
+
+		it("submits name=value split at the first equals sign, then clears the input and shows the loading state", async () => {
+			const onAssignCommand = vi.fn().mockResolvedValue(6);
+			renderOverlay({ onAssignCommand });
+			await enter("note=a=b");
+
+			await fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+
+			expect(onAssignCommand).toHaveBeenCalledWith("note", "a=b");
+			expect(await screen.findByTestId("command-loading")).toBeInTheDocument();
+			expect(screen.getByTestId("assign-input")).toHaveValue("");
+			expect(screen.getByTestId("assign-input")).toBeDisabled();
+		});
+
+		it("rejects input without name=value locally and sends nothing", async () => {
+			const onAssignCommand = vi.fn();
+			renderOverlay({ onAssignCommand });
+			await enter("justaname");
+
+			await fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+
+			expect(screen.getByTestId("command-error")).toHaveTextContent("name=value");
+			expect(onAssignCommand).not.toHaveBeenCalled();
+		});
+
+		it("shows Hub's rejection and keeps the typed text", async () => {
+			renderOverlay({ onAssignCommand: vi.fn().mockRejectedValue(new Error("nope is not an output declared by this Recipe")) });
+			await enter("nope=1");
+
+			await fireEvent.click(screen.getByRole("button", { name: "Assign" }));
+
+			expect(await screen.findByTestId("command-error")).toHaveTextContent("not an output declared");
+			expect(screen.getByTestId("assign-input")).toHaveValue("nope=1");
+		});
+
+		it("offers no assign input to a non-owner", () => {
+			renderOverlay({ operatorId: "op-2" });
+
+			expect(screen.queryByTestId("assign-input")).not.toBeInTheDocument();
 		});
 	});
 

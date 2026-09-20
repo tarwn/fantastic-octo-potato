@@ -197,12 +197,10 @@ export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string,
 }
 
 // Mirrors src/hub/src/lib/server/runner/interventionCommandActions.ts's pending-command wire shape.
-export interface PendingCommand {
-	id: number;
-	stepId: string;
-	kind: "click";
-	payload: { x: number; y: number };
-}
+export type PendingCommand = { id: number; stepId: string } & (
+	| { kind: "click"; payload: { x: number; y: number } }
+	| { kind: "assign"; payload: { name: string; value: string | number | boolean } }
+);
 
 export interface CommandResult {
 	outcome: "succeeded" | "failed";

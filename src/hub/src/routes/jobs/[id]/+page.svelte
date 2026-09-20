@@ -13,7 +13,7 @@
 	import TranscriptPanel from "./_components/TranscriptPanel.svelte";
 
 	import { page } from "$app/state";
-	import { cancelJob, endJob, fetchJob, handBackJob, submitClickCommand, takeControl } from "$lib/api/jobsApi";
+	import { cancelJob, endJob, fetchJob, handBackJob, submitAssignCommand, submitClickCommand, takeControl } from "$lib/api/jobsApi";
 	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
@@ -127,6 +127,12 @@
 		if (!job) throw new Error("Job not loaded");
 
 		return submitClickCommand(job.id, operatorId, crypto.randomUUID(), x, y);
+	}
+
+	async function handleAssignCommand(name: string, value: string): Promise<number> {
+		if (!job) throw new Error("Job not loaded");
+
+		return submitAssignCommand(job.id, operatorId, crypto.randomUUID(), name, value);
 	}
 
 	function closeOverlay(notice: string | null) {
@@ -256,6 +262,7 @@
 					{operatorId}
 					endError={interventionError}
 					onClickCommand={handleClickCommand}
+					onAssignCommand={handleAssignCommand}
 					onEndJob={handleEndJob}
 					onHandBack={handleHandBack}
 					onClose={closeOverlay}

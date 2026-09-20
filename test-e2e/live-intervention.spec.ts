@@ -210,6 +210,41 @@ test.describe("live human intervention shell (spec 0013 Step 1)", () => {
 		await expect.poll(() => jobStatusOf(request, blocked.jobId), { timeout: 30_000 }).toBe(3);
 	});
 
+	test("the owner assigns outputs then hands back past the extraction: Results show the values and a sensitive one stays masked", async ({ page, request, baseURL }) => {
+		const blocked = await createBlockedRecipeJob(request);
+		await page.goto(`/jobs/${blocked.jobId}`);
+		runner = spawnRunner(baseURL!, runnerOutput);
+
+		await page.getByRole("button", { name: "Take Control" }).click({ timeout: 60_000 });
+		const overlay = page.getByRole("dialog");
+		const assignInput = overlay.getByTestId("assign-input");
+
+		await assignInput.fill("nope=1");
+		await overlay.getByRole("button", { name: "Assign" }).click();
+		await expect(overlay.getByTestId("command-error")).toContainText("not an output declared");
+
+		await assignInput.fill("invoiceStatus=Paid in full");
+		await overlay.getByRole("button", { name: "Assign" }).click();
+		await expect(overlay.getByRole("list", { name: "Recent transcript" })).toContainText(/intervention-\d+: succeeded/, { timeout: 30_000 });
+		await expect(overlay.getByTestId("command-loading")).toHaveCount(0);
+
+		await assignInput.fill("accountNote=hunter2");
+		await overlay.getByRole("button", { name: "Assign" }).click();
+		await expect.poll(async () => {
+			const detail = (await (await request.get(`/api/hub/jobs/${blocked.jobId}`)).json()) as { data: { results: { fieldName: string }[] } };
+			return detail.data.results.length;
+		}, { timeout: 30_000 }).toBe(2);
+
+		await overlay.getByTestId("resume-step").selectOption("complete");
+		await overlay.getByRole("button", { name: "Hand Back" }).click();
+		await expect.poll(() => jobStatusOf(request, blocked.jobId), { timeout: 30_000 }).toBe(3);
+
+		const detailResponse = await request.get(`/api/hub/jobs/${blocked.jobId}`);
+		const detailText = await detailResponse.text();
+		expect(detailText).toContain("Paid in full");
+		expect(detailText).not.toContain("hunter2");
+	});
+
 	test("cancelling a Job under human control closes the overlay and shows the new status", async ({ page, request, baseURL }) => {
 		const blocked = await createBlockedRecipeJob(request);
 		await page.goto(`/jobs/${blocked.jobId}`);

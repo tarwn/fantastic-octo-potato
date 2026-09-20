@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { toDbDate } from "../db/dates.ts";
 import { JobStatus } from "../db/jobStatus.ts";
 
-export type InterventionCommandKind = "click";
+export type InterventionCommandKind = "click" | "assign";
 
 export interface InterventionCommand {
 	id: number;
@@ -49,6 +49,10 @@ export function insertInterventionCommand(
 		const command = db.prepare(`SELECT ${COLUMNS} FROM intervention_command WHERE id = ?`).get(lastInsertRowid) as InterventionCommand;
 		return { outcome: "created", command };
 	})();
+}
+
+export function getInterventionCommand(db: Database.Database, jobId: number, commandId: number): InterventionCommand | undefined {
+	return db.prepare(`SELECT ${COLUMNS} FROM intervention_command WHERE id = ? AND job_id = ?`).get(commandId, jobId) as InterventionCommand | undefined;
 }
 
 export function getPendingInterventionCommand(db: Database.Database, jobId: number): InterventionCommand | undefined {

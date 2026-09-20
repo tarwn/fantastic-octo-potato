@@ -16,6 +16,7 @@
 		operatorId,
 		endError,
 		onClickCommand,
+		onAssignCommand,
 		onHandBack,
 		onEndJob,
 		onClose
@@ -24,6 +25,7 @@
 		operatorId: string;
 		endError: string | null;
 		onClickCommand: (x: number, y: number) => Promise<number>;
+		onAssignCommand: (name: string, value: string) => Promise<number>;
 		onHandBack: (resumeStepId: string) => void;
 		onEndJob: () => void;
 		onClose: (notice: string | null) => void;
@@ -44,6 +46,7 @@
 	// A submitted command blocks input until its Transcript entry and screenshot have both arrived.
 	let pendingStepId = $state<string | null>(null);
 	let commandError = $state<string | null>(null);
+	let assignText = $state("");
 	const commandPending = $derived(
 		pendingStepId !== null &&
 		!(
@@ -75,12 +78,29 @@
 		const x = Math.round((event.clientX - bounds.left) * (target.naturalWidth / bounds.width));
 		const y = Math.round((event.clientY - bounds.top) * (target.naturalHeight / bounds.height));
 
+		await submit(() => onClickCommand(x, y));
+	}
+
+	async function submit(send: () => Promise<number>) {
 		commandError = null;
 		try {
-			pendingStepId = interventionStepId(await onClickCommand(x, y));
+			pendingStepId = interventionStepId(await send());
 		}
 		catch (err) {
 			commandError = err instanceof Error ? err.message : "Failed to send command";
+		}
+	}
+
+	async function handleAssign(event: SubmitEvent) {
+		event.preventDefault();
+		const separator = assignText.indexOf("=");
+		if (separator < 1) {
+			commandError = "Enter the assignment as name=value";
+			return;
+		}
+		await submit(() => onAssignCommand(assignText.slice(0, separator).trim(), assignText.slice(separator + 1)));
+		if (commandError === null) {
+			assignText = "";
 		}
 	}
 
@@ -138,6 +158,10 @@
 	{/if}
 	<div class="overlay-actions">
 		{#if isOwner}
+			<form class="assign-form" onsubmit={handleAssign}>
+				<input type="text" bind:value={assignText} disabled={busy} placeholder="name=value" aria-label="Assign an output" data-testid="assign-input" />
+				<button type="submit" class="btn" disabled={busy || assignText.trim() === ""}>Assign</button>
+			</form>
 			<label class="resume-select">
 				Resume at
 				<select bind:value={resumeStepId} disabled={busy} data-testid="resume-step">
@@ -271,11 +295,17 @@
 		font-size: $text-small-size;
 	}
 
-	.resume-select {
+	.assign-form {
 		display: flex;
 		align-items: center;
 		gap: $space-s;
 		margin-right: auto;
+	}
+
+	.resume-select {
+		display: flex;
+		align-items: center;
+		gap: $space-s;
 		font-size: $text-small-size;
 	}
 

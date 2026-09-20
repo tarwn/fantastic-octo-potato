@@ -5,7 +5,7 @@ import { reportDslStep } from "../jobs/recipeJobs/reportDslStep";
 import { isRecord } from "../jobs/types";
 import { JobStatus } from "../storage/db/jobStatus";
 import { JobType } from "../storage/db/jobType";
-import { completeInterventionCommand, getPendingInterventionCommand } from "../storage/repositories/interventionCommandRepository";
+import { completeInterventionCommand, getInterventionCommand, getPendingInterventionCommand } from "../storage/repositories/interventionCommandRepository";
 import { getJobById, type Job } from "../storage/repositories/jobRepository";
 
 import type { RunnerActionResult } from "./runnerActions";
@@ -41,6 +41,11 @@ function findAssignedRecipeJob(
 
 function isRunnerActionResult(value: { job: RecipeJob; runnerId: number } | RunnerActionResult): value is RunnerActionResult {
 	return "status" in value;
+}
+
+function toExtraction(rawPayload: string): { fieldName: string; value: string } {
+	const { name, value } = JSON.parse(rawPayload) as { name: string; value: string | number | boolean };
+	return { fieldName: name, value: String(value) };
 }
 
 // The only place a command's raw payload leaves the Hub. Nothing is returned unless the Job is still Interactive-User.
@@ -90,9 +95,12 @@ export function reportCommandResult(
 
 	const { job, runnerId } = found;
 	const accepted = db.transaction(() => {
-		if (!completeInterventionCommand(db, job.id, commandId)) {
+		const command = getInterventionCommand(db, job.id, commandId);
+		if (!command || !completeInterventionCommand(db, job.id, commandId)) {
 			return false;
 		}
+		// The assigned value only ever comes from the Hub's own copy, so the Runner's report can't alter what reaches Results.
+		const extractions = command.kind === "assign" && outcome === "succeeded" ? [toExtraction(command.rawPayload)] : [];
 		reportDslStep(
 			db,
 			job,
@@ -102,7 +110,7 @@ export function reportCommandResult(
 				stepId: interventionStepId(commandId),
 				outcome,
 				targetDescription: target,
-				extractions: []
+				extractions
 			},
 			new Date()
 		);
