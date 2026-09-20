@@ -1,79 +1,14 @@
 import type Database from "better-sqlite3";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { FieldDeclaration } from "../../types/recipeDefinition";
-import { sendChatCompletion } from "../llm/llmClient";
 import { getPendingCommand, reportCommandResult } from "../runner/interventionCommandActions";
-import { reportJobStep } from "../runner/runnerActions";
 import { useIntegrationTestDb } from "../storage/db/_test/integrationTestDb";
 import { JobStatus } from "../storage/db/jobStatus";
-import { JobType } from "../storage/db/jobType";
-import { claimNextJobForRunner, insertJob, listTranscriptEntries } from "../storage/repositories/jobRepository";
-import { createDraftRecipe, publishRecipe } from "../storage/repositories/recipeRepository";
+import { listTranscriptEntries } from "../storage/repositories/jobRepository";
 
-import { endJob, submitCommand, submitPromptCommand, takeControl } from "./interventionActions";
+import { endJob, submitCommand } from "./interventionActions";
+import { assign, AUTH, click, RESULT_BODY, seedInteractiveJob, SHARED_SECRET } from "./interventionTestSeed";
 import { cancelJob, getJobDetail } from "./jobActions";
-
-vi.mock("../llm/llmClient", () => ({ sendChatCompletion: vi.fn() }));
-
-const SHARED_SECRET = "test-secret";
-const AUTH = `Bearer ${SHARED_SECRET}`;
-const now = new Date("2026-09-15T00:00:00.000Z");
-const RESULT_BODY = { outcome: "succeeded", targetDescription: { component: "element", selector: "" } };
-
-const OUTPUTS: Record<string, FieldDeclaration> = {
-	status: { type: "string", description: "Status", required: false, nullable: false, sensitive: false },
-	total: { type: "number", description: "Total", required: false, nullable: false, sensitive: false },
-	paid: { type: "boolean", description: "Paid", required: false, nullable: false, sensitive: false },
-	stage: { type: "string", description: "Stage", required: false, nullable: false, sensitive: false, enum: ["open", "closed"] },
-	secret: { type: "string", description: "Secret", required: false, nullable: false, sensitive: true }
-};
-
-function seedRecipeJob(db: Database.Database): number {
-	db.exec(`
-		INSERT INTO customer (id, name) VALUES (1, 'Acme');
-		INSERT INTO application (id, name) VALUES (1, 'Widgets');
-		INSERT INTO customer_application_xref (id, customer_id, application_id) VALUES (1, 1, 1);
-		INSERT INTO runner (id, customer_application_xref_id) VALUES (1, 1);
-		INSERT INTO runner (id, customer_application_xref_id) VALUES (2, 1);
-	`);
-	const draft = createDraftRecipe(db, {
-		customerApplicationXrefId: 1,
-		name: "Recipe",
-		goal: "Goal",
-		definition: { schemaVersion: 1, inputs: {}, outputs: { ...OUTPUTS }, steps: [{ id: "open_home", action: "open", args: ["https://example.com"] }], recoveries: [] },
-		sourceTrainingRunId: null,
-		createdAt: now
-	});
-	publishRecipe(db, draft.id, now);
-	const job = insertJob(db, {
-		jobType: JobType.Recipe,
-		name: "Recipe",
-		customerApplicationXrefId: 1,
-		recipeId: draft.id,
-		mode: "Trial",
-		allowlist: "https://example.com",
-		stepTimeoutMs: 15000,
-		createdAt: now
-	});
-	claimNextJobForRunner(db, 1, 1, now);
-	return job.id;
-}
-
-async function seedInteractiveJob(db: Database.Database): Promise<number> {
-	const jobId = seedRecipeJob(db);
-	await reportJobStep(db, "1", String(jobId), AUTH, SHARED_SECRET, {
-		kind: "status",
-		status: JobStatus.InterventionRequested,
-		message: "Step click_missing failed",
-		blockedStepId: "click_missing"
-	});
-	takeControl(db, String(jobId), { operatorId: "op-1" });
-	return jobId;
-}
-
-const assign = (overrides: Record<string, unknown> = {}) => ({ operatorId: "op-1", commandKey: "key-1", kind: "assign", name: "status", value: "shipped", ...overrides });
-const click = (overrides: Record<string, unknown> = {}) => ({ operatorId: "op-1", commandKey: "key-1", kind: "click", x: 10, y: 20, ...overrides });
 
 describe("interventionCommands", () => {
 	const getDb = useIntegrationTestDb();
@@ -224,6 +159,24 @@ describe("interventionCommands", () => {
 		});
 	});
 
+	describe("getJobDetail", () => {
+		it("resolves each completed command Step to its action instead of crashing", async () => {
+			const jobId = await seedInteractiveJob(getDb());
+			const finish = (body: unknown) => {
+				const { id } = (submitCommand(getDb(), String(jobId), body).body as { data: { id: number } }).data;
+				reportCommandResult(getDb(), "1", String(jobId), String(id), AUTH, SHARED_SECRET, RESULT_BODY);
+				return id;
+			};
+			const clickId = finish(click());
+			const assignId = finish(assign({ commandKey: "key-2" }));
+
+			const actions = (getJobDetail(getDb(), String(jobId)).body as { data: { transcript: { text: { stepId?: string; action?: string } }[] } }).data.transcript
+				.filter((entry) => entry.text.stepId?.startsWith("intervention-"))
+				.map((entry) => [entry.text.stepId, entry.text.action]);
+			expect(actions).toEqual([[`intervention-${clickId}`, "click"], [`intervention-${assignId}`, "assign"]]);
+		});
+	});
+
 	describe("voiding", () => {
 		it.each([
 			["cancelled", (db: Database.Database, jobId: number) => cancelJob(db, String(jobId))],
@@ -307,93 +260,6 @@ describe("interventionCommands", () => {
 
 			expect(reportCommandResult(getDb(), "1", String(jobId), "abc", AUTH, SHARED_SECRET, RESULT_BODY).status).toBe(404);
 			expect(reportCommandResult(getDb(), "2", String(jobId), "1", AUTH, SHARED_SECRET, RESULT_BODY).status).toBe(403);
-		});
-	});
-
-	describe("submitPromptCommand", () => {
-		const prompt = (overrides: Record<string, unknown> = {}) => ({ operatorId: "op-1", commandKey: "key-1", kind: "prompt", prompt: "Click the Save button", ...overrides });
-		const validStep = JSON.stringify({ id: "click_save", action: "click", args: [{ by: "text", value: "Save" }], intent: "Click Save" });
-
-		beforeEach(() => {
-			vi.mocked(sendChatCompletion).mockReset().mockResolvedValue(validStep);
-		});
-
-		it("converts the prompt to one atomic Step and serves it to the Runner, returning no Step values", async () => {
-			const jobId = await seedInteractiveJob(getDb());
-
-			const result = await submitPromptCommand(getDb(), String(jobId), prompt());
-
-			expect(result.status).toBe(200);
-			const { id } = (result.body as { data: { id: number } }).data;
-			expect(sendChatCompletion).toHaveBeenCalledTimes(1);
-			expect(JSON.stringify(result.body)).not.toContain("args");
-			expect(getPendingCommand(getDb(), "1", String(jobId), AUTH, SHARED_SECRET).body).toMatchObject({
-				data: { id, kind: "prompt", payload: { step: { action: "click", args: [{ by: "text", value: "Save" }] } } }
-			});
-		});
-
-		it("retries an invalid response, then persists the corrected Step", async () => {
-			vi.mocked(sendChatCompletion).mockResolvedValueOnce("not json");
-			const jobId = await seedInteractiveJob(getDb());
-
-			expect((await submitPromptCommand(getDb(), String(jobId), prompt())).status).toBe(200);
-			expect(sendChatCompletion).toHaveBeenCalledTimes(2);
-		});
-
-		it.each([
-			["never valid", "not json"],
-			["a Step that ends the run", JSON.stringify({ id: "done", action: "finish", args: [null] })]
-		])("returns 422 and creates no command when the response is %s", async (_label, response) => {
-			vi.mocked(sendChatCompletion).mockResolvedValue(response);
-			const jobId = await seedInteractiveJob(getDb());
-
-			expect((await submitPromptCommand(getDb(), String(jobId), prompt())).status).toBe(422);
-			expect(getDb().prepare("SELECT COUNT(*) AS n FROM intervention_command").get()).toEqual({ n: 0 });
-		});
-
-		it("gives the model only the prompt, declared names, and masked Transcript", async () => {
-			const jobId = await seedInteractiveJob(getDb());
-			const first = submitCommand(getDb(), String(jobId), assign({ name: "secret", value: "hunter2" }));
-			reportCommandResult(getDb(), "1", String(jobId), String((first.body as { data: { id: number } }).data.id), AUTH, SHARED_SECRET, RESULT_BODY);
-
-			await submitPromptCommand(getDb(), String(jobId), prompt({ commandKey: "key-2" }));
-
-			const request = JSON.stringify(vi.mocked(sendChatCompletion).mock.calls[0][0]);
-			expect(request).toContain("Click the Save button");
-			expect(request).toContain("secret");
-			expect(request).not.toContain("hunter2");
-		});
-
-		it("returns the original command without another LLM call for a duplicate commandKey", async () => {
-			const jobId = await seedInteractiveJob(getDb());
-			const first = await submitPromptCommand(getDb(), String(jobId), prompt());
-
-			const second = await submitPromptCommand(getDb(), String(jobId), prompt());
-
-			expect((second.body as { data: { id: number } }).data.id).toBe((first.body as { data: { id: number } }).data.id);
-			expect(sendChatCompletion).toHaveBeenCalledTimes(1);
-		});
-
-		it.each([
-			["a different prompt under a reused commandKey", { prompt: "Other" }],
-			["a non-owner replaying the key", { operatorId: "op-2" }]
-		])("rejects %s with 409 without another LLM call", async (_label, overrides) => {
-			const jobId = await seedInteractiveJob(getDb());
-			await submitPromptCommand(getDb(), String(jobId), prompt());
-
-			expect((await submitPromptCommand(getDb(), String(jobId), prompt(overrides))).status).toBe(409);
-			expect(sendChatCompletion).toHaveBeenCalledTimes(1);
-		});
-
-		it.each([
-			["a missing prompt", { prompt: " " }],
-			["a missing operatorId", { operatorId: undefined }],
-			["a missing commandKey", { commandKey: "" }]
-		])("rejects %s with 400 without calling the LLM", async (_label, overrides) => {
-			const jobId = await seedInteractiveJob(getDb());
-
-			expect((await submitPromptCommand(getDb(), String(jobId), prompt(overrides))).status).toBe(400);
-			expect(sendChatCompletion).not.toHaveBeenCalled();
 		});
 	});
 });

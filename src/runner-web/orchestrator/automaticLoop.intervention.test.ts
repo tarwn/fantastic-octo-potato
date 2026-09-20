@@ -225,6 +225,28 @@ describe("runRecipeJobLoop: operator commands", () => {
 		expect(uploadArtifact).toHaveBeenCalledWith(config, job.comms.artifactsUrl, "intervention-9", expect.any(String));
 	}, 20000);
 
+	it("retries a command's screenshot once when the first attempt fails, e.g. mid-navigation", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+		let failedOnce = false;
+		vi.mocked(uploadArtifact).mockImplementation((_config, _url, stepId) => {
+			if (stepId === "intervention-7" && !failedOnce) {
+				failedOnce = true;
+				return Promise.reject(new Error("Execution context was destroyed"));
+			}
+			return Promise.resolve({ id: 1 });
+		});
+
+		try {
+			await runRecipeJobLoop(config, commandJob(clickableFixture), 0.3);
+		}
+		finally {
+			vi.mocked(uploadArtifact).mockResolvedValue({ id: 1 });
+		}
+
+		expect(vi.mocked(uploadArtifact).mock.calls.filter(([, , stepId]) => stepId === "intervention-7")).toHaveLength(2);
+	}, 20000);
+
 	it("resets the idle timeout after each command", async () => {
 		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
 		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);

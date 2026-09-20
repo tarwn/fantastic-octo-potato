@@ -260,7 +260,7 @@ test.describe("live human intervention shell (spec 0013 Step 1)", () => {
 
 			await overlay.getByTestId("prompt-input").fill("Click the top left corner");
 			await overlay.getByRole("button", { name: "Prompt" }).click();
-			await expect(overlay.getByRole("list", { name: "Recent transcript" })).toContainText(/intervention-d+: (succeeded|failed)/, { timeout: 30_000 });
+			await expect(overlay.getByRole("list", { name: "Recent transcript" })).toContainText(/intervention-\d+: (succeeded|failed)/, { timeout: 30_000 });
 			await expect(overlay.getByTestId("command-loading")).toHaveCount(0);
 			expect(await getLlmRequestCount()).toBe(1);
 

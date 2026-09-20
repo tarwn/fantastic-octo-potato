@@ -43,6 +43,16 @@ function props(entries: JobTranscriptEntry[], steps: Step[] = [], recoveries: Re
 }
 
 describe("TranscriptPanel", () => {
+	it("renders an operator command Step from its observed target, since no Recipe Step defines it", async () => {
+		const entry = stepEntry(1, { stepId: "intervention-3", action: "click", targetDescription: { component: "browser", selector: "" } });
+		render(TranscriptPanel, props([entry], [openStep("open_home")]));
+
+		expect(screen.getByText("intervention-3: click on browser")).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole("button", { name: "Toggle details for intervention-3" }));
+		expect(screen.queryByText("recipe step:")).not.toBeInTheDocument();
+		expect(screen.getByText(/observed:/)).toBeInTheDocument();
+	});
+
 	it("renders a non-Step entry's text as a plain string", () => {
 		const entries: JobTranscriptEntry[] = [
 			{

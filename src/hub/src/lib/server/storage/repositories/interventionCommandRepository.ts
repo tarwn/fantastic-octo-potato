@@ -73,6 +73,15 @@ export function voidPendingInterventionCommands(db: Database.Database, jobId: nu
 	db.prepare("UPDATE intervention_command SET status = 'Voided' WHERE job_id = ? AND status = 'Pending'").run(jobId);
 }
 
+// Safe form only: callers outside the Runner endpoint must never see a command's raw payload.
+export function listInterventionCommandSafeSummaries(db: Database.Database, jobId: number): { id: number; kind: InterventionCommandKind; safePayload: string }[] {
+	return db.prepare("SELECT id, kind, safe_payload AS safePayload FROM intervention_command WHERE job_id = ? ORDER BY id").all(jobId) as {
+		id: number;
+		kind: InterventionCommandKind;
+		safePayload: string;
+	}[];
+}
+
 export function getInterventionCommandByKey(db: Database.Database, jobId: number, commandKey: string): InterventionCommand | undefined {
 	return db.prepare(`SELECT ${COLUMNS} FROM intervention_command WHERE job_id = ? AND command_key = ?`).get(jobId, commandKey) as InterventionCommand | undefined;
 }

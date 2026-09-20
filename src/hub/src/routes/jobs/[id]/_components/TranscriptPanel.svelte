@@ -6,6 +6,7 @@
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import StepDescription from "$lib/components/step/StepDescription.svelte";
+	import { isInterventionStepId } from "$lib/interventionCommand";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { SensitivityType } from "$lib/sensitivityType";
@@ -43,7 +44,9 @@
 		return undefined;
 	}
 
-	function findStep(stepId: string): Step {
+	// Operator commands aren't part of the Recipe, so they have no definition to describe.
+	function findStep(stepId: string): Step | undefined {
+		if (isInterventionStepId(stepId)) return undefined;
 		const recoverySteps: ChildStep[] = recoveries.flatMap((recovery) => recovery.steps);
 		const found = findIn([...steps, ...recoverySteps], stepId);
 		if (!found) throw new Error(`Step ${stepId} not found in the definition`);
@@ -134,8 +137,8 @@
 						<span class="transcript-time">{entry.createdAt.toLocaleTimeString()}</span>
 						<span class={`transcript-kind-${kindName(entry.kind).toLowerCase()}`}>{kindName(entry.kind).toUpperCase()}</span>
 						<span class="transcript-text">
-							{#if step && definition}
-								<span class="transcript-step-message">{definition.intent ?? stepMessage(step)}</span>
+							{#if step}
+								<span class="transcript-step-message">{definition?.intent ?? stepMessage(step)}</span>
 								{#each step.inputs as field (field.fieldName)}
 									{@render transcriptStepField("input", field)}
 								{/each}
@@ -168,11 +171,13 @@
 							{/if}
 						</span>
 					</div>
-					{#if step && definition && expanded.has(entry.sequence)}
+					{#if step && expanded.has(entry.sequence)}
 						<div class="transcript-detail">
 							<div>id: {step.stepId}</div>
 							<div>outcome: {step.outcome}</div>
-							<div><span class="transcript-detail-label">recipe step:</span> <StepDescription step={definition} /></div>
+							{#if definition}
+								<div><span class="transcript-detail-label">recipe step:</span> <StepDescription step={definition} /></div>
+							{/if}
 							<div><span class="transcript-detail-label">observed:</span> {observedMessage(step)}</div>
 						</div>
 					{/if}

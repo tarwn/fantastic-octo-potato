@@ -3,3 +3,7 @@
 export function interventionStepId(commandId: number): string {
 	return `intervention-${commandId}`;
 }
+
+export function isInterventionStepId(stepId: string): boolean {
+	return /^intervention-\d+$/.test(stepId);
+}

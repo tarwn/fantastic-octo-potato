@@ -354,7 +354,11 @@ async function runCommand(deps: LoopDeps, command: PendingCommand): Promise<bool
 
 	const accepted = await reportCommandResult(deps.config, deps.job.id, command.id, { outcome: actionResult.outcome, targetDescription: actionResult.targetDescription });
 	if (accepted) {
-		await captureAndUploadArtifact(stepReportingDeps(deps), step.id);
+		// The overlay waits on this screenshot, and one taken mid-navigation (a click on a link) fails, so retry once the page settles.
+		if (!(await captureAndUploadArtifact(stepReportingDeps(deps), step.id))) {
+			await deps.page.waitForLoadState();
+			await captureAndUploadArtifact(stepReportingDeps(deps), step.id);
+		}
 	}
 	return true;
 }
