@@ -39,9 +39,9 @@
 	<div class="transcript-step-field">
 		<span class="transcript-step-field-label">{label}: {field.fieldName}</span>
 		{#if field.sensitivityType !== SensitivityType.None}
-			<RedactedValue value={field.safeValue} />
+			→ <RedactedValue value={field.safeValue} />
 		{:else}
-			<span class="transcript-step-field-value">{field.safeValue}</span>
+			→ <span class="transcript-step-field-value">{field.safeValue}</span>
 		{/if}
 	</div>
 {/snippet}
