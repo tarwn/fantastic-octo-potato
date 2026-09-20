@@ -79,6 +79,12 @@ describe("PublishRecipeModal", () => {
 		expect(publishRecipe).toHaveBeenCalledWith(1, { name: "Final" });
 	});
 
+	it("limits the name input to 40 characters", () => {
+		render(PublishRecipeModal, { open: true, onClose: vi.fn(), onPublished: vi.fn(), recipe: sampleRecipe(), publishedRecipes: [] });
+
+		expect(screen.getByLabelText("Name")).toHaveAttribute("maxlength", "40");
+	});
+
 	it("publishes with the chosen replacement", async () => {
 		vi.mocked(publishRecipe).mockResolvedValue(sampleRecipe({ state: "Published" }));
 		render(PublishRecipeModal, { open: true, onClose: vi.fn(), onPublished: vi.fn(), recipe: sampleRecipe(), publishedRecipes: [LIVE] });

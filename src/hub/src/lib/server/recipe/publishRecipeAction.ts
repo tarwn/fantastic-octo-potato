@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 
+import { MAX_RECIPE_NAME_LENGTH } from "../../recipeName";
 import { RecipeStatus } from "../storage/db/recipeStatus";
 import { getQualifyingTrialJobIds, getRecipeById, publishRecipe, RecipePublishConflictError } from "../storage/repositories/recipeRepository";
 
@@ -14,8 +15,6 @@ interface PublishRecipeBody {
 	name?: unknown;
 	replacesRecipeId?: unknown;
 }
-
-const MAX_RECIPE_NAME_LENGTH = 100;
 
 export function publishRecipeAction(db: Database.Database, rawRecipeId: string, body: PublishRecipeBody): PublishRecipeActionResult {
 	const recipeId = Number(rawRecipeId);

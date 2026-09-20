@@ -47,7 +47,7 @@ const FINISH_STEP: ChildStep = { id: "s2", action: "finish", args: [null] };
 
 beforeEach(() => {
 	vi.mocked(deriveNextStep).mockReset().mockResolvedValue(CLICK_SEARCH_STEP);
-	vi.mocked(compileRecipe).mockReset().mockResolvedValue(COMPILED_DEFINITION);
+	vi.mocked(compileRecipe).mockReset().mockResolvedValue({ definition: COMPILED_DEFINITION, name: "Compiled name" });
 });
 
 function seedRunner(db: Database.Database): number {
@@ -206,7 +206,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		const recipes = listRecipesForApplication(db, 1);
 		expect(recipes).toHaveLength(1);
 		expect(recipes[0]).toEqual(
-			expect.objectContaining({ goal: "Extract invoice total", definition: COMPILED_DEFINITION, sourceTrainingRunId: String(jobId) })
+			expect.objectContaining({ name: "Compiled name", goal: "Extract invoice total", definition: COMPILED_DEFINITION, sourceTrainingRunId: String(jobId) })
 		);
 	});
 

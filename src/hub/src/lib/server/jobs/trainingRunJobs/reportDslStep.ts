@@ -153,7 +153,7 @@ export async function reportDslStep(
 		// status, and never leaves a partially-written/updated draft Recipe (R007) — createDraftRecipe
 		// itself re-validates before persisting.
 		try {
-			const definition = await compileRecipe({
+			const { definition, name } = await compileRecipe({
 				goal: job.details.goal,
 				transcriptSummary,
 				journal: buildJournal(transcriptEntries, listTrainingRunJobSteps(db, job.id)),
@@ -163,7 +163,7 @@ export async function reportDslStep(
 			});
 			createDraftRecipe(db, {
 				customerApplicationXrefId: job.customerApplicationXrefId,
-				name: job.details.goal,
+				name,
 				goal: job.details.goal,
 				definition,
 				sourceTrainingRunId: String(job.id),

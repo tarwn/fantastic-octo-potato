@@ -1,17 +1,18 @@
+import { MAX_RECIPE_NAME_LENGTH } from "../../recipeName";
 import type { JournalEntry } from "../jobs/transcriptSummary";
 import { validateRecipeDefinition } from "../recipe/recipeDefinitionValidation";
 import { SensitivityType } from "../storage/db/sensitivityType";
 
 import { RECIPE_SCHEMA_SYSTEM_PROMPT } from "./prompts/recipeCompilationPrompt";
 import { RECIPE_IDEAL_STEPS_SYSTEM_PROMPT } from "./prompts/recipeIdealStepsPrompt";
+import { RECIPE_NAME_SYSTEM_PROMPT } from "./prompts/recipeNamePrompt";
+import { RECIPE_RECOVERIES_SYSTEM_PROMPT } from "./prompts/recipeRecoveriesPrompt";
 import { sendChatCompletion } from "./llmClient";
 import { requireLlmConfig } from "./llmConfig";
 
-import type { Condition, FieldDeclaration, FieldType, RecipeDefinition, Step } from "$lib/types/recipeDefinition";
+import type { Condition, FieldDeclaration, FieldType, RecipeDefinition, Recovery, Step } from "$lib/types/recipeDefinition";
 
-// Turns a completed Training Run into a RecipeDefinition through focused LLM calls run in order,
-// each validated with a bounded retry before the next builds on it: (1) the final input/output
-// schema, (2) the ideal Steps. The finish checkpoint is always assembled here.
+// Four validated LLM calls in order (schema, Steps, recoveries, name); the finish checkpoint is assembled here.
 
 export interface RecipeCompilationIngredient {
 	fieldName: string;
@@ -57,12 +58,21 @@ interface CompiledSchema {
 	outputs: Record<string, FieldDeclaration>;
 }
 
-export async function compileRecipe(context: RecipeCompilationContext): Promise<RecipeDefinition> {
+export interface CompiledRecipe {
+	definition: RecipeDefinition;
+	name: string;
+}
+
+export async function compileRecipe(context: RecipeCompilationContext): Promise<CompiledRecipe> {
 	const schema = await runStage("schema", RECIPE_SCHEMA_SYSTEM_PROMPT, buildSchemaUserPrompt(context), (raw) => parseCompiledSchema(raw, context));
 	const steps = await runStage("steps", RECIPE_IDEAL_STEPS_SYSTEM_PROMPT, buildStepsUserPrompt(context, schema), (raw) =>
 		parseIdealSteps(raw, schema, context)
 	);
-	return { schemaVersion: 1, ...schema, steps, recoveries: [] };
+	const recoveries = await runStage("recoveries", RECIPE_RECOVERIES_SYSTEM_PROMPT, buildRecoveriesUserPrompt(context, schema, steps), (raw) =>
+		parseRecoveries(raw, schema, steps, context)
+	);
+	const name = await runStage("name", RECIPE_NAME_SYSTEM_PROMPT, buildNameUserPrompt(context, schema), parseName);
+	return { definition: { schemaVersion: 1, ...schema, steps, recoveries }, name };
 }
 
 // Each stage retries on its own so a later stage never re-pays for an earlier one's valid answer.
@@ -102,6 +112,14 @@ function buildSchemaUserPrompt(context: RecipeCompilationContext): string {
 
 function buildStepsUserPrompt(context: RecipeCompilationContext, schema: CompiledSchema): string {
 	return JSON.stringify({ goal: context.goal, inputs: schema.inputs, outputs: schema.outputs, journal: context.journal });
+}
+
+function buildRecoveriesUserPrompt(context: RecipeCompilationContext, schema: CompiledSchema, steps: Step[]): string {
+	return JSON.stringify({ goal: context.goal, inputs: schema.inputs, outputs: schema.outputs, steps, journal: context.journal });
+}
+
+function buildNameUserPrompt(context: RecipeCompilationContext, schema: CompiledSchema): string {
+	return JSON.stringify({ goal: context.goal, inputs: schema.inputs, outputs: schema.outputs });
 }
 
 function assembleInputs(compiled: Record<string, CompiledInputSchema>, context: RecipeCompilationContext): Record<string, FieldDeclaration> {
@@ -179,6 +197,43 @@ function requireIntents(steps: unknown[], raw: string): void {
 			requireIntents((args?.[1] as unknown[]) ?? [], raw);
 		}
 	}
+}
+
+function parseRecoveries(raw: string, schema: CompiledSchema, steps: Step[], context: RecipeCompilationContext): Recovery[] {
+	const { recoveries } = parseJsonObject(raw);
+	if (!Array.isArray(recoveries)) {
+		throw new Error(`LLM response is missing a recoveries array: ${raw}`);
+	}
+	for (const recovery of recoveries) {
+		if (typeof recovery !== "object" || recovery === null) {
+			throw new Error(`LLM response contains a recovery that is not an object: ${raw}`);
+		}
+		const { id, description, steps: recoverySteps } = recovery as { id?: unknown; description?: unknown; steps?: unknown };
+		if (typeof description !== "string" || description.trim() === "") {
+			throw new Error(`LLM response recovery ${String(id)} has no description: ${raw}`);
+		}
+		if (!Array.isArray(recoverySteps)) {
+			throw new Error(`LLM response recovery ${String(id)} has no steps array: ${raw}`);
+		}
+		requireIntents(recoverySteps, raw);
+	}
+	const errors = validateRecipeDefinition({ schemaVersion: 1, ...schema, steps, recoveries: recoveries as Recovery[] }, new Set(context.credentialNames));
+	if (errors.length > 0) {
+		throw new Error(`Compiled recoveries are invalid: ${errors.join("; ")} (raw: ${raw})`);
+	}
+	return recoveries as Recovery[];
+}
+
+function parseName(raw: string): string {
+	const { name } = parseJsonObject(raw);
+	if (typeof name !== "string" || name.trim() === "") {
+		throw new Error(`LLM response is missing a name: ${raw}`);
+	}
+	const trimmed = name.trim();
+	if (trimmed.length > MAX_RECIPE_NAME_LENGTH) {
+		throw new Error(`LLM response name is ${trimmed.length} characters, over the ${MAX_RECIPE_NAME_LENGTH} limit: ${raw}`);
+	}
+	return trimmed;
 }
 
 function parseCompiledSchema(raw: string, context: RecipeCompilationContext): CompiledSchema {
