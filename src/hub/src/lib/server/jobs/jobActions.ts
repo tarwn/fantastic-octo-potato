@@ -28,6 +28,7 @@ import { type Runner, updateRunnerHeartbeat } from "../storage/repositories/runn
 
 import { reportDslStep as reportRecipeJobDslStep } from "./recipeJobs/reportDslStep";
 import { reportDslStep as reportTrainingRunJobDslStep } from "./trainingRunJobs/reportDslStep";
+import { createStepActionResolver } from "./stepActionResolver";
 import { isJobStatus, isRecord, type JobActionResult, type ParseResult } from "./types";
 
 const NON_STEP_TRANSCRIPT_KIND: Record<"info" | "recover" | "observe" | "plan", Exclude<TranscriptKind, TranscriptKind.Step>> = {
@@ -79,6 +80,10 @@ function parseReportStepBody(body: unknown): ParseResult {
 			if (body.parentStepId !== undefined && typeof body.parentStepId !== "string") {
 				return { ok: false, error: "parentStepId must be a string" };
 			}
+			const target = body.targetDescription;
+			if (!isRecord(target) || typeof target.component !== "string" || target.component.trim() === "" || typeof target.selector !== "string") {
+				return { ok: false, error: "targetDescription is required as { component, selector }" };
+			}
 			const extractions = body.extractions ?? [];
 			if (
 				!Array.isArray(extractions) ||
@@ -103,6 +108,7 @@ function parseReportStepBody(body: unknown): ParseResult {
 					stepId: body.stepId,
 					outcome: body.outcome,
 					...(body.parentStepId !== undefined ? { parentStepId: body.parentStepId } : {}),
+					targetDescription: { component: target.component, selector: target.selector },
 					extractions,
 					...(body.credentialNames !== undefined ? { credentialNames: body.credentialNames as string[] } : {})
 				}
@@ -124,12 +130,16 @@ export function getJobDetail(db: Database.Database, rawId: string): JobActionRes
 		return { status: 404, body: { error: `Job ${rawId} not found` } };
 	}
 
+	const actionOf = createStepActionResolver(db, job);
+
 	return {
 		status: 200,
 		body: {
 			data: {
 				...job,
-				transcript: listTranscriptEntries(db, job.id),
+				transcript: listTranscriptEntries(db, job.id).map((entry) =>
+					entry.kind === TranscriptKind.Step ? { ...entry, text: { ...entry.text, action: actionOf(entry.text.stepId) } } : entry
+				),
 				results: listSafeJobResults(db, job.id),
 				ingredients: listSafeJobIngredients(db, job.id),
 				artifacts: listJobStepArtifactsForJob(db, job.id).map((artifact) => ({

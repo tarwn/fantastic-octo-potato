@@ -17,7 +17,7 @@ test("Job detail page shows strip, stage, transcript, results, and goals from re
 
 	await page.goto(`/jobs/${job.id}`);
 
-	await expect(page.getByRole("heading", { name: "Extract the closing balance" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Training Run", exact: true })).toBeVisible();
 	await expect(page.getByText(`job-ca${registeredApplication.id}-${job.id}`)).toBeVisible();
 	await expect(page.getByText("Pending", { exact: true }).first()).toBeVisible();
 	await expect(page.getByText("Acme", { exact: true })).toBeVisible();
@@ -35,6 +35,7 @@ test("Job detail page shows strip, stage, transcript, results, and goals from re
 
 	await expect(page.getByRole("button", { name: "Cancel job" })).toBeVisible();
 	await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Retry Job" })).toBeHidden();
 
 	// Cancel it so it doesn't linger Pending and get claimed ahead of other tests' Jobs
 	// on this shared seeded xref/Runner (see playwright.config.ts's workers: 1 note).

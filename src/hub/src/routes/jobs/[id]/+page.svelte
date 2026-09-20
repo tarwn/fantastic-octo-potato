@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 
+	import StartTrainingModal from "../../registered-applications/[id]/_components/StartTrainingModal.svelte";
+
 	import CompiledRecipeLink from "./_components/CompiledRecipeLink.svelte";
 	import GoalsPanel from "./_components/GoalsPanel.svelte";
 	import JobStrip from "./_components/JobStrip.svelte";
@@ -15,7 +17,7 @@
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
-	import { isTerminalJobStatus } from "$lib/jobStatus";
+	import { isTerminalJobStatus, JobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { JOB_TYPE_LABELS, JobType } from "$lib/jobType";
 	import type { JobDetail } from "$lib/types/job";
@@ -28,6 +30,7 @@
 	let compiledRecipe = $state<RecipeSummary | null>(null);
 	let loadError = $state<string | null>(null);
 	let cancelError = $state<string | null>(null);
+	let retryModalOpen = $state(false);
 	let lastRefreshedOn = $state(new Date());
 
 	const jobId = $derived(Number(page.params.id));
@@ -95,13 +98,16 @@
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
 			<div class="job-page-header">
-				<h1>{job.details.goal}</h1>
+				<h1>Training Run</h1>
 				<div class="job-page-actions">
 					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
 					{#if !isTerminalJobStatus(job.jobStatusId)}
 						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
 					{/if}
 					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
+					{#if job.jobStatusId === JobStatus.CompletedFailed || job.jobStatusId === JobStatus.CompletedError}
+						<button type="button" class="btn" onclick={() => (retryModalOpen = true)}>Retry Job</button>
+					{/if}
 				</div>
 			</div>
 			{#if cancelError}
@@ -118,12 +124,18 @@
 			<CompiledRecipeLink recipe={compiledRecipe} registeredApplicationId={job.customerApplicationXrefId} />
 
 			<div class="job-page-panels">
-				<TranscriptPanel entries={job.transcript} />
+				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
 				</div>
 			</div>
+			<StartTrainingModal
+				open={retryModalOpen}
+				onClose={() => (retryModalOpen = false)}
+				registeredApplicationId={job.customerApplicationXrefId}
+				initialValues={job.details}
+			/>
 		</div>
 	{:else if job && registeredApplication && job.jobType === JobType.Recipe}
 		<div class="job-page-content">
@@ -148,7 +160,7 @@
 			/>
 
 			<div class="job-page-panels">
-				<TranscriptPanel entries={job.transcript} />
+				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<ScreenshotPanel jobId={job.id} artifacts={job.artifacts} />

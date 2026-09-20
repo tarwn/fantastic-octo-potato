@@ -70,6 +70,7 @@ describe("reportJobStep", () => {
 		kind: "dslStep" as const,
 		stepId,
 		outcome: "succeeded" as const,
+		targetDescription: { component: "element", selector: "" },
 		extractions: [] as Array<{ fieldName: string; value: string }>
 	});
 
@@ -192,10 +193,32 @@ describe("reportJobStep", () => {
 		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
 			kind: "dslStep",
 			outcome: "succeeded",
+			targetDescription: { component: "element", selector: "" },
 			extractions: []
 		});
 
 		expect(result).toEqual({ status: 400, body: { error: "stepId is required" } });
+	});
+
+	it.each([
+		["missing", undefined],
+		["without a component", { selector: "id='x'" }],
+		["with a non-string selector", { component: "button", selector: 3 }]
+	])("rejects a dslStep submission with a targetDescription that is %s with 400", async (_label, targetDescription) => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			kind: "dslStep",
+			stepId: "s1",
+			outcome: "succeeded",
+			targetDescription,
+			extractions: []
+		});
+
+		expect(result).toEqual({ status: 400, body: { error: "targetDescription is required as { component, selector }" } });
 	});
 
 	it("rejects a dslStep submission with malformed extractions with 400", async () => {
@@ -208,6 +231,7 @@ describe("reportJobStep", () => {
 			kind: "dslStep",
 			stepId: "s1",
 			outcome: "succeeded",
+			targetDescription: { component: "element", selector: "" },
 			extractions: [{ fieldName: "total" }]
 		});
 

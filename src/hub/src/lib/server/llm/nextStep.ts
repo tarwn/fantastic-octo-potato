@@ -22,6 +22,8 @@ export interface NextStepContext {
 	// Names only, reported by the Runner (never values, never sent by Hub) — lets the model
 	// reference {"ref":"credential","name":"..."} for a login field without ever seeing the secret.
 	knownCredentialNames: string[];
+	// Step ids already used in this run (steps-dsl.md: ids are unique across main steps).
+	knownStepIds: string[];
 }
 
 // Thrown only once every attempt has produced a response that fails validation — distinguished
@@ -33,15 +35,16 @@ export async function deriveNextStep(context: NextStepContext): Promise<ChildSte
 	const knownInputNames = new Set(context.knownInputNames);
 	const knownOutputNames = new Set(context.knownOutputNames);
 	const knownCredentialNames = new Set(context.knownCredentialNames);
+	const knownStepIds = new Set(context.knownStepIds);
 	let lastError: unknown;
 	for (let attempt = 1; attempt <= maxCorrectionAttempts; attempt++) {
 		const raw = await sendChatCompletion({
 			systemPrompt: NEXT_STEP_SYSTEM_PROMPT,
-			userPrompt: buildUserPrompt(context),
+			userPrompt: buildUserPrompt(context, lastError),
 			userImagePngBase64: context.maskedScreenshotPngBase64
 		});
 		try {
-			return parseNextStep(raw, knownInputNames, knownOutputNames, knownCredentialNames);
+			return parseNextStep(raw, knownInputNames, knownOutputNames, knownCredentialNames, knownStepIds);
 		}
 		catch (err) {
 			lastError = err;
@@ -52,18 +55,26 @@ export async function deriveNextStep(context: NextStepContext): Promise<ChildSte
 	);
 }
 
-function buildUserPrompt(context: NextStepContext): string {
+function buildUserPrompt(context: NextStepContext, previousAttemptError: unknown): string {
 	return JSON.stringify({
 		goal: context.goal,
 		alternateGoals: context.alternateGoals,
 		transcript: context.transcriptSummary,
 		knownInputs: context.knownInputNames,
 		knownOutputs: context.knownOutputNames,
-		knownCredentials: context.knownCredentialNames
+		knownCredentials: context.knownCredentialNames,
+		usedStepIds: context.knownStepIds,
+		previousAttemptError: previousAttemptError instanceof Error ? previousAttemptError.message : undefined
 	});
 }
 
-function parseNextStep(raw: string, knownInputNames: Set<string>, knownOutputNames: Set<string>, knownCredentialNames: Set<string>): ChildStep {
+function parseNextStep(
+	raw: string,
+	knownInputNames: Set<string>,
+	knownOutputNames: Set<string>,
+	knownCredentialNames: Set<string>,
+	knownStepIds: Set<string>
+): ChildStep {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(raw);
@@ -75,5 +86,9 @@ function parseNextStep(raw: string, knownInputNames: Set<string>, knownOutputNam
 	if (errors.length > 0) {
 		throw new Error(`LLM response is not a valid atomic Step: ${errors.join("; ")} (raw: ${raw})`);
 	}
-	return parsed as ChildStep;
+	const step = parsed as ChildStep;
+	if (knownStepIds.has(step.id)) {
+		throw new Error(`LLM response reuses an already-used Step id: ${step.id}`);
+	}
+	return step;
 }

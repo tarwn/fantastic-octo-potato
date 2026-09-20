@@ -1,12 +1,16 @@
 <script lang="ts">
+	import ScreenshotOverlay from "./ScreenshotOverlay.svelte";
+
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { SensitivityType } from "$lib/sensitivityType";
-	import type { JobTranscriptEntry, TranscriptFieldRef } from "$lib/types/job";
+	import type { JobStepArtifact, JobTranscriptEntry, StepTranscriptText, TranscriptFieldRef } from "$lib/types/job";
 
-	let { entries }: { entries: JobTranscriptEntry[] } = $props();
+	let { entries, jobId, artifacts }: { entries: JobTranscriptEntry[]; jobId: number; artifacts: JobStepArtifact[] } = $props();
+
+	let overlay = $state<{ text: string; imageUrl: string } | null>(null);
 
 	interface TranscriptDay {
 		dateLabel: string;
@@ -30,6 +34,23 @@
 
 	const days = $derived(groupByDay(entries));
 
+	function stepMessage({ stepId, action, targetDescription }: StepTranscriptText): string {
+		if (action === "open") {
+			return `${stepId}: navigate to URL`;
+		}
+		const selector = targetDescription.selector === "" ? "" : `(${targetDescription.selector})`;
+		return `${stepId}: ${action} on ${targetDescription.component}${selector}`;
+	}
+
+	// Artifacts are ordered oldest-to-newest, so the last match is the latest for that Step.
+	function artifactFor(stepId: string): JobStepArtifact | undefined {
+		return artifacts.findLast((artifact) => artifact.stepId === stepId);
+	}
+
+	function openScreenshot(text: StepTranscriptText, artifact: JobStepArtifact) {
+		overlay = { text: stepMessage(text), imageUrl: `/api/hub/jobs/${jobId}/artifacts/${artifact.id}` };
+	}
+
 	function kindName(kind: TranscriptKind): string {
 		return TranscriptKind[kind];
 	}
@@ -39,9 +60,9 @@
 	<div class="transcript-step-field">
 		<span class="transcript-step-field-label">{label}: {field.fieldName}</span>
 		{#if field.sensitivityType !== SensitivityType.None}
-			<RedactedValue value={field.safeValue} />
+			→ <RedactedValue value={field.safeValue} />
 		{:else}
-			<span class="transcript-step-field-value">{field.safeValue}</span>
+			→ <span class="transcript-step-field-value">{field.safeValue}</span>
 		{/if}
 	</div>
 {/snippet}
@@ -58,7 +79,7 @@
 		<div class="transcript-date">{day.dateLabel}</div>
 		<div class="transcript transcript-rows">
 			{#each day.entries as entry (entry.sequence)}
-				<div class="transcript-row">
+				<div class={["transcript-row", entry.jobStatusId !== null && `transcript-row-${JOB_STATUS_VARIANTS[entry.jobStatusId]}`]}>
 					{#if entry.jobStatusId !== null}
 						<span class={`transcript-rail transcript-rail-${JOB_STATUS_VARIANTS[entry.jobStatusId]}`}></span>
 					{:else}
@@ -68,7 +89,14 @@
 					<span class={`transcript-kind-${kindName(entry.kind).toLowerCase()}`}>{kindName(entry.kind).toUpperCase()}</span>
 					<span class="transcript-text">
 						{#if entry.kind === TranscriptKind.Step}
-							<span class="transcript-step-message">{entry.text.message}</span>
+							{@const step = entry.text}
+							{@const artifact = artifactFor(step.stepId)}
+							<span class="transcript-step-message">
+								{stepMessage(step)}
+								{#if artifact}
+									<button type="button" class="transcript-screenshot-button" aria-label={`View screenshot for ${step.stepId}`} onclick={() => openScreenshot(step, artifact)}>🖼</button>
+								{/if}
+							</span>
 							{#each entry.text.inputs as field (field.fieldName)}
 								{@render transcriptStepField("input", field)}
 							{/each}
@@ -89,6 +117,8 @@
 		</div>
 	{/each}
 </div>
+
+<ScreenshotOverlay open={overlay !== null} onClose={() => (overlay = null)} text={overlay?.text ?? ""} imageUrl={overlay?.imageUrl ?? ""} />
 
 <style lang="scss">
 	@use "../../../../lib/styles/mixins" as *;
@@ -148,12 +178,36 @@
 		@include transcript-rail($status-cancelled-color);
 	}
 
+	.transcript-rail-intervention {
+		@include transcript-rail($status-intervention-color);
+	}
+
+	.transcript-rail-error {
+		@include transcript-rail($status-error-color);
+	}
+
 	.transcript-time {
 		@include transcript-cell-time;
 	}
 
 	.transcript-row {
 		@include transcript-row;
+	}
+
+	.transcript-row-intervention {
+		@include transcript-row-emphasis($status-intervention-surface, $status-intervention-border);
+	}
+
+	.transcript-row-success {
+		@include transcript-row-emphasis($status-success-surface, $status-success-border);
+	}
+
+	.transcript-row-failed {
+		@include transcript-row-emphasis($status-failed-surface, $status-failed-border);
+	}
+
+	.transcript-row-error {
+		@include transcript-row-emphasis($status-error-surface, $status-error-border);
 	}
 
 	.transcript-kind-status {
@@ -190,6 +244,15 @@
 
 	.transcript-step-message {
 		display: block;
+	}
+
+	.transcript-screenshot-button {
+		padding: 0;
+		margin-left: $space-xs;
+		font-size: inherit;
+		background: none;
+		border: 0;
+		cursor: pointer;
 	}
 
 	.transcript-step-field {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 - 2026-09-20
+
+Bug Fixes Batch 1 (spec 0010): Job page status colors now cover every status (including Intervention-Requested and Completed-Error), Training Runs are titled "Training Run", and the Start Job modal shows a loading state instead of a false empty state. A duplicate Step id from the LLM is retried inside the bounded LLM loop, and a failed Training Run gets a "Retry Job" button that pre-fills the Start Training modal. The Runner now reports a masked English `targetDescription` per Step, which Hub stores with `stepId`/`outcome` as separate fields and renders as e.g. `click on button(label='Save')` (`navigate to URL` for `open`), and Transcript Steps with a screenshot open a viewer overlay that the final-screenshot panel reuses via "View larger".
+
 ## 0.9.0 - 2026-09-19
 
 Training Run (spec 0009): an operator can start a Training Run from a Registered Application with just a goal, starting URL, and step limit — Hub calls an OpenAI-scheme LLM to turn the goal into typed Ingredients, then drives per-step discovery by sending the goal, transcript, and masked screenshot to the LLM for one next DSL Step at a time, all validated with bounded correction retries. runner-web's new Training loop executes each Hub-issued Step against a real Playwright browser, mirroring the Recipe Job loop's execution/masking but staying Hub-authoritative for progression. On success, Hub compiles the run's actual observed path into a validated draft Recipe (never a synthesized alternate branch); the Registered Application and Job screens surface a draft Recipe with "Start Trial" and link it back to the Training Job that produced it.

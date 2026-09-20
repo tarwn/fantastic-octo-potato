@@ -101,14 +101,15 @@ describe("runRecipeJobLoop: happy path", () => {
 
 		await runRecipeJobLoop(config, job, 300);
 
-		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [] });
-		expect(reportDslStep).toHaveBeenNthCalledWith(2, config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [] });
+		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], targetDescription: { component: "browser", selector: "" } });
+		expect(reportDslStep).toHaveBeenNthCalledWith(2, config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], targetDescription: { component: "button", selector: "id='go'" } });
 		expect(reportDslStep).toHaveBeenNthCalledWith(3, config, 42, {
 			stepId: "read_secret",
 			outcome: "succeeded",
-			extractions: [{ fieldName: "secret", value: "mysecret" }]
+			extractions: [{ fieldName: "secret", value: "mysecret" }],
+			targetDescription: expect.anything()
 		});
-		expect(reportDslStep).toHaveBeenNthCalledWith(4, config, 42, { stepId: "done", outcome: "succeeded", extractions: [] });
+		expect(reportDslStep).toHaveBeenNthCalledWith(4, config, 42, { stepId: "done", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" } });
 		expect(uploadArtifact).toHaveBeenCalledTimes(5); // 4 Steps + 1 terminal-exit screenshot
 		expect(uploadArtifact).toHaveBeenNthCalledWith(5, config, "/api/runner/runners/1/jobs/42/artifacts", "terminal", expect.any(String));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
@@ -182,7 +183,8 @@ describe("runRecipeJobLoop: recovery", () => {
 			stepId: "click_dismiss",
 			parentStepId: "dismiss_popup",
 			outcome: "succeeded",
-			extractions: []
+			extractions: [],
+			targetDescription: expect.anything()
 		});
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
 	}, 20000);
@@ -221,7 +223,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		vi.mocked(executeAction).mockImplementation(async (page, step, ctx) => {
 			if (step.id === "click_go") {
-				return { outcome: "failed", error: { code: "ACTION_FAILED", message: "login rejected for password hunter2" } };
+				return { outcome: "failed", error: { code: "ACTION_FAILED", message: "login rejected for password hunter2" }, targetDescription: { component: "button", selector: "id='go'" } };
 			}
 			return realExecuteAction(page, step, ctx);
 		});
@@ -295,7 +297,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 		await runRecipeJobLoop(config, job, 300);
 
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go: blocked a disallowed-origin request to https://blocked.example.net/tracker.js");
-		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [] });
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], targetDescription: { component: "button", selector: "id='go'" } });
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
 	}, 20000);
 

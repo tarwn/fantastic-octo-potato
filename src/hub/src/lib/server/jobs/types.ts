@@ -1,5 +1,7 @@
 import { JobStatus } from "../storage/db/jobStatus";
 
+import type { StepTargetDescription } from "$lib/types/job";
+
 export interface JobActionResult {
 	status: number;
 	body: { data: unknown } | { error: string };
@@ -22,6 +24,7 @@ export type ReportStepBody =
 			stepId: string;
 			outcome: "succeeded" | "failed";
 			parentStepId?: string;
+			targetDescription: StepTargetDescription;
 			extractions: Array<{ fieldName: string; value: string }>;
 			credentialNames?: string[];
 	  }

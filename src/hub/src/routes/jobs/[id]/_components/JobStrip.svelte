@@ -89,4 +89,12 @@
 	.strip-status-cancelled {
 		@include panel-strip-status-cell($status-cancelled-color, $status-cancelled-surface);
 	}
+
+	.strip-status-intervention {
+		@include panel-strip-status-cell($status-intervention-color, $status-intervention-surface);
+	}
+
+	.strip-status-error {
+		@include panel-strip-status-cell($status-error-color, $status-error-surface);
+	}
 </style>

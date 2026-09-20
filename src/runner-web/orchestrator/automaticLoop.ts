@@ -4,6 +4,7 @@ import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl, SA
 import { type ActionOutcome, executeAction } from "../browser/actions.ts";
 import { closeBrowserSession, launchBrowserSession } from "../browser/browserSession.ts";
 import { evaluateCondition } from "../browser/conditions.ts";
+import type { TargetDescription } from "../browser/targetDescription.ts";
 import type { RunnerConfig } from "../config.ts";
 import { resolveCredential } from "../credentials.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
@@ -105,7 +106,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	}
 
 	if (actionResult.kind === "businessFailure") {
-		await reportChildOutcome(deps, step.id, "failed", parentStepId, []);
+		await reportChildOutcome(deps, step.id, "failed", parentStepId, [], actionResult.targetDescription);
 		return { type: "fail", error: actionResult.error! };
 	}
 
@@ -116,7 +117,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 		if (actionResult.error) {
 			await reportInfo(deps.config, deps.job.id, redactKnownSecrets(`Step ${step.id} failed: ${actionResult.error.code}: ${actionResult.error.message}`, deps.secrets));
 		}
-		await reportChildOutcome(deps, step.id, "failed", parentStepId, extractions);
+		await reportChildOutcome(deps, step.id, "failed", parentStepId, extractions, actionResult.targetDescription);
 		if (!insideRecovery) {
 			const recovered = await runRecoveryScan(deps, recipe);
 			if (recovered) {
@@ -126,7 +127,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 		return { type: "intervention" };
 	}
 
-	await reportChildOutcome(deps, step.id, "succeeded", parentStepId, extractions);
+	await reportChildOutcome(deps, step.id, "succeeded", parentStepId, extractions, actionResult.targetDescription);
 
 	if (!insideRecovery) {
 		const recovered = await runRecoveryScan(deps, recipe);
@@ -170,12 +171,20 @@ function toWireExtractions(actionResult: ActionOutcome): Array<{ fieldName: stri
 	return [{ fieldName: actionResult.extraction.fieldName, value: scalarToWireValue(actionResult.extraction.value) }];
 }
 
-async function reportChildOutcome(deps: LoopDeps, stepId: string, outcome: "succeeded" | "failed", parentStepId: string | undefined, extractions: Array<{ fieldName: string; value: string }>): Promise<void> {
+async function reportChildOutcome(
+	deps: LoopDeps,
+	stepId: string,
+	outcome: "succeeded" | "failed",
+	parentStepId: string | undefined,
+	extractions: Array<{ fieldName: string; value: string }>,
+	targetDescription: TargetDescription
+): Promise<void> {
 	await reportDslStep(deps.config, deps.job.id, {
 		stepId,
 		outcome,
 		...(parentStepId !== undefined ? { parentStepId } : {}),
-		extractions
+		extractions,
+		targetDescription
 	});
 	await captureAndUploadArtifact(stepReportingDeps(deps), stepId);
 }
@@ -334,7 +343,8 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 		ingredients: job.ingredients,
 		outputs: createOutputsState(),
 		stepTimeoutMs: job.stepTimeoutMs,
-		resolveCredential
+		resolveCredential,
+		secrets
 	};
 	const deps: LoopDeps = {
 		config,

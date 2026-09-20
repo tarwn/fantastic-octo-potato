@@ -95,7 +95,9 @@ describe("jobRepository transcript entries", () => {
 		const jobId = insertPendingTrainingRunJob(db, 1);
 		const createdAt = new Date("2026-09-15T00:01:00.000Z");
 		const stepText = {
-			message: "Extracted the target field",
+			stepId: "read_total",
+			outcome: "succeeded" as const,
+			targetDescription: { component: "element", selector: "id='total'" },
 			inputs: [{ fieldName: "starting_url", safeValue: "https://example.com/start", sensitivityType: SensitivityType.None }],
 			outputs: [{ fieldName: "total", safeValue: "••••••", sensitivityType: SensitivityType.PII }]
 		};

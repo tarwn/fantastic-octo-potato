@@ -20,6 +20,7 @@ function baseContext(overrides: Partial<NextStepContext> = {}): NextStepContext 
 		knownInputNames: [],
 		knownOutputNames: [],
 		knownCredentialNames: [],
+		knownStepIds: [],
 		...overrides
 	};
 }
@@ -86,6 +87,40 @@ describe("deriveNextStep", () => {
 
 		await expect(deriveNextStep(baseContext())).rejects.toThrow(NextStepInvalidResponseError);
 		expect(mockedSendChatCompletion).toHaveBeenCalledTimes(2);
+	});
+
+	it("retries when the response reuses an already-used Step id and succeeds on a fresh id", async () => {
+		mockedSendChatCompletion
+			.mockResolvedValueOnce(JSON.stringify({ id: "open_starting_url", action: "finish", args: [null] }))
+			.mockResolvedValueOnce(JSON.stringify({ id: "finish_run", action: "finish", args: [null] }));
+		const { deriveNextStep } = await import("./nextStep");
+
+		const result = await deriveNextStep(baseContext({ knownStepIds: ["open_starting_url"] }));
+
+		expect(result).toEqual({ id: "finish_run", action: "finish", args: [null] });
+		expect(mockedSendChatCompletion).toHaveBeenCalledTimes(2);
+	});
+
+	it("fails loudly when the response reuses an already-used Step id on every attempt", async () => {
+		mockedSendChatCompletion.mockResolvedValue(JSON.stringify({ id: "open_starting_url", action: "finish", args: [null] }));
+		const { deriveNextStep, NextStepInvalidResponseError } = await import("./nextStep");
+
+		await expect(deriveNextStep(baseContext({ knownStepIds: ["open_starting_url"] }))).rejects.toThrow(NextStepInvalidResponseError);
+		expect(mockedSendChatCompletion).toHaveBeenCalledTimes(2);
+	});
+
+	it("lists the used Step ids in the prompt and carries the collision error into the retry prompt", async () => {
+		mockedSendChatCompletion
+			.mockResolvedValueOnce(JSON.stringify({ id: "open_starting_url", action: "finish", args: [null] }))
+			.mockResolvedValueOnce(JSON.stringify({ id: "finish_run", action: "finish", args: [null] }));
+		const { deriveNextStep } = await import("./nextStep");
+
+		await deriveNextStep(baseContext({ knownStepIds: ["open_starting_url"] }));
+
+		const [[first], [second]] = mockedSendChatCompletion.mock.calls;
+		expect(JSON.parse(first.userPrompt).usedStepIds).toEqual(["open_starting_url"]);
+		expect(JSON.parse(first.userPrompt).previousAttemptError).toBeUndefined();
+		expect(JSON.parse(second.userPrompt).previousAttemptError).toContain("open_starting_url");
 	});
 
 	it("fails loudly when the response references an unknown input", async () => {

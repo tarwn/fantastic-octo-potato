@@ -88,6 +88,7 @@ async function runOneStep(deps: LoopDeps, step: ChildStep): Promise<ChildStep | 
 		stepId: step.id,
 		outcome: actionResult.outcome,
 		extractions,
+		targetDescription: actionResult.targetDescription,
 		credentialNames: deps.credentialNames
 	});
 	await captureAndUploadArtifact(stepReportingDeps(deps), step.id, deps.job.syntheticDataConfirmed);
@@ -121,7 +122,8 @@ export async function runTrainingJobLoop(config: RunnerConfig, job: ClaimedJob):
 		ingredients: job.ingredients,
 		outputs: createOutputsState(),
 		stepTimeoutMs: job.stepTimeoutMs,
-		resolveCredential
+		resolveCredential,
+		secrets
 	};
 	const deps: LoopDeps = { config, job, ctx, page: session.page, secrets, credentialNames, blockedEvents };
 

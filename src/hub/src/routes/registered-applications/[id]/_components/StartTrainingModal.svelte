@@ -3,8 +3,25 @@
 	import { resolve } from "$app/paths";
 	import { startTrainingRun } from "$lib/api/jobsApi";
 
-	let { open, onClose, registeredApplicationId }: { open: boolean; onClose: () => void; registeredApplicationId: number } =
-		$props();
+	interface InitialValues {
+		goal: string;
+		startingUrl: string;
+		maxSteps: number;
+		alternateGoals: string[];
+		syntheticDataConfirmed: boolean;
+	}
+
+	let {
+		open,
+		onClose,
+		registeredApplicationId,
+		initialValues = null
+	}: {
+		open: boolean;
+		onClose: () => void;
+		registeredApplicationId: number;
+		initialValues?: InitialValues | null;
+	} = $props();
 
 	let dialogEl = $state<HTMLDialogElement | undefined>();
 
@@ -32,11 +49,11 @@
 	});
 
 	function resetForm() {
-		goal = "";
-		startingUrl = "";
-		maxSteps = "";
-		alternateGoals = "";
-		syntheticDataConfirmed = false;
+		goal = initialValues?.goal ?? "";
+		startingUrl = initialValues?.startingUrl ?? "";
+		maxSteps = initialValues ? String(initialValues.maxSteps) : "";
+		alternateGoals = initialValues?.alternateGoals.join("\n") ?? "";
+		syntheticDataConfirmed = initialValues?.syntheticDataConfirmed ?? false;
 		goalError = null;
 		startingUrlError = null;
 		maxStepsError = null;

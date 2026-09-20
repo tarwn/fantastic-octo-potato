@@ -103,6 +103,20 @@ describe("StartRecipeJobModal", () => {
 		expect(screen.queryByText("Draft recipe")).not.toBeInTheDocument();
 	});
 
+	it("shows a loading message, not the empty state, until Recipes have loaded", async () => {
+		let resolveFetch: (recipes: RecipeSummary[]) => void = () => {};
+		vi.mocked(fetchRecipes).mockReturnValue(new Promise((resolve) => (resolveFetch = resolve)));
+		render(StartRecipeJobModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1, mode: "Trial" });
+
+		expect(await screen.findByText("Loading Recipes...")).toBeInTheDocument();
+		expect(screen.queryByText(/Recipes are available/)).not.toBeInTheDocument();
+
+		resolveFetch([]);
+
+		expect(await screen.findByText("No draft Recipes are available.")).toBeInTheDocument();
+		expect(screen.queryByText("Loading Recipes...")).not.toBeInTheDocument();
+	});
+
 	it("shows an irreversible badge for a Step marked irreversible", async () => {
 		render(StartRecipeJobModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1, mode: "Trial" });
 

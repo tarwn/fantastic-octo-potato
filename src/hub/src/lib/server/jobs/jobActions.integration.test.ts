@@ -7,7 +7,14 @@ import { JobStatus } from "../storage/db/jobStatus";
 import { TranscriptKind } from "../storage/db/jobTranscriptKind";
 import { JobType } from "../storage/db/jobType";
 import { SensitivityType } from "../storage/db/sensitivityType";
-import { claimNextJobForRunner, insertJob, upsertJobIngredient, upsertJobResult } from "../storage/repositories/jobRepository";
+import {
+	appendAutoSequencedTranscriptEntry,
+	claimNextJobForRunner,
+	insertJob,
+	insertTrainingRunJobStep,
+	upsertJobIngredient,
+	upsertJobResult
+} from "../storage/repositories/jobRepository";
 import { createDraftRecipe, publishRecipe } from "../storage/repositories/recipeRepository";
 
 import { cancelJob, getJobDetail, getJobStepArtifactImage, listJobsAction } from "./jobActions";
@@ -69,6 +76,93 @@ describe("jobActions", () => {
 			expect(result).toEqual({
 				status: 200,
 				body: { data: { ...job, transcript: [], results: [], ingredients: [], artifacts: [] } }
+			});
+		});
+
+		describe("Step transcript rows", () => {
+			const now = new Date("2026-09-15T00:03:00.000Z");
+			const target = { component: "button", selector: "id='save'" };
+
+			function reportStepRow(jobId: number, stepId: string, parentStepId?: string): void {
+				appendAutoSequencedTranscriptEntry(
+					getDb(),
+					jobId,
+					TranscriptKind.Step,
+					{ stepId, outcome: "succeeded", ...(parentStepId ? { parentStepId } : {}), targetDescription: target, inputs: [], outputs: [] },
+					now
+				);
+			}
+
+			function transcriptTextOf(jobId: number): unknown[] {
+				const detail = getJobDetail(getDb(), String(jobId));
+				return (detail.body as { data: { transcript: Array<{ text: unknown }> } }).data.transcript.map((entry) => entry.text);
+			}
+
+			it("resolves a Training Run row's action from its stored Step definition, keeping the fields separate", () => {
+				const xrefId = seedRegisteredApplication(getDb());
+				const job = insertTrainingRunJob(getDb(), xrefId);
+				insertTrainingRunJobStep(getDb(), job.id, { id: "click_save", action: "click", args: [{ by: "css", value: "#save" }] }, now);
+				reportStepRow(job.id, "click_save");
+
+				expect(transcriptTextOf(job.id)).toEqual([
+					{ stepId: "click_save", outcome: "succeeded", action: "click", targetDescription: target, inputs: [], outputs: [] }
+				]);
+			});
+
+			it("resolves a Recipe Job row's action for top-level, child, and recovery Steps", () => {
+				const xrefId = seedRegisteredApplication(getDb());
+				const draft = createDraftRecipe(getDb(), {
+					customerApplicationXrefId: xrefId,
+					name: "Recipe",
+					goal: "Goal",
+					definition: {
+						schemaVersion: 1,
+						inputs: {},
+						outputs: {},
+						steps: [
+							{ id: "open_home", action: "open", args: ["https://example.com"] },
+							{ id: "form", action: "group", args: [[{ id: "click_save", action: "click", args: [{ by: "css", value: "#save" }] }]] },
+							{ id: "done", action: "finish", args: [{ test: "exists", args: [{ by: "css", value: "#done" }] }] }
+						],
+						recoveries: [
+							{
+								id: "dismiss_popup",
+								description: "Dismiss the popup",
+								when: { test: "exists", args: [{ by: "css", value: "#popup" }] },
+								steps: [{ id: "click_dismiss", action: "click", args: [{ by: "css", value: "#dismiss" }] }]
+							}
+						]
+					},
+					sourceTrainingRunId: null,
+					createdAt: now
+				});
+				const recipe = publishRecipe(getDb(), draft.id, now)!;
+				const job = insertJob(getDb(), {
+					jobType: JobType.Recipe,
+					customerApplicationXrefId: xrefId,
+					recipeId: recipe.id,
+					mode: "Execute",
+					allowlist: "https://example.com",
+					stepTimeoutMs: 15000,
+					createdAt: now
+				});
+				reportStepRow(job.id, "open_home");
+				reportStepRow(job.id, "click_save", "form");
+				reportStepRow(job.id, "click_dismiss", "dismiss_popup");
+
+				expect(transcriptTextOf(job.id)).toEqual([
+					expect.objectContaining({ stepId: "open_home", action: "open" }),
+					expect.objectContaining({ stepId: "click_save", action: "click", parentStepId: "form" }),
+					expect.objectContaining({ stepId: "click_dismiss", action: "click", parentStepId: "dismiss_popup" })
+				]);
+			});
+
+			it("crashes when a row's stepId resolves to no Step", () => {
+				const xrefId = seedRegisteredApplication(getDb());
+				const job = insertTrainingRunJob(getDb(), xrefId);
+				reportStepRow(job.id, "ghost_step");
+
+				expect(() => getJobDetail(getDb(), String(job.id))).toThrow(/ghost_step/);
 			});
 		});
 

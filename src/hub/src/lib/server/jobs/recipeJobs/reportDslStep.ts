@@ -43,8 +43,20 @@ export function reportDslStep(
 		outputs.push({ fieldName: extraction.fieldName, safeValue: maskValue(extraction.value, sensitivityType), sensitivityType });
 	}
 
-	const message = `${step.parentStepId ? `${step.parentStepId} > ` : ""}${step.stepId}: ${step.outcome}`;
-	appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Step, { message, inputs: [], outputs }, now);
+	appendAutoSequencedTranscriptEntry(
+		db,
+		job.id,
+		TranscriptKind.Step,
+		{
+			stepId: step.stepId,
+			outcome: step.outcome,
+			...(step.parentStepId !== undefined ? { parentStepId: step.parentStepId } : {}),
+			targetDescription: step.targetDescription,
+			inputs: [],
+			outputs
+		},
+		now
+	);
 	updateJobHeartbeat(db, job.id, now);
 	updateRunnerHeartbeat(db, runnerId, now);
 
