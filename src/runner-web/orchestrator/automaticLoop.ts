@@ -14,7 +14,10 @@ import { log } from "../logger.ts";
 import {
 	type ClaimedRecipeJob,
 	fetchJobStatus,
+	fetchPendingCommand,
 	JobStatus,
+	type PendingCommand,
+	reportCommandResult,
 	reportDslStep,
 	reportInfo,
 	reportStatus,
@@ -311,6 +314,40 @@ async function runProgram(deps: LoopDeps, recipe: RecipeDefinition, startStepId?
 	}
 }
 
+// Runs one operator command through the same executeAction/allowlist path as a Recipe Step. Returns
+// false when the Job must end. A result Hub refuses (the Job left Interactive-User mid-command) is
+// discarded here, and the wait loop's next status read exits per the new status.
+async function runCommand(deps: LoopDeps, command: PendingCommand): Promise<boolean> {
+	const step: ChildStep = { id: command.stepId, action: "click", args: [{ by: "point", x: command.payload.x, y: command.payload.y }] };
+	const failWithError = async (targetDescription: TargetDescription, message: string): Promise<false> => {
+		// A refused result means the Job already left Interactive-User; that newer status must not be overwritten.
+		if (await reportCommandResult(deps.config, deps.job.id, command.id, { outcome: "failed", targetDescription })) {
+			await reportStatus(deps.config, deps.job.id, JobStatus.CompletedError, redactKnownSecrets(message, deps.secrets));
+		}
+		return false;
+	};
+
+	let actionResult: ActionOutcome;
+	try {
+		actionResult = await executeAction(deps.page, step, deps.ctx);
+	}
+	catch (err: unknown) {
+		const rawMessage = err instanceof Error ? err.message : String(err);
+		return failWithError(BROWSER_TARGET_DESCRIPTION, `Unexpected error executing command ${step.id}: ${rawMessage}`);
+	}
+
+	const blockedNavigationUrl = await reportBlockedRequests(stepReportingDeps(deps), step.id);
+	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [...deps.job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS])) {
+		return failWithError(actionResult.targetDescription, `Command ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}`);
+	}
+
+	const accepted = await reportCommandResult(deps.config, deps.job.id, command.id, { outcome: actionResult.outcome, targetDescription: actionResult.targetDescription });
+	if (accepted) {
+		await captureAndUploadArtifact(stepReportingDeps(deps), step.id);
+	}
+	return true;
+}
+
 type InterventionResult = { type: "ended" } | { type: "resume"; stepId: string };
 
 // Keeps the same browser/page open and follows the Hub-owned status. The timeout is a wait for a
@@ -338,6 +375,16 @@ async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: n
 		if (statusId === JobStatus.InteractiveUser && !takenOver) {
 			takenOver = true;
 			deadline = Date.now() + timeoutMs;
+		}
+		if (statusId === JobStatus.InteractiveUser) {
+			const command = await fetchPendingCommand(deps.config, deps.job.id);
+			if (command) {
+				if (!(await runCommand(deps, command))) {
+					return { type: "ended" };
+				}
+				deadline = Date.now() + timeoutMs;
+				continue;
+			}
 		}
 		if (Date.now() >= deadline) {
 			await reportStatus(

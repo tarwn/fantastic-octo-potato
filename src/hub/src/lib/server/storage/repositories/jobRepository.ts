@@ -6,6 +6,8 @@ import { TranscriptKind } from "../db/jobTranscriptKind.ts";
 import { JobType } from "../db/jobType.ts";
 import { SensitivityType } from "../db/sensitivityType.ts";
 
+import { voidPendingInterventionCommands } from "./interventionCommandRepository.ts";
+
 import type { StepTargetDescription } from "$lib/types/job";
 import type { ChildStep } from "$lib/types/recipeDefinition";
 
@@ -444,9 +446,12 @@ export function claimNextJobForRunner(
 // status/timestamp must not be overwritten by a late or mismatched call. Any status written here
 // releases intervention ownership; only takeJobControl ever sets an owner.
 export function updateJobStatus(db: Database.Database, jobId: number, status: JobStatus, completedAt: Date | null = null): void {
-	db.prepare(
-		`UPDATE job SET job_status_id = ?, completed_at = ?, intervention_owner = NULL, resume_step_id = NULL WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
-	).run(status, toDbDate(completedAt), jobId);
+	db.transaction(() => {
+		db.prepare(
+			`UPDATE job SET job_status_id = ?, completed_at = ?, intervention_owner = NULL, resume_step_id = NULL WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
+		).run(status, toDbDate(completedAt), jobId);
+		voidPendingInterventionCommands(db, jobId);
+	})();
 }
 
 // Take Control is one conditional update: only an unowned Intervention-Requested Job can be taken,
@@ -474,6 +479,7 @@ export function endJobAsOwner(db: Database.Database, jobId: number, operatorId: 
 		if (changes === 0) {
 			return false;
 		}
+		voidPendingInterventionCommands(db, jobId);
 		appendTranscriptEntry(db, jobId, nextTranscriptSequence(db, jobId), TranscriptKind.Status, `Job ended by operator ${operatorId}`, now, JobStatus.CompletedFailed);
 		return true;
 	})();

@@ -13,7 +13,7 @@
 	import TranscriptPanel from "./_components/TranscriptPanel.svelte";
 
 	import { page } from "$app/state";
-	import { cancelJob, endJob, fetchJob, handBackJob, takeControl } from "$lib/api/jobsApi";
+	import { cancelJob, endJob, fetchJob, handBackJob, submitClickCommand, takeControl } from "$lib/api/jobsApi";
 	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
@@ -121,6 +121,12 @@
 		catch (err) {
 			interventionError = err instanceof Error ? err.message : "Failed to hand back";
 		}
+	}
+
+	async function handleClickCommand(x: number, y: number): Promise<number> {
+		if (!job) throw new Error("Job not loaded");
+
+		return submitClickCommand(job.id, operatorId, crypto.randomUUID(), x, y);
 	}
 
 	function closeOverlay(notice: string | null) {
@@ -245,7 +251,15 @@
 				</div>
 			</div>
 			{#if overlayOpen}
-				<InterventionOverlay {job} {operatorId} endError={interventionError} onEndJob={handleEndJob} onHandBack={handleHandBack} onClose={closeOverlay} />
+				<InterventionOverlay
+					{job}
+					{operatorId}
+					endError={interventionError}
+					onClickCommand={handleClickCommand}
+					onEndJob={handleEndJob}
+					onHandBack={handleHandBack}
+					onClose={closeOverlay}
+				/>
 			{/if}
 		</div>
 	{/if}

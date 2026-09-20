@@ -57,11 +57,21 @@ const JOB: JobDetail = {
 	]
 };
 
-function renderOverlay(overrides: { job?: JobDetail; operatorId?: string; onClose?: (notice: string | null) => void; onEndJob?: () => void; onHandBack?: (resumeStepId: string) => void } = {}) {
+function renderOverlay(
+	overrides: {
+		job?: JobDetail;
+		operatorId?: string;
+		onClose?: (notice: string | null) => void;
+		onEndJob?: () => void;
+		onHandBack?: (resumeStepId: string) => void;
+		onClickCommand?: (x: number, y: number) => Promise<number>;
+	} = {}
+) {
 	return render(InterventionOverlay, {
 		job: overrides.job ?? JOB,
 		operatorId: overrides.operatorId ?? "op-1",
 		endError: null,
+		onClickCommand: overrides.onClickCommand ?? vi.fn().mockResolvedValue(1),
 		onEndJob: overrides.onEndJob ?? vi.fn(),
 		onHandBack: overrides.onHandBack ?? vi.fn(),
 		onClose: overrides.onClose ?? vi.fn()
@@ -141,6 +151,82 @@ describe("InterventionOverlay", () => {
 		expect(screen.getByTestId("intervention-readonly")).toBeInTheDocument();
 		expect(screen.queryByRole("button", { name: "End Job" })).not.toBeInTheDocument();
 		expect(screen.getByTestId("intervention-owner")).toHaveTextContent("Owner: op-1");
+	});
+
+	describe("click command", () => {
+		// The preview is shown at half size (200x100 on screen for a 400x200 image).
+		function showScaledScreenshot(): HTMLElement {
+			const target = screen.getByTestId("screenshot-target");
+			Object.defineProperty(screen.getByRole("img"), "naturalWidth", { value: 400 });
+			Object.defineProperty(screen.getByRole("img"), "naturalHeight", { value: 200 });
+			target.getBoundingClientRect = () => ({ left: 10, top: 20, width: 200, height: 100 }) as DOMRect;
+			return target;
+		}
+
+		const doneEntry = (stepId: string): JobDetail["transcript"][number] => ({
+			id: 2,
+			jobId: 7,
+			sequence: 2,
+			kind: TranscriptKind.Step,
+			text: { stepId, action: "click", outcome: "succeeded", targetDescription: { component: "element", selector: "" }, inputs: [], outputs: [] },
+			createdAt: new Date(),
+			jobStatusId: null
+		});
+
+		it("submits a click as full-size image pixels, not preview pixels", async () => {
+			const onClickCommand = vi.fn().mockResolvedValue(5);
+			renderOverlay({ onClickCommand });
+			const target = showScaledScreenshot();
+
+			await fireEvent.click(target, { clientX: 60, clientY: 45 });
+
+			expect(onClickCommand).toHaveBeenCalledWith(100, 50);
+		});
+
+		it("shows a loading indicator and blocks input until the command's Transcript entry and screenshot both arrive", async () => {
+			const onClickCommand = vi.fn().mockResolvedValue(5);
+			const { rerender } = renderOverlay({ onClickCommand });
+			await fireEvent.click(showScaledScreenshot(), { clientX: 60, clientY: 45 });
+
+			expect(await screen.findByTestId("command-loading")).toBeInTheDocument();
+			expect(screen.getByTestId("screenshot-target")).toBeDisabled();
+			expect(screen.getByRole("button", { name: "Hand Back" })).toBeDisabled();
+			expect(screen.getByRole("button", { name: "End Job" })).toBeDisabled();
+
+			await rerender({ job: { ...JOB, transcript: [...JOB.transcript, doneEntry("intervention-5")] } });
+			expect(screen.getByTestId("command-loading")).toBeInTheDocument();
+
+			await rerender({
+				job: { ...JOB, transcript: [...JOB.transcript, doneEntry("intervention-5")], artifacts: [...JOB.artifacts, { id: 12, stepId: "intervention-5", createdAt: new Date() }] }
+			});
+			expect(screen.queryByTestId("command-loading")).not.toBeInTheDocument();
+			expect(screen.getByTestId("screenshot-target")).toBeEnabled();
+			expect((screen.getByRole("img") as HTMLImageElement).src).toContain("/api/hub/jobs/7/artifacts/12");
+		});
+
+		it("shows the error and stays unblocked when Hub rejects the command", async () => {
+			renderOverlay({ onClickCommand: vi.fn().mockRejectedValue(new Error("Job 7 already has a command pending")) });
+
+			await fireEvent.click(showScaledScreenshot(), { clientX: 60, clientY: 45 });
+
+			expect(await screen.findByTestId("command-error")).toHaveTextContent("Job 7 already has a command pending");
+			expect(screen.queryByTestId("command-loading")).not.toBeInTheDocument();
+		});
+
+		it("falls back to a generic message when the failure is not an Error", async () => {
+			renderOverlay({ onClickCommand: vi.fn().mockRejectedValue("nope") });
+
+			await fireEvent.click(showScaledScreenshot(), { clientX: 60, clientY: 45 });
+
+			expect(await screen.findByTestId("command-error")).toHaveTextContent("Failed to send command");
+		});
+
+		it("does not make the screenshot clickable for a non-owner", () => {
+			renderOverlay({ operatorId: "op-2" });
+
+			expect(screen.queryByTestId("screenshot-target")).not.toBeInTheDocument();
+			expect(screen.getByRole("img")).toBeInTheDocument();
+		});
 	});
 
 	it("closes without a notice when the operator closes it", async () => {

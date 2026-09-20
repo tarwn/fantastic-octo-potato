@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RunnerConfig } from "./config.ts";
-import { initRunner, pollRunner, reportDslStep, RunnerHttpError } from "./runnerClient.ts";
+import { fetchPendingCommand, initRunner, pollRunner, reportCommandResult, reportDslStep, RunnerHttpError } from "./runnerClient.ts";
 
 const config: RunnerConfig = {
 	hubUrl: "http://localhost:4173",
@@ -91,5 +91,64 @@ describe("reportDslStep", () => {
 		expect(error).toBeInstanceOf(RunnerHttpError);
 		expect((error as RunnerHttpError).status).toBe(403);
 		expect((error as Error).message).toMatch(/403.*not the owner/);
+	});
+});
+
+describe("fetchPendingCommand", () => {
+	it("gets the Job's pending command with bearer auth", async () => {
+		const command = { id: 7, stepId: "intervention-7", kind: "click", payload: { x: 1, y: 2 } };
+		const fetchMock = vi.mocked(fetch);
+		fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: command }), { status: 200 }));
+
+		const result = await fetchPendingCommand(config, 42);
+
+		expect(fetchMock).toHaveBeenCalledWith("http://localhost:4173/api/runner/runners/1/jobs/42/commands/pending", { headers: { authorization: "Bearer the-secret" } });
+		expect(result).toEqual(command);
+	});
+
+	it("returns null when nothing is pending", async () => {
+		vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ data: null }), { status: 200 }));
+
+		expect(await fetchPendingCommand(config, 42)).toBeNull();
+	});
+
+	it("throws a RunnerHttpError carrying the status when the response is not ok", async () => {
+		vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error: "not the owner" }), { status: 403 }));
+
+		const error = await fetchPendingCommand(config, 42).catch((err: unknown) => err);
+
+		expect(error).toBeInstanceOf(RunnerHttpError);
+		expect((error as RunnerHttpError).status).toBe(403);
+	});
+});
+
+describe("reportCommandResult", () => {
+	const result = { outcome: "succeeded", targetDescription: { component: "element", selector: "" } } as const;
+
+	it("posts the result to the command's endpoint and reports it accepted", async () => {
+		const fetchMock = vi.mocked(fetch);
+		fetchMock.mockResolvedValue(new Response(JSON.stringify({ data: { jobStatusId: 8 } }), { status: 200 }));
+
+		expect(await reportCommandResult(config, 42, 7, result)).toBe(true);
+		expect(fetchMock).toHaveBeenCalledWith("http://localhost:4173/api/runner/runners/1/jobs/42/commands/7/result", {
+			method: "POST",
+			headers: { authorization: "Bearer the-secret", "content-type": "application/json" },
+			body: JSON.stringify(result)
+		});
+	});
+
+	it("reports a 409 as not accepted so the caller discards the result", async () => {
+		vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error: "not pending" }), { status: 409 }));
+
+		expect(await reportCommandResult(config, 42, 7, result)).toBe(false);
+	});
+
+	it("throws a RunnerHttpError for any other failure", async () => {
+		vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ error: "boom" }), { status: 500 }));
+
+		const error = await reportCommandResult(config, 42, 7, result).catch((err: unknown) => err);
+
+		expect(error).toBeInstanceOf(RunnerHttpError);
+		expect((error as RunnerHttpError).status).toBe(500);
 	});
 });

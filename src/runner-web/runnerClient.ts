@@ -196,6 +196,53 @@ export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string,
 	return body.data;
 }
 
+// Mirrors src/hub/src/lib/server/runner/interventionCommandActions.ts's pending-command wire shape.
+export interface PendingCommand {
+	id: number;
+	stepId: string;
+	kind: "click";
+	payload: { x: number; y: number };
+}
+
+export interface CommandResult {
+	outcome: "succeeded" | "failed";
+	targetDescription: { component: string; selector: string };
+}
+
+// The operator command waiting for this Job, if any (Hub only ever serves one, and only while Interactive-User).
+export async function fetchPendingCommand(config: RunnerConfig, jobId: number): Promise<PendingCommand | null> {
+	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/commands/pending`, {
+		headers: { authorization: `Bearer ${config.runnerSharedSecret}` }
+	});
+
+	if (!response.ok) {
+		const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+		throw new RunnerHttpError(response.status, `fetchPendingCommand failed: ${response.status} ${body?.error ?? response.statusText}`);
+	}
+
+	const body = (await response.json()) as { data: PendingCommand | null };
+	return body.data;
+}
+
+// Returns false when Hub refused the result because the Job left Interactive-User while the command ran
+// (409): the caller discards it and follows the Job's new status.
+export async function reportCommandResult(config: RunnerConfig, jobId: number, commandId: number, result: CommandResult): Promise<boolean> {
+	const response = await fetch(`${config.hubUrl}/api/runner/runners/${config.runnerId}/jobs/${jobId}/commands/${commandId}/result`, {
+		method: "POST",
+		headers: { authorization: `Bearer ${config.runnerSharedSecret}`, "content-type": "application/json" },
+		body: JSON.stringify(result)
+	});
+
+	if (response.status === 409) {
+		return false;
+	}
+	if (!response.ok) {
+		const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+		throw new RunnerHttpError(response.status, `reportCommandResult failed: ${response.status} ${body?.error ?? response.statusText}`);
+	}
+	return true;
+}
+
 export interface JobState {
 	statusId: JobStatus;
 	// Set while an operator has handed control back and the Runner has not yet resumed there.

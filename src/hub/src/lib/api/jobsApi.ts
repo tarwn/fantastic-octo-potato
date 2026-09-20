@@ -144,3 +144,17 @@ export function endJob(id: number, operatorId: string): Promise<Job> {
 export function handBackJob(id: number, operatorId: string, resumeStepId: string): Promise<Job> {
 	return postIntervention(id, "hand-back", { operatorId, resumeStepId });
 }
+
+// Resolves with the command's id, which is all the overlay needs to find its Transcript entry and screenshot.
+export async function submitClickCommand(id: number, operatorId: string, commandKey: string, x: number, y: number): Promise<number> {
+	const response = await fetch(`/api/hub/jobs/${id}/commands`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ operatorId, commandKey, kind: "click", x, y })
+	});
+	const body = (await response.json()) as { data: { id: number } } | { error: string };
+	if ("error" in body) {
+		throw new Error(body.error);
+	}
+	return body.data.id;
+}

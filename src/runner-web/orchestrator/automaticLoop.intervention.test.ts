@@ -1,10 +1,17 @@
+import type { Request, Route } from "playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { launchBrowserSession } from "../browser/browserSession.ts";
+import { executeAction } from "../browser/actions.ts";
+import { launchBrowserSession, type RouteHandler } from "../browser/browserSession.ts";
 import type { RecipeDefinition, Step } from "../dsl/types.ts";
-import { type ClaimedRecipeJob, fetchJobStatus, JobStatus, reportStatus } from "../runnerClient.ts";
+import { type ClaimedRecipeJob, fetchJobStatus, fetchPendingCommand, JobStatus, type PendingCommand, reportCommandResult, reportStatus, uploadArtifact } from "../runnerClient.ts";
 
 import { runRecipeJobLoop } from "./automaticLoop.ts";
+
+vi.mock("../browser/actions.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../browser/actions.ts")>();
+	return { ...actual, executeAction: vi.fn(actual.executeAction) };
+});
 
 vi.mock("../browser/browserSession.ts", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../browser/browserSession.ts")>();
@@ -19,7 +26,9 @@ vi.mock("../runnerClient.ts", async (importOriginal) => {
 		reportStatus: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
 		reportInfo: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
 		uploadArtifact: vi.fn().mockResolvedValue({ id: 1 }),
-		fetchJobStatus: vi.fn()
+		fetchJobStatus: vi.fn(),
+		fetchPendingCommand: vi.fn().mockResolvedValue(null),
+		reportCommandResult: vi.fn().mockResolvedValue(true)
 	};
 });
 
@@ -51,6 +60,8 @@ const job: ClaimedRecipeJob = {
 afterEach(() => {
 	vi.clearAllMocks();
 	vi.mocked(fetchJobStatus).mockReset();
+	vi.mocked(fetchPendingCommand).mockReset().mockResolvedValue(null);
+	vi.mocked(reportCommandResult).mockReset().mockResolvedValue(true);
 });
 
 async function expectBrowserClosed(): Promise<void> {
@@ -130,6 +141,134 @@ describe("runRecipeJobLoop: Intervention wait", () => {
 		await runRecipeJobLoop(config, job, 300);
 
 		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedError, `Unexpected status change to ${JobStatus.Pending} during intervention`);
+		await expectBrowserClosed();
+	}, 20000);
+});
+
+// A full-viewport button, so any point clicked lands on it; clicking it reveals #done.
+const clickableFixture = `data:text/html,${encodeURIComponent("<button style=\"position:fixed;inset:0;width:100%;height:100%\" onclick=\"document.body.insertAdjacentHTML('beforeend','<p id=done>done</p>')\">Go</button>")}`;
+
+// Simulates the allowlist route handler blocking a navigation mid-command (see automaticLoop.test.ts).
+async function simulateBlockedRequest(url: string): Promise<void> {
+	const handler = vi.mocked(launchBrowserSession).mock.calls[0][0] as RouteHandler;
+	const route = { abort: vi.fn().mockResolvedValue(undefined), continue: vi.fn().mockResolvedValue(undefined) } as unknown as Route;
+	const request = { url: () => url, isNavigationRequest: () => true } as unknown as Request;
+	await handler(route, request);
+}
+
+// vi.clearAllMocks leaves a mockImplementation override in place, so tests wrap this unmocked original.
+const realExecuteAction = (await vi.importActual<typeof import("../browser/actions.ts")>("../browser/actions.ts")).executeAction;
+
+function commandJob(fixture: string): ClaimedRecipeJob {
+	return {
+		...job,
+		recipe: {
+			...blockedRecipe,
+			steps: [
+				{ id: "open_fixture", action: "open", args: [fixture] } as Step,
+				{ id: "click_missing", action: "click", args: [{ by: "css", value: "#does-not-exist" }] },
+				{ id: "verify_clicked", action: "verify", args: [{ test: "exists", args: [{ by: "css", value: "#done" }] }] },
+				{ id: "finish_up", action: "finish", args: [null] } as Step
+			]
+		}
+	};
+}
+
+const clickCommand: PendingCommand = { id: 7, stepId: "intervention-7", kind: "click", payload: { x: 30, y: 40 } };
+
+describe("runRecipeJobLoop: operator commands", () => {
+	it("executes a pending click once, reports its result and screenshot under the command's Step id, and lets a hand-back continue from the clicked page", async () => {
+		vi.mocked(fetchJobStatus)
+			.mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: null })
+			.mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: "verify_clicked" });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 300);
+
+		expect(reportCommandResult).toHaveBeenCalledOnce();
+		expect(reportCommandResult).toHaveBeenCalledWith(config, 42, 7, { outcome: "succeeded", targetDescription: expect.any(Object) });
+		expect(uploadArtifact).toHaveBeenCalledWith(config, job.comms.artifactsUrl, "intervention-7", expect.any(String));
+		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
+		await expectBrowserClosed();
+	}, 20000);
+
+	it("resets the idle timeout after each command", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+		const times: Record<string, number> = {};
+		vi.mocked(reportCommandResult).mockImplementation(() => {
+			times.result = Date.now();
+			return Promise.resolve(true);
+		});
+		vi.mocked(reportStatus).mockImplementation(() => {
+			times.failed = Date.now();
+			return Promise.resolve({ jobStatusId: JobStatus.Running });
+		});
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 0.3);
+
+		expect(times.failed - times.result).toBeGreaterThanOrEqual(290);
+		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedFailed, "Interactive session idle timed out");
+	}, 20000);
+
+	it("discards the screenshot when Hub refuses the result because the Job left Interactive-User, then follows the new status", async () => {
+		vi.mocked(fetchJobStatus)
+			.mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: null })
+			.mockResolvedValue({ statusId: JobStatus.CompletedCancelled, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+		vi.mocked(reportCommandResult).mockResolvedValue(false);
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 300);
+
+		expect(uploadArtifact).not.toHaveBeenCalledWith(config, job.comms.artifactsUrl, "intervention-7", expect.any(String));
+		expect(reportStatus).not.toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.any(String));
+		await expectBrowserClosed();
+	}, 20000);
+
+	it("reports a failed result and Completed-Error when the click navigates to a disallowed origin", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+
+		vi.mocked(executeAction).mockImplementation(async (page, step, ctx) => {
+			if (step.id === clickCommand.stepId) {
+				await simulateBlockedRequest("https://blocked.example.net/redirected");
+			}
+			return realExecuteAction(page, step, ctx);
+		});
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 300);
+
+		vi.mocked(executeAction).mockImplementation(realExecuteAction);
+		expect(reportCommandResult).toHaveBeenCalledWith(config, 42, 7, { outcome: "failed", targetDescription: expect.any(Object) });
+		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
+		await expectBrowserClosed();
+	}, 20000);
+
+	it("does not overwrite a newer status with Completed-Error when Hub refuses the failed result", async () => {
+		vi.mocked(fetchJobStatus)
+			.mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: null })
+			.mockResolvedValue({ statusId: JobStatus.CompletedCancelled, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+		vi.mocked(reportCommandResult).mockResolvedValue(false);
+		vi.mocked(executeAction).mockImplementation((page, step, ctx) => (step.id === clickCommand.stepId ? Promise.reject(new Error("boom")) : realExecuteAction(page, step, ctx)));
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 300);
+
+		vi.mocked(executeAction).mockImplementation(realExecuteAction);
+		expect(reportStatus).not.toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.any(String));
+		await expectBrowserClosed();
+	}, 20000);
+
+	it("reports a failed result and Completed-Error when executing the command throws", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
+		vi.mocked(fetchPendingCommand).mockResolvedValueOnce(clickCommand);
+		vi.mocked(executeAction).mockImplementation((page, step, ctx) => (step.id === clickCommand.stepId ? Promise.reject(new Error("boom")) : realExecuteAction(page, step, ctx)));
+
+		await runRecipeJobLoop(config, commandJob(clickableFixture), 300);
+
+		vi.mocked(executeAction).mockImplementation(realExecuteAction);
+		expect(reportCommandResult).toHaveBeenCalledWith(config, 42, 7, { outcome: "failed", targetDescription: expect.any(Object) });
+		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedError, "Unexpected error executing command intervention-7: boom");
 		await expectBrowserClosed();
 	}, 20000);
 });

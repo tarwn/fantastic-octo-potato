@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 
 // Order matters: children before parents, to satisfy foreign key constraints.
 const USER_DEFINED_TABLES = [
+	"intervention_command",
 	"job_ingredient",
 	"job_result",
 	"job_transcript_entry",

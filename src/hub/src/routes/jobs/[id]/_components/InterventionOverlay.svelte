@@ -2,6 +2,7 @@
 	import { untrack } from "svelte";
 
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
+	import { interventionStepId } from "$lib/interventionCommand";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS, JobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { JobType } from "$lib/jobType";
@@ -14,6 +15,7 @@
 		job,
 		operatorId,
 		endError,
+		onClickCommand,
 		onHandBack,
 		onEndJob,
 		onClose
@@ -21,6 +23,7 @@
 		job: JobDetail;
 		operatorId: string;
 		endError: string | null;
+		onClickCommand: (x: number, y: number) => Promise<number>;
 		onHandBack: (resumeStepId: string) => void;
 		onEndJob: () => void;
 		onClose: (notice: string | null) => void;
@@ -38,6 +41,18 @@
 	let resumeStepId = $state(untrack(() => (job.blockedStepId !== null && resumeStepIds.includes(job.blockedStepId) ? job.blockedStepId : (resumeStepIds[0] ?? ""))));
 	const handingBack = $derived(job.resumeStepId !== null);
 
+	// A submitted command blocks input until its Transcript entry and screenshot have both arrived.
+	let pendingStepId = $state<string | null>(null);
+	let commandError = $state<string | null>(null);
+	const commandPending = $derived(
+		pendingStepId !== null &&
+		!(
+			job.transcript.some((entry) => entry.kind === TranscriptKind.Step && entry.text.stepId === pendingStepId) &&
+			job.artifacts.some((artifact) => artifact.stepId === pendingStepId)
+		)
+	);
+	const busy = $derived(handingBack || commandPending);
+
 	$effect(() => {
 		dialogEl?.showModal();
 	});
@@ -51,6 +66,23 @@
 			onClose(`Control moved to operator ${job.interventionOwner}`);
 		}
 	});
+
+	// The screenshot is scaled to fit, so map the click back to pixels of the image itself.
+	async function handleScreenshotClick(event: MouseEvent) {
+		const image = event.currentTarget as HTMLElement;
+		const bounds = image.getBoundingClientRect();
+		const target = image.querySelector("img")!;
+		const x = Math.round((event.clientX - bounds.left) * (target.naturalWidth / bounds.width));
+		const y = Math.round((event.clientY - bounds.top) * (target.naturalHeight / bounds.height));
+
+		commandError = null;
+		try {
+			pendingStepId = interventionStepId(await onClickCommand(x, y));
+		}
+		catch (err) {
+			commandError = err instanceof Error ? err.message : "Failed to send command";
+		}
+	}
 
 	function describeEntry(entry: JobTranscriptEntry): string {
 		return entry.kind === TranscriptKind.Step ? `${entry.text.stepId}: ${entry.text.outcome}` : entry.text;
@@ -72,7 +104,19 @@
 
 	<div class="overlay-body">
 		{#if latestArtifact}
-			<img class="overlay-image" src={`/api/hub/jobs/${job.id}/artifacts/${latestArtifact.id}`} alt="Latest screenshot of the blocked session" />
+			{@const screenshotUrl = `/api/hub/jobs/${job.id}/artifacts/${latestArtifact.id}`}
+			<div class="overlay-screenshot">
+				{#if isOwner}
+					<button type="button" class="screenshot-target" disabled={busy} onclick={handleScreenshotClick} data-testid="screenshot-target">
+						<img class="overlay-image" src={screenshotUrl} alt="Latest screenshot of the blocked session" />
+					</button>
+				{:else}
+					<img class="overlay-image" src={screenshotUrl} alt="Latest screenshot of the blocked session" />
+				{/if}
+				{#if commandPending}
+					<div class="overlay-loading" role="status" data-testid="command-loading">Running command…</div>
+				{/if}
+			</div>
 		{:else}
 			<p class="overlay-empty">No screenshot yet.</p>
 		{/if}
@@ -89,20 +133,23 @@
 	{#if endError}
 		<p class="overlay-error">{endError}</p>
 	{/if}
+	{#if commandError}
+		<p class="overlay-error" data-testid="command-error">{commandError}</p>
+	{/if}
 	<div class="overlay-actions">
 		{#if isOwner}
 			<label class="resume-select">
 				Resume at
-				<select bind:value={resumeStepId} disabled={handingBack} data-testid="resume-step">
+				<select bind:value={resumeStepId} disabled={busy} data-testid="resume-step">
 					{#each resumeStepIds as stepId (stepId)}
 						<option value={stepId}>{stepId}</option>
 					{/each}
 				</select>
 			</label>
-			<button type="button" class="btn" disabled={handingBack} onclick={() => onHandBack(resumeStepId)}>
+			<button type="button" class="btn" disabled={busy} onclick={() => onHandBack(resumeStepId)}>
 				{handingBack ? "Handing back…" : "Hand Back"}
 			</button>
-			<button type="button" class="btn" disabled={handingBack} onclick={onEndJob}>End Job</button>
+			<button type="button" class="btn" disabled={busy} onclick={onEndJob}>End Job</button>
 		{/if}
 		<button type="button" class="btn" onclick={() => dialogEl?.close()}>Close</button>
 	</div>
@@ -164,6 +211,38 @@
 		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 		gap: $space-m;
 		min-height: 0;
+	}
+
+	.overlay-screenshot {
+		position: relative;
+		display: flex;
+		min-height: 0;
+		align-items: flex-start;
+		justify-content: center;
+	}
+
+	.screenshot-target {
+		display: block;
+		max-width: 100%;
+		max-height: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		cursor: crosshair;
+
+		&:disabled {
+			cursor: progress;
+		}
+	}
+
+	.overlay-loading {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: $overlay-backdrop-color;
+		color: $text-color-muted;
 	}
 
 	.overlay-image {

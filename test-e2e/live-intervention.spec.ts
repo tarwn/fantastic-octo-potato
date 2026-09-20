@@ -172,6 +172,44 @@ test.describe("live human intervention shell (spec 0013 Step 1)", () => {
 		expect(detail.data.transcript.filter((entry) => typeof entry.text === "string" && entry.text.includes("failed with no matching recoverable scenario"))).toHaveLength(2);
 	});
 
+	test("the owner clicks the screenshot: the command runs once, the overlay loads until its result arrives, then a hand-back completes the Job", async ({
+		page,
+		request,
+		baseURL
+	}) => {
+		const blocked = await createBlockedRecipeJob(request);
+		await page.goto(`/jobs/${blocked.jobId}`);
+		runner = spawnRunner(baseURL!, runnerOutput);
+
+		await page.getByRole("button", { name: "Take Control" }).click({ timeout: 60_000 });
+		const overlay = page.getByRole("dialog");
+		const operatorId = await page.evaluate(() => localStorage.getItem("hub.operatorId"));
+		const submit = (data: Record<string, unknown>) => request.post(`/api/hub/jobs/${blocked.jobId}/commands`, { data: { kind: "click", x: 5, y: 5, ...data } });
+
+		await overlay.getByTestId("screenshot-target").click({ position: { x: 20, y: 20 } });
+		await expect(overlay.getByTestId("command-loading")).toBeVisible();
+		await expect(overlay.getByTestId("command-loading")).toHaveCount(0, { timeout: 30_000 });
+		await expect(overlay.getByRole("list", { name: "Recent transcript" })).toContainText(/intervention-\d+: (succeeded|failed)/);
+
+		// Same key twice is one command; a different key while it is pending is rejected; a non-owner is rejected.
+		const first = await submit({ operatorId, commandKey: "dup" });
+		const again = await submit({ operatorId, commandKey: "dup" });
+		expect(first.status()).toBe(200);
+		expect(((await again.json()) as { data: { id: number } }).data.id).toBe(((await first.json()) as { data: { id: number } }).data.id);
+		expect((await submit({ operatorId, commandKey: "other" })).status()).toBe(409);
+		expect((await submit({ operatorId: "someone-else", commandKey: "theirs" })).status()).toBe(409);
+
+		await expect(overlay.getByTestId("command-loading")).toHaveCount(0);
+		await expect.poll(async () => {
+			const detail = (await (await request.get(`/api/hub/jobs/${blocked.jobId}`)).json()) as { data: { transcript: { text: { stepId?: string } | string }[] } };
+			return detail.data.transcript.filter((entry) => typeof entry.text !== "string" && entry.text.stepId?.startsWith("intervention-")).length;
+		}, { timeout: 30_000 }).toBe(2);
+
+		await overlay.getByTestId("resume-step").selectOption("complete");
+		await overlay.getByRole("button", { name: "Hand Back" }).click();
+		await expect.poll(() => jobStatusOf(request, blocked.jobId), { timeout: 30_000 }).toBe(3);
+	});
+
 	test("cancelling a Job under human control closes the overlay and shows the new status", async ({ page, request, baseURL }) => {
 		const blocked = await createBlockedRecipeJob(request);
 		await page.goto(`/jobs/${blocked.jobId}`);
