@@ -69,6 +69,13 @@ async function runOneStep(deps: LoopDeps, step: ChildStep): Promise<ChildStep | 
 
 	const blockedNavigationUrl = await reportBlockedRequests(stepReportingDeps(deps), step.id);
 	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [deps.job.allowlist, ...SAFE_ALLOWED_ORIGINS])) {
+		await reportDslStep(deps.config, deps.job.id, {
+			stepId: step.id,
+			outcome: "failed",
+			extractions: [],
+			targetDescription: actionResult.targetDescription,
+			credentialNames: deps.credentialNames
+		});
 		await reportStatus(
 			deps.config,
 			deps.job.id,

@@ -102,6 +102,14 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	// see at all (data:/about:/blob:), so both are checked here.
 	const blockedNavigationUrl = await reportBlockedRequests(stepReportingDeps(deps), step.id);
 	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [...deps.job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS])) {
+		// Not reportChildOutcome: it screenshots, and the page is on a disallowed origin.
+		await reportDslStep(deps.config, deps.job.id, {
+			stepId: step.id,
+			outcome: "failed",
+			...(parentStepId !== undefined ? { parentStepId } : {}),
+			extractions: [],
+			targetDescription: actionResult.targetDescription
+		});
 		return { type: "error", message: redactKnownSecrets(`Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}`, deps.secrets) };
 	}
 
