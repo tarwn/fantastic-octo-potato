@@ -23,7 +23,7 @@ import {
 import { redactKnownSecrets } from "../textRedaction.ts";
 
 import { collectCredentialNames } from "./program/credentialNames.ts";
-import { buildLocationIndex } from "./program/locationIndex.ts";
+import { buildLocationIndex, type Location } from "./program/locationIndex.ts";
 import { captureAndUploadArtifact, reportBlockedRequests, scalarToWireValue, type StepReportingDeps } from "./stepReporting.ts";
 
 const RECOVERY_POLL_INTERVAL_MS = 2000;
@@ -245,12 +245,23 @@ async function runRecovery(deps: LoopDeps, recipe: RecipeDefinition, recovery: R
 	return { type: "outcome", outcome };
 }
 
+function toPosition(location: Location): Position {
+	return location.level === "top" ? { topIndex: location.topIndex } : { topIndex: location.topIndex, resume: { array: location.array, childIndex: location.childIndex } };
+}
+
 // The shared Automatic Loop interpreter: walks the Recipe's top-level Steps, descending into
 // group/if children and reconstructing goto continuations, until a terminal SequenceOutcome
 // (finish/fail/intervention/error) is reached.
-async function runProgram(deps: LoopDeps, recipe: RecipeDefinition): Promise<Exclude<SequenceOutcome, { type: "advance" | "goto" }>> {
+async function runProgram(deps: LoopDeps, recipe: RecipeDefinition, startStepId?: string): Promise<Exclude<SequenceOutcome, { type: "advance" | "goto" }>> {
 	const locationIndex = buildLocationIndex(recipe.steps);
 	let pos: Position = { topIndex: 0 };
+	if (startStepId !== undefined) {
+		const start = locationIndex.get(startStepId);
+		if (!start) {
+			return { type: "error", message: `Resume step not found: ${startStepId}` };
+		}
+		pos = toPosition(start);
+	}
 
 	for (;;) {
 		if (pos.topIndex >= recipe.steps.length) {
@@ -293,31 +304,36 @@ async function runProgram(deps: LoopDeps, recipe: RecipeDefinition): Promise<Exc
 			if (!location) {
 				return { type: "error", message: `goto target not found: ${outcome.target}` };
 			}
-			pos = location.level === "top" ? { topIndex: location.topIndex } : { topIndex: location.topIndex, resume: { array: location.array, childIndex: location.childIndex } };
+			pos = toPosition(location);
 			continue;
 		}
 		return outcome;
 	}
 }
 
-type InterventionResult = "timeout" | "terminal" | "unexpectedChange";
+type InterventionResult = { type: "ended" } | { type: "resume"; stepId: string };
 
 // Keeps the same browser/page open and follows the Hub-owned status. The timeout is a wait for a
 // human until an operator takes control, then restarts as an idle timeout once they do. Status is
 // read before the deadline is judged so a takeover just before expiry is never failed by mistake.
+// A hand-back is answered by reporting Running (which releases the owner) and returning the Step to resume at.
 async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: number): Promise<InterventionResult> {
 	const timeoutMs = interventionTimeoutSeconds * 1000;
 	let deadline = Date.now() + timeoutMs;
 	let takenOver = false;
 	for (;;) {
 		await sleep(Math.min(RECOVERY_POLL_INTERVAL_MS, Math.max(deadline - Date.now(), 0)));
-		const statusId = await fetchJobStatus(deps.config, deps.job.comms.statusUrl);
+		const { statusId, resumeStepId } = await fetchJobStatus(deps.config, deps.job.comms.statusUrl);
 		if (TERMINAL_JOB_STATUSES.includes(statusId)) {
-			return "terminal";
+			return { type: "ended" };
 		}
 		if (statusId !== JobStatus.InterventionRequested && statusId !== JobStatus.InteractiveUser) {
 			await reportStatus(deps.config, deps.job.id, JobStatus.CompletedError, `Unexpected status change to ${statusId} during intervention`);
-			return "unexpectedChange";
+			return { type: "ended" };
+		}
+		if (statusId === JobStatus.InteractiveUser && resumeStepId !== null) {
+			await reportStatus(deps.config, deps.job.id, JobStatus.Running, `Resuming at step ${resumeStepId}`);
+			return { type: "resume", stepId: resumeStepId };
 		}
 		if (statusId === JobStatus.InteractiveUser && !takenOver) {
 			takenOver = true;
@@ -330,7 +346,7 @@ async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: n
 				JobStatus.CompletedFailed,
 				takenOver ? "Interactive session idle timed out" : "Intervention timed out with no human recovery"
 			);
-			return "timeout";
+			return { type: "ended" };
 		}
 	}
 }
@@ -374,26 +390,34 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 	};
 
 	try {
-		const outcome = await runProgram(deps, job.recipe);
+		let startStepId: string | undefined;
+		for (;;) {
+			const outcome = await runProgram(deps, job.recipe, startStepId);
 
-		if (outcome.type === "error") {
-			await reportStatus(config, job.id, JobStatus.CompletedError, outcome.message);
-		}
-		else if (outcome.type === "fail") {
-			await reportStatus(config, job.id, JobStatus.CompletedFailed, redactKnownSecrets(`${outcome.error.code}: ${outcome.error.message}`, secrets));
-		}
-		else if (outcome.type === "finish") {
-			await reportStatus(config, job.id, JobStatus.CompletedSuccess, "Recipe finished");
-		}
-		else {
-			await reportStatus(
-				config,
-				job.id,
-				JobStatus.InterventionRequested,
-				redactKnownSecrets(`Step ${outcome.stepId} failed with no matching recoverable scenario`, secrets),
-				outcome.stepId
-			);
-			await waitForIntervention(deps, interventionTimeoutSeconds);
+			if (outcome.type === "error") {
+				await reportStatus(config, job.id, JobStatus.CompletedError, outcome.message);
+			}
+			else if (outcome.type === "fail") {
+				await reportStatus(config, job.id, JobStatus.CompletedFailed, redactKnownSecrets(`${outcome.error.code}: ${outcome.error.message}`, secrets));
+			}
+			else if (outcome.type === "finish") {
+				await reportStatus(config, job.id, JobStatus.CompletedSuccess, "Recipe finished");
+			}
+			else {
+				await reportStatus(
+					config,
+					job.id,
+					JobStatus.InterventionRequested,
+					redactKnownSecrets(`Step ${outcome.stepId} failed with no matching recoverable scenario`, secrets),
+					outcome.stepId
+				);
+				const interventionResult = await waitForIntervention(deps, interventionTimeoutSeconds);
+				if (interventionResult.type === "resume") {
+					startStepId = interventionResult.stepId;
+					continue;
+				}
+			}
+			break;
 		}
 	}
 	catch (err: unknown) {

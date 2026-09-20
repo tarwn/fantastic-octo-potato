@@ -60,7 +60,7 @@ async function expectBrowserClosed(): Promise<void> {
 
 describe("runRecipeJobLoop: Intervention wait", () => {
 	it("times out to Completed-Failed while no operator takes control", async () => {
-		vi.mocked(fetchJobStatus).mockResolvedValue(JobStatus.InterventionRequested);
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InterventionRequested, resumeStepId: null });
 
 		await runRecipeJobLoop(config, job, 0.1);
 
@@ -69,7 +69,7 @@ describe("runRecipeJobLoop: Intervention wait", () => {
 	}, 20000);
 
 	it("restarts the timeout as an idle timeout once an operator takes control", async () => {
-		vi.mocked(fetchJobStatus).mockResolvedValue(JobStatus.InteractiveUser);
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InteractiveUser, resumeStepId: null });
 
 		await runRecipeJobLoop(config, job, 0.3);
 
@@ -81,7 +81,7 @@ describe("runRecipeJobLoop: Intervention wait", () => {
 	}, 20000);
 
 	it("stops without reporting when Hub moves the Job to a terminal status (cancelled or ended)", async () => {
-		vi.mocked(fetchJobStatus).mockResolvedValue(JobStatus.CompletedCancelled);
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.CompletedCancelled, resumeStepId: null });
 
 		await runRecipeJobLoop(config, job, 300);
 
@@ -90,8 +90,42 @@ describe("runRecipeJobLoop: Intervention wait", () => {
 		await expectBrowserClosed();
 	}, 20000);
 
+	it("reports Running and resumes at the handed-back Step, finishing the Job in the same session", async () => {
+		const resumable = { ...job, recipe: { ...blockedRecipe, steps: [...blockedRecipe.steps, { id: "finish_up", action: "finish", args: [null] } as Step] } };
+		vi.mocked(fetchJobStatus).mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: "finish_up" });
+
+		await runRecipeJobLoop(config, resumable, 300);
+
+		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.Running, "Resuming at step finish_up");
+		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedSuccess, "Recipe finished");
+		expect(launchBrowserSession).toHaveBeenCalledOnce();
+		await expectBrowserClosed();
+	}, 20000);
+
+	it("requests intervention again when the resume Step fails, then follows the new wait", async () => {
+		vi.mocked(fetchJobStatus)
+			.mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: "click_missing" })
+			.mockResolvedValue({ statusId: JobStatus.CompletedCancelled, resumeStepId: null });
+
+		await runRecipeJobLoop(config, job, 300);
+
+		const requests = vi.mocked(reportStatus).mock.calls.filter((call) => call[2] === JobStatus.InterventionRequested);
+		expect(requests).toHaveLength(2);
+		expect(requests[1][4]).toBe("click_missing");
+		await expectBrowserClosed();
+	}, 20000);
+
+	it("reports Completed-Error when the resume Step is not in the Recipe", async () => {
+		vi.mocked(fetchJobStatus).mockResolvedValueOnce({ statusId: JobStatus.InteractiveUser, resumeStepId: "nope" });
+
+		await runRecipeJobLoop(config, job, 300);
+
+		expect(reportStatus).toHaveBeenLastCalledWith(config, 42, JobStatus.CompletedError, "Resume step not found: nope");
+		await expectBrowserClosed();
+	}, 20000);
+
 	it("reports Completed-Error on an unexpected non-terminal status change", async () => {
-		vi.mocked(fetchJobStatus).mockResolvedValue(JobStatus.Pending);
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.Pending, resumeStepId: null });
 
 		await runRecipeJobLoop(config, job, 300);
 

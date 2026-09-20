@@ -4,6 +4,8 @@
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS, JobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
+	import { JobType } from "$lib/jobType";
+	import { collectResumableStepIds } from "$lib/recipeStepIds";
 	import type { JobDetail, JobTranscriptEntry } from "$lib/types/job";
 
 	const RECENT_TRANSCRIPT_ENTRIES = 6;
@@ -12,12 +14,14 @@
 		job,
 		operatorId,
 		endError,
+		onHandBack,
 		onEndJob,
 		onClose
 	}: {
 		job: JobDetail;
 		operatorId: string;
 		endError: string | null;
+		onHandBack: (resumeStepId: string) => void;
 		onEndJob: () => void;
 		onClose: (notice: string | null) => void;
 	} = $props();
@@ -29,6 +33,10 @@
 	const isOwner = $derived(job.jobStatusId === JobStatus.InteractiveUser && job.interventionOwner === operatorId);
 	const latestArtifact = $derived(job.artifacts.reduce<JobDetail["artifacts"][number] | undefined>((latest, artifact) => (latest && latest.id > artifact.id ? latest : artifact), undefined));
 	const recentEntries = $derived(job.transcript.slice(-RECENT_TRANSCRIPT_ENTRIES));
+	const resumeStepIds = $derived(job.jobType === JobType.Recipe ? collectResumableStepIds(job.recipe) : []);
+	// Defaults to the blocked step; the operator overrides it with the selector.
+	let resumeStepId = $state(untrack(() => (job.blockedStepId !== null && resumeStepIds.includes(job.blockedStepId) ? job.blockedStepId : (resumeStepIds[0] ?? ""))));
+	const handingBack = $derived(job.resumeStepId !== null);
 
 	$effect(() => {
 		dialogEl?.showModal();
@@ -83,7 +91,18 @@
 	{/if}
 	<div class="overlay-actions">
 		{#if isOwner}
-			<button type="button" class="btn" onclick={onEndJob}>End Job</button>
+			<label class="resume-select">
+				Resume at
+				<select bind:value={resumeStepId} disabled={handingBack} data-testid="resume-step">
+					{#each resumeStepIds as stepId (stepId)}
+						<option value={stepId}>{stepId}</option>
+					{/each}
+				</select>
+			</label>
+			<button type="button" class="btn" disabled={handingBack} onclick={() => onHandBack(resumeStepId)}>
+				{handingBack ? "Handing back…" : "Hand Back"}
+			</button>
+			<button type="button" class="btn" disabled={handingBack} onclick={onEndJob}>End Job</button>
 		{/if}
 		<button type="button" class="btn" onclick={() => dialogEl?.close()}>Close</button>
 	</div>
@@ -173,8 +192,17 @@
 		font-size: $text-small-size;
 	}
 
+	.resume-select {
+		display: flex;
+		align-items: center;
+		gap: $space-s;
+		margin-right: auto;
+		font-size: $text-small-size;
+	}
+
 	.overlay-actions {
 		display: flex;
+		align-items: center;
 		justify-content: flex-end;
 		gap: $space-m;
 	}

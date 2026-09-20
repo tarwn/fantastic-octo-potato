@@ -78,6 +78,7 @@ interface JobBase {
 	interventionOwner: string | null;
 	blockedStepId: string | null;
 	blockedReason: string | null;
+	resumeStepId: string | null;
 }
 
 export type Job =
@@ -168,6 +169,7 @@ interface JobRow {
 	interventionOwner: string | null;
 	blockedStepId: string | null;
 	blockedReason: string | null;
+	resumeStepId: string | null;
 	trainingGoal: string | null;
 	trainingStartingUrl: string | null;
 	trainingAllowlist: string | null;
@@ -211,7 +213,7 @@ const JOB_SELECT = `
 	SELECT job.id, job.name, job.customer_application_xref_id AS customerApplicationXrefId, job.job_type_id AS jobTypeId,
 	       job.job_status_id AS jobStatusId, job.runner_id AS runnerId, job.created_at AS createdAt,
 	       job.started_at AS startedAt, job.heartbeat_on AS heartbeatOn, job.completed_at AS completedAt,
-	       job.intervention_owner AS interventionOwner, job.blocked_step_id AS blockedStepId, job.blocked_reason AS blockedReason,
+	       job.intervention_owner AS interventionOwner, job.blocked_step_id AS blockedStepId, job.blocked_reason AS blockedReason, job.resume_step_id AS resumeStepId,
 	       training_job.goal AS trainingGoal, training_job.starting_url AS trainingStartingUrl,
 	       training_job.allowlist AS trainingAllowlist, training_job.max_steps AS trainingMaxSteps,
 	       training_job.alternate_goals AS trainingAlternateGoals,
@@ -238,7 +240,8 @@ function mapJobRow(row: JobRow): Job {
 		completedAt: fromDbDate(row.completedAt),
 		interventionOwner: row.interventionOwner,
 		blockedStepId: row.blockedStepId,
-		blockedReason: row.blockedReason
+		blockedReason: row.blockedReason,
+		resumeStepId: row.resumeStepId
 	};
 
 	if (row.jobTypeId === JobType.TrainingRun) {
@@ -337,7 +340,8 @@ export function insertJob(db: Database.Database, params: InsertJobParams): Job {
 			completedAt: null,
 			interventionOwner: null,
 			blockedStepId: null,
-			blockedReason: null
+			blockedReason: null,
+			resumeStepId: null
 		};
 
 		if (params.jobType === JobType.TrainingRun) {
@@ -441,7 +445,7 @@ export function claimNextJobForRunner(
 // releases intervention ownership; only takeJobControl ever sets an owner.
 export function updateJobStatus(db: Database.Database, jobId: number, status: JobStatus, completedAt: Date | null = null): void {
 	db.prepare(
-		`UPDATE job SET job_status_id = ?, completed_at = ?, intervention_owner = NULL WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
+		`UPDATE job SET job_status_id = ?, completed_at = ?, intervention_owner = NULL, resume_step_id = NULL WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
 	).run(status, toDbDate(completedAt), jobId);
 }
 
@@ -471,6 +475,29 @@ export function endJobAsOwner(db: Database.Database, jobId: number, operatorId: 
 			return false;
 		}
 		appendTranscriptEntry(db, jobId, nextTranscriptSequence(db, jobId), TranscriptKind.Status, `Job ended by operator ${operatorId}`, now, JobStatus.CompletedFailed);
+		return true;
+	})();
+}
+
+// Owner-only: records where the Runner should resume. The status and owner stay as they are until
+// the Runner reports Running (which clears both), so the Hub never claims a resume the Runner hasn't made.
+export function handBackJobAsOwner(db: Database.Database, jobId: number, operatorId: string, resumeStepId: string, now: Date): boolean {
+	return db.transaction(() => {
+		const { changes } = db
+			.prepare("UPDATE job SET resume_step_id = ? WHERE id = ? AND job_status_id = ? AND intervention_owner = ? AND resume_step_id IS NULL")
+			.run(resumeStepId, jobId, JobStatus.InteractiveUser, operatorId);
+		if (changes === 0) {
+			return false;
+		}
+		appendTranscriptEntry(
+			db,
+			jobId,
+			nextTranscriptSequence(db, jobId),
+			TranscriptKind.Status,
+			`Control handed back by operator ${operatorId}, resuming at step ${resumeStepId}`,
+			now,
+			JobStatus.InteractiveUser
+		);
 		return true;
 	})();
 }

@@ -27,6 +27,7 @@ const BASE_JOB = {
 	interventionOwner: null,
 	blockedStepId: null,
 	blockedReason: null,
+	resumeStepId: null,
 	transcript: [],
 	results: [],
 	ingredients: [],

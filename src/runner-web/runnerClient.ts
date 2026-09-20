@@ -196,10 +196,16 @@ export async function uploadArtifact(config: RunnerConfig, artifactsUrl: string,
 	return body.data;
 }
 
+export interface JobState {
+	statusId: JobStatus;
+	// Set while an operator has handed control back and the Runner has not yet resumed there.
+	resumeStepId: string | null;
+}
+
 // Polls the Hub-side Job detail (no runner bearer-auth required, same endpoint the Hub UI uses)
-// for its current status — used during the Intervention-Requested wait to detect an externally
-// changed terminal status.
-export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): Promise<JobStatus> {
+// for its current state — used during the Intervention wait to follow Hub-owned changes (a
+// terminal status, or a hand-back naming where to resume).
+export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): Promise<JobState> {
 	const response = await fetch(`${config.hubUrl}${statusUrl}`);
 
 	if (!response.ok) {
@@ -207,6 +213,6 @@ export async function fetchJobStatus(config: RunnerConfig, statusUrl: string): P
 		throw new Error(`fetchJobStatus failed: ${response.status} ${body?.error ?? response.statusText}`);
 	}
 
-	const body = (await response.json()) as { data: { jobStatusId: JobStatus } };
-	return body.data.jobStatusId;
+	const body = (await response.json()) as { data: { jobStatusId: JobStatus; resumeStepId: string | null } };
+	return { statusId: body.data.jobStatusId, resumeStepId: body.data.resumeStepId };
 }

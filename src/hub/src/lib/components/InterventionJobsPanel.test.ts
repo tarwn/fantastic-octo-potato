@@ -22,6 +22,7 @@ function job(id: number, jobStatusId: JobStatus, interventionOwner: string | nul
 		interventionOwner,
 		blockedStepId: null,
 		blockedReason: null,
+		resumeStepId: null,
 		details: { recipeId: 1, mode: "Trial", allowlist: "https://example.test", stepTimeoutMs: 15000 }
 	};
 }

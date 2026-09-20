@@ -203,7 +203,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		// A negative timeout guarantees the deadline has already passed on the loop's first check,
 		// so the test doesn't need to wait out a real polling interval.
-		vi.mocked(fetchJobStatus).mockResolvedValue(JobStatus.InterventionRequested);
+		vi.mocked(fetchJobStatus).mockResolvedValue({ statusId: JobStatus.InterventionRequested, resumeStepId: null });
 		await runRecipeJobLoop(config, job, -1);
 
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, expect.stringContaining("Step click_missing failed: TARGET_NOT_FOUND"));

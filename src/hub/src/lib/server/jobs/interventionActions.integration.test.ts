@@ -8,7 +8,7 @@ import { JobType } from "../storage/db/jobType";
 import { claimNextJobForRunner, getJobById, insertJob, listTranscriptEntries } from "../storage/repositories/jobRepository";
 import { createDraftRecipe, publishRecipe } from "../storage/repositories/recipeRepository";
 
-import { endJob, takeControl } from "./interventionActions";
+import { endJob, handBack, takeControl } from "./interventionActions";
 import { cancelJob, getJobDetail } from "./jobActions";
 
 const SHARED_SECRET = "test-secret";
@@ -148,6 +148,74 @@ describe("interventionActions", () => {
 			expect(endJob(getDb(), String(jobId), { operatorId: "op-1" }).status).toBe(409);
 			expect(takeControl(getDb(), String(jobId), { operatorId: "op-2" }).status).toBe(409);
 			expect(getJobById(getDb(), jobId)!.jobStatusId).toBe(JobStatus.CompletedCancelled);
+		});
+	});
+
+	describe("handBack", () => {
+		async function ownedJob(): Promise<number> {
+			const jobId = seedRecipeJob(getDb());
+			await requestIntervention(getDb(), jobId);
+			takeControl(getDb(), String(jobId), { operatorId: "op-1" });
+			return jobId;
+		}
+
+		it("records the resume Step and a Transcript entry, leaving status and owner for the Runner to release", async () => {
+			const jobId = await ownedJob();
+
+			const result = handBack(getDb(), String(jobId), { operatorId: "op-1", resumeStepId: "open_home" });
+
+			expect(result.status).toBe(200);
+			const job = getJobById(getDb(), jobId)!;
+			expect(job.resumeStepId).toBe("open_home");
+			expect(job.jobStatusId).toBe(JobStatus.InteractiveUser);
+			expect(job.interventionOwner).toBe("op-1");
+			expect(listTranscriptEntries(getDb(), jobId).at(-1)).toMatchObject({ text: "Control handed back by operator op-1, resuming at step open_home" });
+		});
+
+		it("clears the resume Step and owner when the Runner reports Running", async () => {
+			const jobId = await ownedJob();
+			handBack(getDb(), String(jobId), { operatorId: "op-1", resumeStepId: "open_home" });
+
+			await reportJobStep(getDb(), "1", String(jobId), AUTH, SHARED_SECRET, { kind: "status", status: JobStatus.Running, message: "Resuming at step open_home" });
+
+			expect(getJobById(getDb(), jobId)).toMatchObject({ jobStatusId: JobStatus.Running, interventionOwner: null, resumeStepId: null });
+		});
+
+		it("rejects a Step id that is not in the Recipe", async () => {
+			const jobId = await ownedJob();
+
+			expect(handBack(getDb(), String(jobId), { operatorId: "op-1", resumeStepId: "nope" }).status).toBe(400);
+			expect(getJobById(getDb(), jobId)!.resumeStepId).toBeNull();
+		});
+
+		it("rejects a second hand-back while the first is waiting for the Runner", async () => {
+			const jobId = await ownedJob();
+			handBack(getDb(), String(jobId), { operatorId: "op-1", resumeStepId: "open_home" });
+
+			expect(handBack(getDb(), String(jobId), { operatorId: "op-1", resumeStepId: "open_home" }).status).toBe(409);
+		});
+
+		it("rejects a non-owner", async () => {
+			const jobId = await ownedJob();
+
+			expect(handBack(getDb(), String(jobId), { operatorId: "op-2", resumeStepId: "open_home" }).status).toBe(409);
+			expect(getJobById(getDb(), jobId)!.resumeStepId).toBeNull();
+		});
+
+		it("never revives a terminal Job", async () => {
+			const jobId = await ownedJob();
+			endJob(getDb(), String(jobId), { operatorId: "op-1" });
+
+			expect(handBack(getDb(), String(jobId), { operatorId: "op-1", resumeStepId: "open_home" }).status).toBe(409);
+			expect(getJobById(getDb(), jobId)).toMatchObject({ jobStatusId: JobStatus.CompletedFailed, resumeStepId: null });
+		});
+
+		it("rejects missing fields and unknown Jobs", async () => {
+			const jobId = await ownedJob();
+
+			expect(handBack(getDb(), String(jobId), { resumeStepId: "open_home" }).status).toBe(400);
+			expect(handBack(getDb(), String(jobId), { operatorId: "op-1" }).status).toBe(400);
+			expect(handBack(getDb(), "999", { operatorId: "op-1", resumeStepId: "open_home" }).status).toBe(404);
 		});
 	});
 

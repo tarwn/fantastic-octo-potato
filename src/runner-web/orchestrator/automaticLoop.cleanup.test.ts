@@ -25,7 +25,7 @@ vi.mock("../runnerClient.ts", async (importOriginal) => {
 		reportStatus: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
 		reportInfo: vi.fn().mockResolvedValue({ jobStatusId: actual.JobStatus.Running }),
 		uploadArtifact: vi.fn().mockResolvedValue({ id: 1 }),
-		fetchJobStatus: vi.fn().mockResolvedValue(actual.JobStatus.InterventionRequested)
+		fetchJobStatus: vi.fn().mockResolvedValue({ statusId: actual.JobStatus.InterventionRequested, resumeStepId: null })
 	};
 });
 

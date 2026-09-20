@@ -126,6 +126,52 @@ test.describe("live human intervention shell (spec 0013 Step 1)", () => {
 		await expect.poll(() => runnerOutput.join("")).toMatch(RUNNER_LOOP_FINISHED);
 	});
 
+	test("the owner hands back at a later Step and the Job completes in the same browser session", async ({ page, request, baseURL }) => {
+		const blocked = await createBlockedRecipeJob(request);
+		await page.goto(`/jobs/${blocked.jobId}`);
+		runner = spawnRunner(baseURL!, runnerOutput);
+
+		await page.getByRole("button", { name: "Take Control" }).click({ timeout: 60_000 });
+		const overlay = page.getByRole("dialog");
+		await expect(overlay.getByTestId("resume-step")).toHaveValue("open_invoice_lookup");
+
+		const nonOwner = await request.post(`/api/hub/jobs/${blocked.jobId}/hand-back`, { data: { operatorId: "someone-else", resumeStepId: "complete" } });
+		expect(nonOwner.status()).toBe(409);
+
+		await overlay.getByTestId("resume-step").selectOption("complete");
+		await overlay.getByRole("button", { name: "Hand Back" }).click();
+
+		await expect(page.getByRole("dialog")).toHaveCount(0);
+		await expect.poll(() => jobStatusOf(request, blocked.jobId), { timeout: 30_000 }).toBe(3);
+		const detail = (await (await request.get(`/api/hub/jobs/${blocked.jobId}`)).json()) as {
+			data: { interventionOwner: string | null; transcript: { text: unknown }[] };
+		};
+		expect(detail.data.interventionOwner).toBeNull();
+		expect(detail.data.transcript.map((entry) => entry.text)).toContain("Resuming at step complete");
+		await expect.poll(() => runnerOutput.join("")).toMatch(RUNNER_LOOP_FINISHED);
+	});
+
+	test("handing back at the blocked Step while the blocker persists requests intervention again with the owner cleared", async ({
+		page,
+		request,
+		baseURL
+	}) => {
+		const blocked = await createBlockedRecipeJob(request);
+		await page.goto(`/jobs/${blocked.jobId}`);
+		runner = spawnRunner(baseURL!, runnerOutput);
+
+		await page.getByRole("button", { name: "Take Control" }).click({ timeout: 60_000 });
+		await page.getByRole("dialog").getByRole("button", { name: "Hand Back" }).click();
+
+		await expect(page.getByRole("dialog")).toHaveCount(0);
+		await expect(page.getByRole("button", { name: "Take Control" })).toBeVisible({ timeout: 60_000 });
+		const detail = (await (await request.get(`/api/hub/jobs/${blocked.jobId}`)).json()) as {
+			data: { jobStatusId: number; interventionOwner: string | null; resumeStepId: string | null; transcript: { text: unknown }[] };
+		};
+		expect(detail.data).toMatchObject({ jobStatusId: 6, interventionOwner: null, resumeStepId: null });
+		expect(detail.data.transcript.filter((entry) => typeof entry.text === "string" && entry.text.includes("failed with no matching recoverable scenario"))).toHaveLength(2);
+	});
+
 	test("cancelling a Job under human control closes the overlay and shows the new status", async ({ page, request, baseURL }) => {
 		const blocked = await createBlockedRecipeJob(request);
 		await page.goto(`/jobs/${blocked.jobId}`);

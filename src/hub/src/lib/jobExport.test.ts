@@ -20,6 +20,7 @@ const BASE = {
 	interventionOwner: null,
 	blockedStepId: null,
 	blockedReason: null,
+	resumeStepId: null,
 	transcript: [],
 	results: [],
 	ingredients: [{ fieldName: "password", safeValue: "***", sensitivityType: SensitivityType.Other }],

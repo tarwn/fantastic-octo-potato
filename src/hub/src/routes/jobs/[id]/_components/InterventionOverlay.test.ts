@@ -33,8 +33,19 @@ const JOB: JobDetail = {
 	interventionOwner: "op-1",
 	blockedStepId: "click_missing",
 	blockedReason: "Step click_missing failed with no matching recoverable scenario",
+	resumeStepId: null,
 	details: { recipeId: 1, mode: "Trial", allowlist: "https://example.test", stepTimeoutMs: 15000 },
-	recipe: { schemaVersion: 1, inputs: {}, outputs: {}, steps: [], recoveries: [] },
+	recipe: {
+		schemaVersion: 1,
+		inputs: {},
+		outputs: {},
+		steps: [
+			{ id: "open_home", action: "open", args: ["https://example.test"] },
+			{ id: "click_missing", action: "click", args: [{ by: "text", value: "Missing" }] },
+			{ id: "finish_up", action: "finish", args: [null] }
+		],
+		recoveries: []
+	},
 	transcript: [
 		{ id: 1, jobId: 7, sequence: 1, kind: TranscriptKind.Status, text: "Control taken by operator op-1", createdAt: new Date(), jobStatusId: JobStatus.InteractiveUser }
 	],
@@ -46,12 +57,13 @@ const JOB: JobDetail = {
 	]
 };
 
-function renderOverlay(overrides: { job?: JobDetail; operatorId?: string; onClose?: (notice: string | null) => void; onEndJob?: () => void } = {}) {
+function renderOverlay(overrides: { job?: JobDetail; operatorId?: string; onClose?: (notice: string | null) => void; onEndJob?: () => void; onHandBack?: (resumeStepId: string) => void } = {}) {
 	return render(InterventionOverlay, {
 		job: overrides.job ?? JOB,
 		operatorId: overrides.operatorId ?? "op-1",
 		endError: null,
 		onEndJob: overrides.onEndJob ?? vi.fn(),
+		onHandBack: overrides.onHandBack ?? vi.fn(),
 		onClose: overrides.onClose ?? vi.fn()
 	});
 }
@@ -81,6 +93,46 @@ describe("InterventionOverlay", () => {
 
 		expect(onEndJob).toHaveBeenCalledOnce();
 		expect(screen.queryByTestId("intervention-readonly")).not.toBeInTheDocument();
+	});
+
+	it("hands back at the blocked Step by default", async () => {
+		const onHandBack = vi.fn();
+		renderOverlay({ onHandBack });
+
+		expect((screen.getByTestId("resume-step") as HTMLSelectElement).value).toBe("click_missing");
+		await fireEvent.click(screen.getByRole("button", { name: "Hand Back" }));
+
+		expect(onHandBack).toHaveBeenCalledWith("click_missing");
+	});
+
+	it("defaults the resume Step to the first option when the blocked Step is not resumable", () => {
+		renderOverlay({ job: { ...JOB, blockedStepId: "recovery_step" } });
+
+		expect((screen.getByTestId("resume-step") as HTMLSelectElement).value).toBe("open_home");
+	});
+
+	it("hands back at the Step the owner selects", async () => {
+		const onHandBack = vi.fn();
+		renderOverlay({ onHandBack });
+
+		await fireEvent.change(screen.getByTestId("resume-step"), { target: { value: "finish_up" } });
+		await fireEvent.click(screen.getByRole("button", { name: "Hand Back" }));
+
+		expect(onHandBack).toHaveBeenCalledWith("finish_up");
+	});
+
+	it("locks the actions while a hand-back is waiting for the Runner", () => {
+		renderOverlay({ job: { ...JOB, resumeStepId: "finish_up" } });
+
+		expect(screen.getByRole("button", { name: "Handing back…" })).toBeDisabled();
+		expect(screen.getByRole("button", { name: "End Job" })).toBeDisabled();
+		expect(screen.getByTestId("resume-step")).toBeDisabled();
+	});
+
+	it("offers no hand back to a non-owner", () => {
+		renderOverlay({ operatorId: "op-2" });
+
+		expect(screen.queryByRole("button", { name: "Hand Back" })).not.toBeInTheDocument();
 	});
 
 	it("is read-only for a viewer who is not the owner", () => {

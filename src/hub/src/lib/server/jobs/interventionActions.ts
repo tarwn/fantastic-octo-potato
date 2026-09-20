@@ -1,7 +1,9 @@
 import type Database from "better-sqlite3";
 
+import { collectResumableStepIds } from "../../recipeStepIds";
 import { JobType } from "../storage/db/jobType";
-import { endJobAsOwner, getJobById, type Job, takeJobControl } from "../storage/repositories/jobRepository";
+import { endJobAsOwner, getJobById, handBackJobAsOwner, type Job, takeJobControl } from "../storage/repositories/jobRepository";
+import { getRecipeById } from "../storage/repositories/recipeRepository";
 
 import { isRecord, type JobActionResult } from "./types";
 
@@ -53,6 +55,35 @@ export function endJob(db: Database.Database, rawId: string, body: unknown): Job
 	}
 
 	if (!endJobAsOwner(db, job.id, operatorId, new Date())) {
+		return { status: 409, body: { error: `Job ${rawId} is not currently owned by this operator` } };
+	}
+	return { status: 200, body: { data: getJobById(db, job.id) } };
+}
+
+// Records the resume position only: the Runner resumes from its status poll, and DSL progression stays Runner-authoritative.
+export function handBack(db: Database.Database, rawId: string, body: unknown): JobActionResult {
+	const operatorId = parseOperatorId(body);
+	if (operatorId === undefined) {
+		return { status: 400, body: { error: "operatorId is required" } };
+	}
+	const resumeStepId = isRecord(body) && typeof body.resumeStepId === "string" ? body.resumeStepId : undefined;
+	if (resumeStepId === undefined) {
+		return { status: 400, body: { error: "resumeStepId is required" } };
+	}
+	const job = findRecipeJob(db, rawId);
+	if (isJobActionResult(job)) {
+		return job;
+	}
+
+	const recipe = job.details.recipeId === null ? undefined : getRecipeById(db, job.details.recipeId);
+	if (!recipe) {
+		throw new Error(`Job ${job.id} references a Recipe that no longer exists`);
+	}
+	if (!collectResumableStepIds(recipe.definition).includes(resumeStepId)) {
+		return { status: 400, body: { error: `Step ${resumeStepId} is not a resume position in this Recipe` } };
+	}
+
+	if (!handBackJobAsOwner(db, job.id, operatorId, resumeStepId, new Date())) {
 		return { status: 409, body: { error: `Job ${rawId} is not currently owned by this operator` } };
 	}
 	return { status: 200, body: { data: getJobById(db, job.id) } };

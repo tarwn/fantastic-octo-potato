@@ -52,7 +52,8 @@ describe("StartTrainingModal", () => {
 			completedAt: null,
 			interventionOwner: null,
 			blockedStepId: null,
-			blockedReason: null
+			blockedReason: null,
+			resumeStepId: null
 		});
 	});
 

@@ -34,6 +34,7 @@ interface JobBase {
 	interventionOwner: string | null;
 	blockedStepId: string | null;
 	blockedReason: string | null;
+	resumeStepId: string | null;
 }
 
 export type Job =

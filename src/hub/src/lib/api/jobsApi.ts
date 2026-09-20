@@ -120,11 +120,11 @@ export async function cancelJob(id: number): Promise<Job> {
 	return parseJob(body.data);
 }
 
-async function postIntervention(id: number, action: "take-control" | "end", operatorId: string): Promise<Job> {
+async function postIntervention(id: number, action: "take-control" | "end" | "hand-back", request: Record<string, string>): Promise<Job> {
 	const response = await fetch(`/api/hub/jobs/${id}/${action}`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ operatorId })
+		body: JSON.stringify(request)
 	});
 	const body = (await response.json()) as { data: JobResponse } | { error: string };
 	if ("error" in body) {
@@ -134,9 +134,13 @@ async function postIntervention(id: number, action: "take-control" | "end", oper
 }
 
 export function takeControl(id: number, operatorId: string): Promise<Job> {
-	return postIntervention(id, "take-control", operatorId);
+	return postIntervention(id, "take-control", { operatorId });
 }
 
 export function endJob(id: number, operatorId: string): Promise<Job> {
-	return postIntervention(id, "end", operatorId);
+	return postIntervention(id, "end", { operatorId });
+}
+
+export function handBackJob(id: number, operatorId: string, resumeStepId: string): Promise<Job> {
+	return postIntervention(id, "hand-back", { operatorId, resumeStepId });
 }
