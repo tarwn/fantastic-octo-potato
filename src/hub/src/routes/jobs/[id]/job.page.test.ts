@@ -34,7 +34,8 @@ const RECIPE_JOB: JobDetail = {
 	...BASE_JOB,
 	name: "Sample recipe",
 	jobType: JobType.Recipe,
-	details: { recipeId: 1, mode: "Trial", allowlist: "https://example.test", stepTimeoutMs: 15000 }
+	details: { recipeId: 1, mode: "Trial", allowlist: "https://example.test", stepTimeoutMs: 15000 },
+	recipe: { schemaVersion: 1, inputs: {}, outputs: {}, steps: [], recoveries: [] }
 };
 
 const TRAINING_JOB: JobDetail = {
@@ -49,8 +50,37 @@ const TRAINING_JOB: JobDetail = {
 		alternateGoals: [],
 		syntheticDataConfirmed: false,
 		stepTimeoutMs: 15000
-	}
+	},
+	steps: []
 };
+
+describe("Job page eyebrow", () => {
+	beforeEach(() => {
+		vi.mocked(fetchRegisteredApplication).mockReset().mockResolvedValue({ id: 3, customerName: "Acme", applicationName: "Widgets", runners: [] });
+		vi.mocked(fetchRecipes).mockReset().mockResolvedValue([]);
+	});
+
+	it.each([
+		["Trial", "TRIAL"],
+		["Execute", "EXECUTE"]
+	] as const)("shows a %s Recipe Job's mode", async (mode, label) => {
+		vi.mocked(fetchJob)
+			.mockReset()
+			.mockResolvedValue({ ...RECIPE_JOB, details: { ...RECIPE_JOB.details, mode } } as JobDetail);
+
+		render(JobPage);
+
+		expect(await screen.findByText(label)).toBeInTheDocument();
+	});
+
+	it("shows a Training Run", async () => {
+		vi.mocked(fetchJob).mockReset().mockResolvedValue(TRAINING_JOB);
+
+		render(JobPage);
+
+		expect(await screen.findByText("TRAINING RUN")).toBeInTheDocument();
+	});
+});
 
 describe("Job page title", () => {
 	beforeEach(() => {

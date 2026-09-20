@@ -11,3 +11,9 @@ export const JOB_TYPE_LABELS: Record<JobType, string> = {
 	[JobType.TrainingRun]: "Training",
 	[JobType.Recipe]: "Recipe"
 };
+
+export function jobTypeLabel(
+	job: { jobType: JobType.TrainingRun } | { jobType: JobType.Recipe; details: { mode: "Trial" | "Execute" } }
+): string {
+	return job.jobType === JobType.Recipe ? job.details.mode : "Training Run";
+}

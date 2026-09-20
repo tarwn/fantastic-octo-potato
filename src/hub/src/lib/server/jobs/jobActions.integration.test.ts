@@ -19,7 +19,7 @@ import { createDraftRecipe, publishRecipe } from "../storage/repositories/recipe
 
 import { cancelJob, getJobDetail, getJobStepArtifactImage, listJobsAction } from "./jobActions";
 
-import type { RecipeDefinition } from "$lib/types/recipeDefinition";
+import type { RecipeDefinition, Step } from "$lib/types/recipeDefinition";
 
 const SHARED_SECRET = "test-secret";
 
@@ -76,7 +76,7 @@ describe("jobActions", () => {
 
 			expect(result).toEqual({
 				status: 200,
-				body: { data: { ...job, transcript: [], results: [], ingredients: [], artifacts: [] } }
+				body: { data: { ...job, steps: [], transcript: [], results: [], ingredients: [], artifacts: [] } }
 			});
 		});
 
@@ -314,5 +314,71 @@ describe("jobActions", () => {
 			expect(secondJobId).not.toBe(firstJobId);
 			expect(getJobStepArtifactImage(db, String(secondJobId), String(artifactId))).toBeUndefined();
 		});
+	});
+});
+
+describe("getJobDetail definitions", () => {
+	const getDb = useIntegrationTestDb();
+	const now = new Date("2026-09-15T00:03:00.000Z");
+
+	it("includes a Training Run's saved Steps, with credentials still refs", () => {
+		const xrefId = seedRegisteredApplication(getDb());
+		const job = insertTrainingRunJob(getDb(), xrefId);
+		const fill: Step = { id: "fill_pw", action: "fill", args: [{ by: "label", value: "Password" }, { ref: "credential", name: "password" }] };
+		insertTrainingRunJobStep(getDb(), job.id, fill, now);
+
+		const body = getJobDetail(getDb(), String(job.id)).body as { data: { steps: unknown } };
+
+		expect(body.data.steps).toEqual([fill]);
+		expect(JSON.stringify(body)).not.toContain("hunter2");
+	});
+
+	it("crashes for a Recipe Job with no recipe_id", () => {
+		const xrefId = seedRegisteredApplication(getDb());
+		const job = insertJob(getDb(), {
+			jobType: JobType.Recipe,
+			name: "Trial",
+			customerApplicationXrefId: xrefId,
+			recipeId: null,
+			mode: "Trial",
+			allowlist: "https://example.com",
+			stepTimeoutMs: 15000,
+			createdAt: now
+		});
+
+		expect(() => getJobDetail(getDb(), String(job.id))).toThrow(/no recipe_id/);
+	});
+
+	it("includes a Recipe Job's Recipe definition", () => {
+		const xrefId = seedRegisteredApplication(getDb());
+		const definition: RecipeDefinition = {
+			schemaVersion: 1,
+			inputs: {},
+			outputs: {},
+			steps: [{ id: "open_home", action: "open", args: ["https://example.com"] }],
+			recoveries: []
+		};
+		const draft = createDraftRecipe(getDb(), {
+			customerApplicationXrefId: xrefId,
+			name: "Recipe",
+			goal: "Goal",
+			definition,
+			sourceTrainingRunId: null,
+			createdAt: now
+		});
+		const job = insertJob(getDb(), {
+			jobType: JobType.Recipe,
+			name: "Trial",
+			customerApplicationXrefId: xrefId,
+			recipeId: draft.id,
+			mode: "Trial",
+			allowlist: "https://example.com",
+			stepTimeoutMs: 15000,
+			createdAt: now
+		});
+
+		const body = getJobDetail(getDb(), String(job.id)).body as { data: { recipe: unknown } };
+
+		expect(body.data.recipe).toEqual(definition);
 	});
 });

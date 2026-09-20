@@ -1,6 +1,7 @@
 import { TranscriptKind } from "$lib/jobTranscriptKind";
 import { JobType } from "$lib/jobType";
 import type { Job, JobDetail, JobTranscriptEntry } from "$lib/types/job";
+import type { RecipeDefinition, Step } from "$lib/types/recipeDefinition";
 
 // The built-in Omit doesn't distribute over a union, so it would collapse Job's discriminated
 // union (jobType/details, kind/text) into an uncorrelated shape — this variant re-distributes
@@ -27,7 +28,7 @@ type JobDetailResponse = JobResponse & {
 	results: JobDetail["results"];
 	ingredients: JobDetail["ingredients"];
 	artifacts: JobStepArtifactResponse[];
-};
+} & ({ jobType: JobType.TrainingRun; steps: Step[] } | { jobType: JobType.Recipe; recipe: RecipeDefinition });
 
 export interface StartTrainingRunRequested {
 	goal: string;
@@ -64,14 +65,22 @@ function parseTranscriptEntry(entry: JobTranscriptEntryResponse): JobTranscriptE
 	return { ...entry, createdAt };
 }
 
+// See parseJob's comment — narrowing on both `parsed` and `job` keeps the definition correlated with jobType.
 function parseJobDetail(job: JobDetailResponse): JobDetail {
-	return {
-		...parseJob(job),
+	const parsed = parseJob(job);
+	const common = {
 		transcript: job.transcript.map(parseTranscriptEntry),
 		results: job.results,
 		ingredients: job.ingredients,
 		artifacts: job.artifacts.map((artifact) => ({ ...artifact, createdAt: new Date(artifact.createdAt) }))
 	};
+	if (parsed.jobType === JobType.TrainingRun && job.jobType === JobType.TrainingRun) {
+		return { ...parsed, ...common, steps: job.steps };
+	}
+	if (parsed.jobType === JobType.Recipe && job.jobType === JobType.Recipe) {
+		return { ...parsed, ...common, recipe: job.recipe };
+	}
+	throw new Error(`Job ${job.id} parsed to a different jobType than its response`);
 }
 
 export async function fetchJobs(): Promise<Job[]> {

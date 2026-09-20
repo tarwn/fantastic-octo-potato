@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("Job detail page shows strip, stage, transcript, results, and goals from real data", async ({ page, request }) => {
 	const registeredApplications = await (await request.get("/api/hub/registered-applications")).json();
@@ -34,8 +35,16 @@ test("Job detail page shows strip, stage, transcript, results, and goals from re
 	await expect(page.getByText("allowlist: https://example.com")).toBeVisible();
 
 	await expect(page.getByRole("button", { name: "Cancel job" })).toBeVisible();
-	await expect(page.getByRole("button", { name: "Export JSON" })).toBeVisible();
+	await expect(page.getByText("TRAINING RUN", { exact: true })).toBeVisible();
 	await expect(page.getByRole("button", { name: "Retry Job" })).toBeHidden();
+
+	const downloadPromise = page.waitForEvent("download");
+	await page.getByRole("button", { name: "Export JSON" }).click();
+	const download = await downloadPromise;
+	const exported = JSON.parse(await readFile(await download.path(), "utf8"));
+	expect(Object.keys(exported).sort()).toEqual(["run", "transcript"]);
+	expect(exported.run).toEqual({ steps: [], ingredients: [] });
+	expect(exported.transcript.id).toBe(job.id);
 
 	// Cancel it so it doesn't linger Pending and get claimed ahead of other tests' Jobs
 	// on this shared seeded xref/Runner (see playwright.config.ts's workers: 1 note).

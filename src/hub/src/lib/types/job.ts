@@ -2,6 +2,7 @@ import type { JobStatus } from "$lib/jobStatus";
 import type { TranscriptKind } from "$lib/jobTranscriptKind";
 import type { JobType } from "$lib/jobType";
 import type { SensitivityType } from "$lib/sensitivityType";
+import type { RecipeDefinition, Step } from "$lib/types/recipeDefinition";
 
 export interface TrainingRunJob {
 	goal: string;
@@ -94,4 +95,7 @@ export type JobDetail = Job & {
 	results: JobResult[];
 	ingredients: SafeIngredient[];
 	artifacts: JobStepArtifact[];
-};
+} & (
+		| { jobType: JobType.TrainingRun; steps: Step[] }
+		| { jobType: JobType.Recipe; recipe: RecipeDefinition }
+	);
