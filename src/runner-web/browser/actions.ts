@@ -7,7 +7,7 @@ import type { ChildStep, ScalarValue } from "../dsl/types.ts";
 import { resolveStringValue, resolveValue } from "../dsl/valueResolver.ts";
 
 import { evaluateCondition } from "./conditions.ts";
-import { describeTarget, NO_TARGET_DESCRIPTION, type TargetDescription } from "./targetDescription.ts";
+import { BROWSER_TARGET_DESCRIPTION, describeTarget, NO_TARGET_DESCRIPTION, type TargetDescription } from "./targetDescription.ts";
 import { isPointTarget, resolveElementAtPoint, resolveElementTarget, resolveViewportPoint } from "./targetResolver.ts";
 
 // A step reports exactly one of these; `kind: "businessFailure"` distinguishes the `fail` action's
@@ -131,6 +131,7 @@ async function runAction(page: Page, step: ChildStep, ctx: ExecutionContext, des
 	try {
 		switch (step.action) {
 			case "open": {
+				described.value = BROWSER_TARGET_DESCRIPTION;
 				await page.goto(resolveStringValue(step.args[0], ctx));
 				return { outcome: "succeeded" };
 			}

@@ -9,6 +9,7 @@ export interface TargetDescription {
 }
 
 export const NO_TARGET_DESCRIPTION: TargetDescription = { component: "element", selector: "" };
+export const BROWSER_TARGET_DESCRIPTION: TargetDescription = { component: "browser", selector: "" };
 
 const MAX_SELECTOR_VALUE_LENGTH = 50;
 

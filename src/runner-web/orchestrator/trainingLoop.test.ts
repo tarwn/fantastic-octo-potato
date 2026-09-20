@@ -90,7 +90,7 @@ describe("runTrainingJobLoop: happy path", () => {
 
 		await runTrainingJobLoop(config, job);
 
-		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" }, credentialNames: [] });
+		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], targetDescription: { component: "browser", selector: "" }, credentialNames: [] });
 		expect(reportDslStep).toHaveBeenNthCalledWith(2, config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], targetDescription: { component: "button", selector: "id='go'" }, credentialNames: [] });
 		expect(uploadArtifact).toHaveBeenCalledTimes(3); // 2 Steps + 1 terminal-exit screenshot
 		expect(uploadArtifact).toHaveBeenNthCalledWith(3, config, "/api/runner/runners/1/jobs/42/artifacts", "terminal", expect.any(String));

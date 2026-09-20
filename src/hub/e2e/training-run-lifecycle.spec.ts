@@ -32,11 +32,11 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 
 	const stepResponse = await request.post(`/api/runner/runners/${runnerId}/jobs/${jobId}/steps`, {
 		headers: { authorization: "Bearer change-me" },
-		data: { kind: "dslStep", stepId: "open_starting_url", outcome: "succeeded", extractions: [] }
+		data: { kind: "dslStep", stepId: "open_starting_url", outcome: "succeeded", targetDescription: { component: "element", selector: "" }, extractions: [] }
 	});
 	expect(stepResponse.status()).toBe(200);
 
 	// no page.reload() — the Job detail page's RefreshIndicator drives this refetch on its own.
 	await expect(page.getByText("Running", { exact: true }).first()).toBeVisible({ timeout: 8000 });
-	await expect(page.getByText("open_starting_url: succeeded")).toBeVisible();
+	await expect(page.getByText("open_starting_url: navigate to URL")).toBeVisible();
 });

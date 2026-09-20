@@ -78,7 +78,7 @@ describe("TranscriptPanel", () => {
 				jobId: 1,
 				sequence: 1,
 				kind: TranscriptKind.Step,
-				text: { stepId: "open_home", outcome: "succeeded", action: "open", targetDescription: { component: "element", selector: "" }, inputs: [], outputs: [] },
+				text: { stepId: "open_home", outcome: "succeeded", action: "open", targetDescription: { component: "browser", selector: "" }, inputs: [], outputs: [] },
 				createdAt: new Date(),
 				jobStatusId: null
 			}
@@ -86,7 +86,7 @@ describe("TranscriptPanel", () => {
 
 		render(TranscriptPanel, { entries, jobId: 1, artifacts: [] });
 
-		expect(screen.getByText("open_home: open on element")).toBeInTheDocument();
+		expect(screen.getByText("open_home: navigate to URL")).toBeInTheDocument();
 	});
 
 	it.each([

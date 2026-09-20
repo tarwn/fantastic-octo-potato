@@ -35,7 +35,7 @@ describe("executeAction: interaction", () => {
 		const page = await fixture.browser.newPage();
 		try {
 			const result = await executeAction(page, { id: "s", action: "open", args: ["about:blank"] }, newContext());
-			expect(result).toMatchObject({ outcome: "succeeded" });
+			expect(result).toMatchObject({ outcome: "succeeded", targetDescription: { component: "browser", selector: "" } });
 			expect(page.url()).toBe("about:blank");
 		}
 		finally {

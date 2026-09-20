@@ -89,10 +89,10 @@ Requirement → Step: R001–R003 → 1; R006 → 2; R007 → 3; R008 → 4; R00
 - `docs/context/hub/backend/runner-api.md`; ARCHITECTURE.md (masking before data leaves the Runner; per-Step structured details)
 
 **Work:**
-- `runner-web`: `describeTarget(locator, secrets)` next to `targetResolver.ts` implementing C001/C002, skipping any candidate the masking (C006) would alter; call it for every action that resolves a single-element `Locator`; thread it through `ActionOutcome` to `reportDslStep`. Actions with no element (`open`, `scroll`, `goto`, `finish`, `fail`, `assign`, point targets) report `{ component: "element", selector: "" }`.
+- `runner-web`: `describeTarget(locator, secrets)` next to `targetResolver.ts` implementing C001/C002, skipping any candidate the masking (C006) would alter; call it for every action that resolves a single-element `Locator`; thread it through `ActionOutcome` to `reportDslStep`. `open` navigates the browser rather than acting on an element, so it reports `{ component: "browser", selector: "" }`. Other actions with no element (`scroll`, `goto`, `finish`, `fail`, `assign`, point targets) report `{ component: "element", selector: "" }`.
 - `hub`: `parseReportStepBody` requires `targetDescription` like `stepId`/`outcome`. `StepTranscriptText` gains `stepId`, `outcome`, `parentStepId?`, `targetDescription`; both `reportDslStep.ts` files store them instead of the folded `message`; update the mirrored client type. No migration for existing rows (C007).
 - Job API assembly (`jobRepository.ts` transcript mapping / `getJobDetail`) resolves each Step row's `action` from its `stepId`: Training Runs via `training_job_step.definition`, Recipe Jobs via the Recipe definition's Steps (child Steps included). A `stepId` that resolves to no Step crashes (no fallback).
-- `TranscriptPanel.svelte` renders `{stepId}: {action} on {component}({selector})` for Step rows, dropping `({selector})` when the selector is empty.
+- `TranscriptPanel.svelte` renders `{stepId}: {action} on {component}({selector})` for Step rows, dropping `({selector})` when the selector is empty. `open` Steps render `{stepId}: navigate to URL` instead.
 - Update `runner-api.md` for the new field.
 
 ---

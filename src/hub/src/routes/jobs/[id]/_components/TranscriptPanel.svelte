@@ -35,6 +35,9 @@
 	const days = $derived(groupByDay(entries));
 
 	function stepMessage({ stepId, action, targetDescription }: StepTranscriptText): string {
+		if (action === "open") {
+			return `${stepId}: navigate to URL`;
+		}
 		const selector = targetDescription.selector === "" ? "" : `(${targetDescription.selector})`;
 		return `${stepId}: ${action} on ${targetDescription.component}${selector}`;
 	}

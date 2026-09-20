@@ -101,7 +101,7 @@ describe("runRecipeJobLoop: happy path", () => {
 
 		await runRecipeJobLoop(config, job, 300);
 
-		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], targetDescription: { component: "element", selector: "" } });
+		expect(reportDslStep).toHaveBeenNthCalledWith(1, config, 42, { stepId: "open_fixture", outcome: "succeeded", extractions: [], targetDescription: { component: "browser", selector: "" } });
 		expect(reportDslStep).toHaveBeenNthCalledWith(2, config, 42, { stepId: "click_go", outcome: "succeeded", extractions: [], targetDescription: { component: "button", selector: "id='go'" } });
 		expect(reportDslStep).toHaveBeenNthCalledWith(3, config, 42, {
 			stepId: "read_secret",
