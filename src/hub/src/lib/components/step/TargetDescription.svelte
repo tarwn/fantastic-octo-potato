@@ -12,7 +12,7 @@
 {#if locator.by === "point"}
 	<span class={`target ${className ?? ""}`} data-testid="target-point">{locator.x},{locator.y}</span>
 {:else}
-	<span class={`target ${className ?? ""}`} data-testid="target-element">{locator.by}
+	<span class={`target ${className ?? ""}`} data-testid="target-element">{locator.by}{locator.by === "text" && locator.exact === false ? " containing" : ""}
 		{#if typeof locator.value === "string"}"{locator.value}"{:else}<ValueDescription value={locator.value} />{/if}</span>
 {/if}
 

@@ -32,6 +32,13 @@ Respond with ONLY a single JSON object describing exactly one Step, shaped like:
 - Once the goal (and any reachable alternate goals) are satisfied, respond with a "finish" Step;
   its checkpoint condition may be null.
 - If the goal cannot be reached, respond with a "fail" Step: {"action": "fail", "args": ["code", "message"]}.
+- To read one field out of a larger block of text, use a read with a structured spec instead of "text":
+  target the block with {"by": "text", "value": "Amount:", "exact": false} (a contained label that
+  anchors to something semantic), and extract with a regex that matches exactly once and has one
+  capture. Prefer a named group and "parse": "string" to keep formatting such as "$1200.00"; use
+  "parse": "number" only when the capture is a clean number (unlike "number", which converts the
+  whole element). Never embed observed values in the pattern. Example:
+  {"id": "read_amount", "action": "read", "args": [{"by": "text", "value": "Amount:", "exact": false}, {"source": "text", "extract": {"by": "regex", "pattern": "Amount:\\s*(?<value>\\S+)", "group": "value"}, "parse": "string"}, {"ref": "output", "name": "amount"}], "intent": "Read the amount"}
 - intent is a short human-readable description of the Step; irreversible may be set true for a
   Step that cannot be undone (e.g. submitting a payment).
 

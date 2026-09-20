@@ -31,6 +31,29 @@ describe("StepDescription", () => {
 		expect(description(step).textContent?.replace(/\s+/g, " ").trim()).toBe(expected);
 	});
 
+	describe("structured read", () => {
+		const amountTarget = { by: "text", value: "Amount:", exact: false } as const;
+		const out = { ref: "output", name: "amount" } as const;
+
+		it("summarizes a named group with the regex only in the disclosure", () => {
+			const el = description({
+				id: "s",
+				action: "read",
+				args: [amountTarget, { source: "text", extract: { by: "regex", pattern: "Amount:\\s*(?<value>\\S+)", group: "value" }, parse: "string" }, out]
+			});
+
+			expect(el.textContent?.replace(/\s+/g, " ")).toContain("read text containing \"Amount:\" and capture \"value\" to output: amount");
+			expect(screen.getByTestId("step-technical")).toHaveTextContent("text regex Amount:\\s*(?<value>\\S+), parse string");
+		});
+
+		it("summarizes a numbered group and omits parse when absent", () => {
+			description({ id: "s", action: "read", args: [amountTarget, { source: "value", extract: { by: "regex", pattern: "(\\d+)", group: 1 } }, out] });
+
+			expect(screen.getByTestId("step-description")).toHaveTextContent("capture group 1");
+			expect(screen.getByTestId("step-technical")).not.toHaveTextContent("parse");
+		});
+	});
+
 	it.each(["check", "verify"] as const)("describes %s with its condition in a wrapper", (action) => {
 		const step: ChildStep = { id: "s", action, args: [{ test: "visible", args: [save] }] };
 

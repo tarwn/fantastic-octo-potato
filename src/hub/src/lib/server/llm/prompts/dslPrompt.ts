@@ -15,6 +15,7 @@ An enumerated action and typed args array avoid parsing instruction strings. IDs
 | Target | Example | Playwright |
 | --- | --- | --- |
 | Text | {"by":"text","value":"Search"} | getByText(value,{exact:true}) |
+| Text containing | {"by":"text","value":"Amount:","exact":false} | getByText(value,{exact:false}): case-insensitive substring, still exactly one match |
 | Field label | {"by":"label","value":"Account number"} | getByLabel(value,{exact:true}) |
 | Placeholder | {"by":"placeholder","value":"Search accounts"} | getByPlaceholder(value,{exact:true}) |
 | CSS | {"by":"css","value":"button[name=search]"} | locator(value) |
@@ -41,7 +42,7 @@ Values are scalars or {"ref":"input"|"output"|"credential","name":"…"}. Inputs
 | select | [E,[{by:"value"|"label",value:S},…]] | Choose native select options / selectOption |
 | scrollIntoView | [E] | Bring target into view / scrollIntoViewIfNeeded |
 | scroll | [deltaX,deltaY] | Scroll browser viewport / mouse.wheel |
-| read | [T,"text"|"value"|"number",D] | Copy text/value or parse a number |
+| read | [T,"text"|"value"|"number"|ReadSpec,D] | Copy text/value, parse a number, or extract one regex capture |
 | check | [C] | Report boolean answer in transcript |
 | verify | [C] | Wait for condition to be true |
 | assign | [D,V] | Set/copy an output, including null |
@@ -51,7 +52,7 @@ Values are scalars or {"ref":"input"|"output"|"credential","name":"…"}. Inputs
 | finish | [C or null] | Confirm completion and validate Recipe outputs |
 | fail | [code,message] | Business failure / Completed-Failed |
 
-"fill" is "select this field and type into it," including editable HTML; clearing is fill with "". "text" copies innerText; "value" copies the raw input/textarea/select string. "number" reads a control value when available, otherwise innerText, trims it, and converts the entire string with "Number": empty → null, nonfinite/invalid → failure. No native number-input requirement or partial parsing. Date-like values use text/value unchanged; date types and interpretation are deferred. Results can include the runner timezone as separate metadata, without claiming it is the application's timezone.
+"fill" is "select this field and type into it," including editable HTML; clearing is fill with "". "text" copies innerText; "value" copies the raw input/textarea/select string. "number" reads a control value when available, otherwise innerText, trims it, and converts the entire string with "Number": empty → null, nonfinite/invalid → failure. No native number-input requirement or partial parsing. A ReadSpec {"source":"text"|"value","extract":{"by":"regex","pattern":"…","group":1|"name"},"parse":"string"|"number"} reads the source, requires exactly one regex match, and returns the selected capture unchanged ("parse" defaults to "string") or, for "number", converted like "number". "exact" is valid only on text targets. Date-like values use text/value unchanged; date types and interpretation are deferred. Results can include the runner timezone as separate metadata, without claiming it is the application's timezone.
 
 ## Conditions
 

@@ -20,6 +20,8 @@ Respond with ONLY a single JSON object shaped like:
   ends, retries, failed Steps, and reads of values that are not in outputs.
 - Every Step needs a unique id and an intent. "if" and "group" are allowed; use "if" only where the
   journal shows the page can legitimately differ between runs.
+- A read with a structured spec (extract by regex, "exact": false text target) is understood as
+  reading one field from a larger block; carry it forward unchanged.
 - Reference only the inputs, outputs, and credentials seen in the journal and listed in inputs/outputs.
 - Never put a literal sensitive value in a Step; use a reference.
 - The final Step must be {"action": "finish", "args": [null]} — its checkpoint is filled in for you.
