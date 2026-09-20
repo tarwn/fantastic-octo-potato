@@ -17,7 +17,7 @@
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
-	import { isTerminalJobStatus, JobStatus } from "$lib/jobStatus";
+	import { isTerminalJobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { JOB_TYPE_LABELS, JobType } from "$lib/jobType";
 	import type { JobDetail } from "$lib/types/job";
@@ -105,9 +105,7 @@
 						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
 					{/if}
 					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
-					{#if job.jobStatusId === JobStatus.CompletedFailed || job.jobStatusId === JobStatus.CompletedError}
-						<button type="button" class="btn" onclick={() => (retryModalOpen = true)}>Retry Job</button>
-					{/if}
+					<button type="button" class="btn" onclick={() => (retryModalOpen = true)}>Retry Job</button>
 				</div>
 			</div>
 			{#if cancelError}
