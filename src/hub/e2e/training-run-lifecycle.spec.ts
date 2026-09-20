@@ -38,5 +38,11 @@ test("a Job created via the Start Training modal goes Pending then Running with 
 
 	// no page.reload() — the Job detail page's RefreshIndicator drives this refetch on its own.
 	await expect(page.getByText("Running", { exact: true }).first()).toBeVisible({ timeout: 8000 });
-	await expect(page.getByText("open_starting_url: navigate to URL")).toBeVisible();
+	await expect(page.getByText("Open the starting URL", { exact: true })).toBeVisible();
+
+	await page.getByRole("button", { name: "Toggle details for open_starting_url" }).click();
+	await expect(page.getByText("id: open_starting_url")).toBeVisible();
+	await expect(page.getByText("outcome: succeeded")).toBeVisible();
+	await expect(page.getByText("recipe step:")).toBeVisible();
+	await expect(page.getByText("observed: navigate to URL")).toBeVisible();
 });

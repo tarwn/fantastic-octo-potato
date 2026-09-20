@@ -123,7 +123,7 @@
 			<CompiledRecipeLink recipe={compiledRecipe} registeredApplicationId={job.customerApplicationXrefId} />
 
 			<div class="job-page-panels">
-				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} />
+				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} steps={job.steps} recoveries={[]} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
@@ -159,7 +159,7 @@
 			/>
 
 			<div class="job-page-panels">
-				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} />
+				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} steps={job.recipe.steps} recoveries={job.recipe.recoveries} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<ScreenshotPanel jobId={job.id} artifacts={job.artifacts} />

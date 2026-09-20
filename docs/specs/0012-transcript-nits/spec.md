@@ -15,9 +15,10 @@ Operators reading a Job see its true type (Training Run, Trial, Execute), a scan
 - R010: LLM-compiled draft Recipes must have `intent` on every Step (verified, and enforced if not already).
 - R007: Screenshot button is a simpler icon/emoji, 10-20% subtler grey/slate, larger click area than today but smaller than the row height (negative margin allowed).
 - R008: Every Step row has a toggle; other rows hold an invisible, non-interactive placeholder in the same column (screenshot and toggle columns are fixed-width so they align down the list). Expanded state survives the Job page's 5s refresh (keyed by row `sequence`). Pressed, it expands a detail area below the unchanged top row: same row background, indented to the text column plus `$space-l`.
-  - Line 1: `id: {stepId}` and `outcome: {outcome}`
-  - Line 2: `recipe step:` `<StepDescription />` of the Step found by step id
-  - Line 3: `observed:` `stepMessage(step)`
+  - Line 1: `id: {stepId}`
+  - Line 2: `outcome: {outcome}`
+  - Line 3: `recipe step:` `<StepDescription />` of the Step found by step id
+  - Line 4: `observed:` the `stepMessage(step)` text without its `{stepId}: ` prefix
 - R009: DEFER records for: pretty 404/500 pages and API 404 messaging; `plan` transcript kind; `observe` transcript kind.
 
 ## Constraints
