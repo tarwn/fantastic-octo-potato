@@ -1,14 +1,14 @@
-# ADR (draft): Operator command wire protocol for live Human Intervention
+# ADR 5: Operator command wire protocol for live Human Intervention
 
 **Author:** Agent (Eli Weinstock-Herman)
 
-While a Recipe Job is `Interactive-User`, the owner sends commands (click now; assign and prompt later) that the Runner must execute in its still-open browser session. The Runner has no inbound channel (it pulls from the Hub by polling), commands can carry operator-typed values that must never appear in Job responses, and a Job can leave `Interactive-User` (cancel, end, timeout) while a command is in flight. This draft moves to `docs/adrs/hub/` in the last step of the spec.
+While a Recipe Job is `Interactive-User`, the owner sends commands (click, assign, prompt) that the Runner must execute in its still-open browser session. The Runner has no inbound channel (it pulls from the Hub by polling), commands can carry operator-typed values that must never appear in Job responses, and a Job can leave `Interactive-User` (cancel, end, timeout) while a command is in flight. Introduced by spec [0013-human-intervention](../../specs/0013-human-intervention/spec.md).
 
 ## Decision
 
 The Hub persists at most one pending command per Job in `intervention_command`, and the Runner pulls it:
 
-- **Submit** (`POST /api/hub/jobs/:id/commands`): validated by the Hub, then inserted in one transaction that re-checks status (`Interactive-User`) and owner. A second submit while one is `Pending` gets a 409.
+- **Submit** (`POST /api/hub/jobs/:id/commands`): validated by the Hub (a `prompt` is converted to one atomic Step by the Hub LLM call first), then inserted in one transaction that re-checks status (`Interactive-User`) and owner. A second submit while one is `Pending` gets a 409.
 - **Idempotency**: each submission carries a client `commandKey`, unique per Job. A duplicate returns the original command rather than creating another.
 - **Pull** (`GET .../runners/:id/jobs/:jobId/commands/pending`): the only endpoint that returns `raw_payload`, and only while the Job is `Interactive-User`. The Runner reads it at its existing in-Job poll cadence.
 - **Result** (`POST .../commands/:commandId/result`): accepted once, only for a `Pending` command on a Job that is still `Interactive-User`; it writes the command's Transcript Step entry through the ordinary DSL Step report path. Otherwise 409, and the Runner discards the result and follows the Job's new status.
@@ -27,7 +27,7 @@ A single pending command with a pull model needs no queue semantics, ordering ru
 
 ## Status
 
-Proposed
+Accepted
 
 ## Consequences
 

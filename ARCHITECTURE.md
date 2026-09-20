@@ -194,7 +194,7 @@ On start, the Runner connects to it's configured Hub URL:
     - If an allowlist violation occurs, Report `Completed-Error` with details and exit job
   - Interactive Loop (`Intervention-Requested`, see [Human Intervention](#human-intervention))
     - Keep the same browser session open
-    - Wait up to X seconds (settings from Hub initial call), if human intervention has not occurred then report status of `Completed-Failed` with details of the timed out wait and exit the job to look for new work
+    - Wait up to X seconds (settings from Hub initial call, restarting as an idle timeout once a human takes control), if human intervention has not occurred or goes idle then report status of `Completed-Failed` with details of the timed out wait and exit the job to look for new work
     - As user steps are received from Hub, they are executed and the additional details for Human Intervention mode are provided
     - This continues until either the user sends a recovery action, the job status changes on it's own, or a non-recoverable error occurs:
       - -> non-recoverable error: same logic for `Completed-Error` above
@@ -326,26 +326,24 @@ No LLM usage in this mode.
 
 ## Human Intervention
 
-When Human Intervention is requested, a user can open the affected Job and press a "Take Control" button. The goal is to direct the Runner through additional steps that either returns it to the Recipe Steps so it can continue, or determine the job should finish as `Completed-Failed`.
+Human Intervention applies to Recipe Jobs only; Training Jobs stay Hub-authoritative and never enter it ([DEFER 10](./docs/defers/0010-training-job-intervention.md)). When a Recipe Job is `Intervention-Requested`, a user can open the affected Job and press a "Take Control" button. The goal is to direct the Runner through additional steps that either return it to the Recipe Steps so it can continue, or end the job as `Completed-Failed`.
 
-When a Human uses the "Take Control" button, an atomic update is applied to the Job Status (`Interactive-User`) and adding the user's id on the record, only if the status is still `Intervention-Requested` and a null user id. If the lock is obtained, the user is presented with the control panel. This prevents race conditions when taking control and mixed signals to the runner, transcript, or LLM. This information is added to the Job Transcript as part of the status change.
+When a Human uses the "Take Control" button, an atomic update is applied to the Job Status (`Interactive-User`) and stamps a client-generated `operatorId` on the record, only if the status is still `Intervention-Requested` and no owner is set. There is no auth, so `operatorId` is an ownership token that prevents mixed signals to the runner, transcript, or LLM, not a security boundary. The Runner keeps its browser session open, and its intervention timeout restarts as an idle timeout once control is taken. This information is added to the Job Transcript as part of the status change.
 
-Each Human Intervention step is included in the Transcript and a future addition will enable Hub to take the Transcript and Recipe and use the LLM to fashion a new draft to test, changing either the main Steps or adding in new Recoverable Scenarios.
+Each Human Intervention command is included in the Transcript. Commands are not persisted as Recoverable Scenarios. A future addition will enable Hub to take the Transcript and Recipe and use the LLM to fashion a new draft ([DEFER 3](./docs/defers/0003-intervention-to-revised-recipe.md)).
 
-1. An overlay opens that displays the Human Intervention panel
-    - Displays the next desired step, the human is either recovering to get to this step or entering an alternative option for the step
+1. An overlay opens that displays the Human Intervention panel, locked to the owner
+    - Displays the blocked Step and reason
     - Latest screenshot of where the runner is right now
     - Transcript of recent actions
-2. The Human has three ways to perform an action:
-    - Click the screen to communicate a "Click x,y" Action
-    - Type a prompt for the LLM to convert into Actions, "Read the value out of the such-and-such label as output `acct_no`"
+2. The owner has three ways to perform an action, one command at a time (a single pending command per Job that the Runner pulls, see [ADR 0005](./docs/adrs/hub/0005-operator-command-wire-protocol.md)):
+    - Click the screenshot to communicate a "Click x,y" Action
+    - Type a prompt that Hub converts, with one LLM call on explicit submit, into one atomic Step: "Read the value out of the such-and-such label as output `acct_no`"
       - (FUTURE) The step is displayed to the user prior to being added for the Runner to pick up, allowing them to explicitly approve in case it is an irreversible action
     - Assign an output directly: `acct_no=null`
-3. Note: Before adding these steps for the runner to execute, Hub verifies the job status is still `Interactive-User` and this user is the one it's locked to as a secondary control (for instance, ensuring a cancelled job doesn't get toggled back since the Runner will have moved on).
-   1. (FUTURE) Surface the acknowledgment from the Runner picking up the new step in the transcript to the overlay, then use the inverse (it';s been X seconds since posting the step and the runner hasn't picked it up) to detect if the Runner is no longer connected and has gone stale
-5. When ready, the Human hands control back to the Runner, selecting the step they should continue from
-   1. When returning to the same step the Runner was stuck on, this is effectively a new Recoverable Scenario
-   2. When extracting or assigning a value, this is an alternate set of steps within the main plan
+3. Note: Before accepting a command, Hub verifies the job status is still `Interactive-User` and this operator is the owner (for instance, ensuring a cancelled job doesn't get toggled back since the Runner will have moved on). A command still pending when the Job leaves `Interactive-User` is voided.
+   1. (FUTURE) Surface the acknowledgment from the Runner picking up the new step in the transcript to the overlay, then use the inverse (it's been X seconds since posting the step and the runner hasn't picked it up) to detect if the Runner is no longer connected and has gone stale
+4. When ready, the owner hands control back to the Runner, selecting the Recipe Step to resume at. Hub validates the position and the Runner resumes there, so readiness is proven by the resume Step running. The owner can instead end the Job as `Completed-Failed`.
 
 (FUTURE) At any time if the Job status changes away from `Interactive-User` while this user is in the screen or the user id on the Job status does not match their id, the overlay locks with a message indicating the new job status or that Human XYZ is now in interactive control instead.
 
