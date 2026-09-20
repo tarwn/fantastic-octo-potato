@@ -15,7 +15,8 @@ export enum JobStatus {
 	CompletedFailed = 4,
 	CompletedCancelled = 5,
 	InterventionRequested = 6,
-	CompletedError = 7
+	CompletedError = 7,
+	InteractiveUser = 8
 }
 
 export const TERMINAL_JOB_STATUSES: readonly JobStatus[] = [
@@ -86,6 +87,7 @@ export interface ReportStatusRequest {
 	kind: "status";
 	status: JobStatus;
 	message: string;
+	blockedStepId?: string;
 }
 
 export interface ReportInfoRequest {
@@ -168,8 +170,8 @@ export async function reportDslStep(config: RunnerConfig, jobId: number, request
 
 // Directly changes a Job's status (e.g. Intervention-Requested, Completed-Error/-Failed/-Success)
 // — the same "status" report kind Hub's reportJobStep already accepts.
-export async function reportStatus(config: RunnerConfig, jobId: number, status: JobStatus, message: string): Promise<ReportStepResult> {
-	return postJobStep(config, jobId, { kind: "status", status, message });
+export async function reportStatus(config: RunnerConfig, jobId: number, status: JobStatus, message: string, blockedStepId?: string): Promise<ReportStepResult> {
+	return postJobStep(config, jobId, { kind: "status", status, message, ...(blockedStepId !== undefined ? { blockedStepId } : {}) });
 }
 
 // A non-fatal transcript note — e.g. a blocked subresource request that didn't fail the current

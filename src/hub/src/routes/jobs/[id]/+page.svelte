@@ -5,6 +5,7 @@
 
 	import CompiledRecipeLink from "./_components/CompiledRecipeLink.svelte";
 	import GoalsPanel from "./_components/GoalsPanel.svelte";
+	import InterventionOverlay from "./_components/InterventionOverlay.svelte";
 	import JobStrip from "./_components/JobStrip.svelte";
 	import ResultsPanel from "./_components/ResultsPanel.svelte";
 	import ScreenshotPanel from "./_components/ScreenshotPanel.svelte";
@@ -12,19 +13,19 @@
 	import TranscriptPanel from "./_components/TranscriptPanel.svelte";
 
 	import { page } from "$app/state";
-	import { cancelJob, fetchJob } from "$lib/api/jobsApi";
+	import { cancelJob, endJob, fetchJob, takeControl } from "$lib/api/jobsApi";
 	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
 	import { buildJobExport } from "$lib/jobExport";
-	import { isTerminalJobStatus } from "$lib/jobStatus";
+	import { isTerminalJobStatus, JobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { JobType, jobTypeLabel } from "$lib/jobType";
+	import { getOperatorId } from "$lib/operatorId";
+	import { chooseRefreshIntervalSeconds } from "$lib/refreshInterval";
 	import type { JobDetail } from "$lib/types/job";
 	import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
-
-	const REFRESH_INTERVAL_SECONDS = 5;
 
 	let job = $state<JobDetail | null>(null);
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
@@ -33,8 +34,14 @@
 	let cancelError = $state<string | null>(null);
 	let retryModalOpen = $state(false);
 	let lastRefreshedOn = $state(new Date());
+	let overlayOpen = $state(false);
+	let interventionNotice = $state<string | null>(null);
+	let interventionError = $state<string | null>(null);
+	let operatorId = $state("");
 
 	const jobId = $derived(Number(page.params.id));
+	// Re-chosen from the latest load, so a status change switches the rate without a reload.
+	const refreshIntervalSeconds = $derived(chooseRefreshIntervalSeconds(job, lastRefreshedOn));
 
 	async function load() {
 		try {
@@ -51,7 +58,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(() => {
+		operatorId = getOperatorId();
+		void load();
+	});
 
 	async function refresh() {
 		await load();
@@ -69,6 +79,40 @@
 		catch (err) {
 			cancelError = err instanceof Error ? err.message : "Failed to cancel Job";
 		}
+	}
+
+	async function handleTakeControl() {
+		if (!job) return;
+
+		interventionNotice = null;
+		interventionError = null;
+		try {
+			await takeControl(job.id, operatorId);
+			await refresh();
+			overlayOpen = true;
+		}
+		catch (err) {
+			interventionError = err instanceof Error ? err.message : "Failed to take control";
+			await refresh();
+		}
+	}
+
+	async function handleEndJob() {
+		if (!job) return;
+
+		interventionError = null;
+		try {
+			await endJob(job.id, operatorId);
+			await refresh();
+		}
+		catch (err) {
+			interventionError = err instanceof Error ? err.message : "Failed to end Job";
+		}
+	}
+
+	function closeOverlay(notice: string | null) {
+		overlayOpen = false;
+		interventionNotice = notice;
 	}
 
 	function exportJson() {
@@ -101,7 +145,7 @@
 			<div class="job-page-header">
 				<h1>{job.name}</h1>
 				<div class="job-page-actions">
-					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
+					<RefreshIndicator intervalSeconds={refreshIntervalSeconds} {lastRefreshedOn} onRefresh={refresh} />
 					{#if !isTerminalJobStatus(job.jobStatusId)}
 						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
 					{/if}
@@ -146,10 +190,32 @@
 			<div class="job-page-header">
 				<h1>{job.name}</h1>
 				<div class="job-page-actions">
-					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
+					<RefreshIndicator intervalSeconds={refreshIntervalSeconds} {lastRefreshedOn} onRefresh={refresh} />
+					{#if job.jobStatusId === JobStatus.InterventionRequested}
+						<button type="button" class="btn" onclick={handleTakeControl}>Take Control</button>
+					{:else if job.jobStatusId === JobStatus.InteractiveUser}
+						<button type="button" class="btn" onclick={() => (overlayOpen = true)}>
+							{job.interventionOwner === operatorId ? "Open control panel" : "View control panel"}
+						</button>
+					{/if}
+					{#if job.jobStatusId === JobStatus.InterventionRequested || job.jobStatusId === JobStatus.InteractiveUser}
+						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
+					{/if}
 					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
 				</div>
 			</div>
+			{#if cancelError}
+				<p class="job-page-message">{cancelError}</p>
+			{/if}
+			{#if interventionError}
+				<p class="job-page-message" role="alert">{interventionError}</p>
+			{/if}
+			{#if interventionNotice}
+				<p class="job-page-message" role="status">{interventionNotice}</p>
+			{/if}
+			{#if job.interventionOwner !== null}
+				<p class="job-page-message" data-testid="job-owner">Owner: {job.interventionOwner === operatorId ? "you" : job.interventionOwner}</p>
+			{/if}
 
 			<JobStrip
 				customerName={registeredApplication.customerName}
@@ -165,6 +231,9 @@
 					<ScreenshotPanel jobId={job.id} artifacts={job.artifacts} />
 				</div>
 			</div>
+			{#if overlayOpen}
+				<InterventionOverlay {job} {operatorId} endError={interventionError} onEndJob={handleEndJob} onClose={closeOverlay} />
+			{/if}
 		</div>
 	{/if}
 </div>

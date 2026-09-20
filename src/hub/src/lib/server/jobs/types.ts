@@ -10,7 +10,7 @@ export interface JobActionResult {
 // halt is deliberately excluded — it's a schema/enum slot for a future Intervention-Requested
 // status change, not something a Runner can submit as free text this spec.
 export type ReportStepBody =
-	| { kind: "status"; status: JobStatus; message: string }
+	| { kind: "status"; status: JobStatus; message: string; blockedStepId?: string }
 	| { kind: "info"; message: string }
 	// Both Recipe and Training Run Jobs report DSL Steps by string id (Training issues real atomic
 	// DSL Steps, not a bespoke sequence-based shape). extractions still carries the raw

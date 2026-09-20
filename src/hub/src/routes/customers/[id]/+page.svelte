@@ -5,14 +5,21 @@
 
 	import { page } from "$app/state";
 	import { fetchCustomer } from "$lib/api/customersApi";
+	import { fetchJobs } from "$lib/api/jobsApi";
+	import InterventionJobsPanel from "$lib/components/InterventionJobsPanel.svelte";
 	import type { CustomerDetail } from "$lib/types/customer";
+	import type { Job } from "$lib/types/job";
 
 	let customer = $state<CustomerDetail | null>(null);
+	let jobs = $state<Job[]>([]);
 	let loadError = $state<string | null>(null);
 
 	onMount(async () => {
 		try {
-			customer = await fetchCustomer(Number(page.params.id));
+			const loadedCustomer = await fetchCustomer(Number(page.params.id));
+			const registeredApplicationIds = loadedCustomer.registeredApplications.map((application) => application.id);
+			jobs = (await fetchJobs()).filter((job) => registeredApplicationIds.includes(job.customerApplicationXrefId));
+			customer = loadedCustomer;
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load customer";
@@ -29,6 +36,7 @@
 		<p class="page-message">{loadError}</p>
 	{:else if customer}
 		<h1>{customer.name}</h1>
+		<InterventionJobsPanel {jobs} />
 		<RegisteredApplicationsPanel registeredApplications={customer.registeredApplications} />
 	{/if}
 </div>

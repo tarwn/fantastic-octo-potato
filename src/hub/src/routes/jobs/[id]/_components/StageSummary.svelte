@@ -29,6 +29,8 @@
 				return "needs intervention";
 			case JobStatus.CompletedError:
 				return "error";
+			case JobStatus.InteractiveUser:
+				return "under human control";
 		}
 	}
 

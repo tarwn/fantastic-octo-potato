@@ -49,7 +49,10 @@ describe("StartTrainingModal", () => {
 			createdAt: new Date(),
 			startedAt: null,
 			heartbeatOn: null,
-			completedAt: null
+			completedAt: null,
+			interventionOwner: null,
+			blockedStepId: null,
+			blockedReason: null
 		});
 	});
 

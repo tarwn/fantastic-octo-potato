@@ -12,6 +12,7 @@ import type { ChildStep } from "$lib/types/recipeDefinition";
 // Intervention-Requested is a halted, non-terminal state (ARCHITECTURE.md's Core Loop) — it waits
 // for a human or an intervention timeout, it doesn't end the Job.
 export const TERMINAL_JOB_STATUSES = [JobStatus.CompletedSuccess, JobStatus.CompletedFailed, JobStatus.CompletedCancelled, JobStatus.CompletedError];
+export const INTERVENTION_JOB_STATUSES = [JobStatus.InterventionRequested, JobStatus.InteractiveUser];
 
 // Status-change transcript rows share job_transcript_entry's (job_id, sequence) column with
 // step reports, so they're pinned outside a step report's 1..maxSteps range: negative before
@@ -74,6 +75,9 @@ interface JobBase {
 	startedAt: Date | null;
 	heartbeatOn: Date | null;
 	completedAt: Date | null;
+	interventionOwner: string | null;
+	blockedStepId: string | null;
+	blockedReason: string | null;
 }
 
 export type Job =
@@ -161,6 +165,9 @@ interface JobRow {
 	startedAt: string | null;
 	heartbeatOn: string | null;
 	completedAt: string | null;
+	interventionOwner: string | null;
+	blockedStepId: string | null;
+	blockedReason: string | null;
 	trainingGoal: string | null;
 	trainingStartingUrl: string | null;
 	trainingAllowlist: string | null;
@@ -204,6 +211,7 @@ const JOB_SELECT = `
 	SELECT job.id, job.name, job.customer_application_xref_id AS customerApplicationXrefId, job.job_type_id AS jobTypeId,
 	       job.job_status_id AS jobStatusId, job.runner_id AS runnerId, job.created_at AS createdAt,
 	       job.started_at AS startedAt, job.heartbeat_on AS heartbeatOn, job.completed_at AS completedAt,
+	       job.intervention_owner AS interventionOwner, job.blocked_step_id AS blockedStepId, job.blocked_reason AS blockedReason,
 	       training_job.goal AS trainingGoal, training_job.starting_url AS trainingStartingUrl,
 	       training_job.allowlist AS trainingAllowlist, training_job.max_steps AS trainingMaxSteps,
 	       training_job.alternate_goals AS trainingAlternateGoals,
@@ -227,7 +235,10 @@ function mapJobRow(row: JobRow): Job {
 		createdAt: fromDbDate(row.createdAt),
 		startedAt: fromDbDate(row.startedAt),
 		heartbeatOn: fromDbDate(row.heartbeatOn),
-		completedAt: fromDbDate(row.completedAt)
+		completedAt: fromDbDate(row.completedAt),
+		interventionOwner: row.interventionOwner,
+		blockedStepId: row.blockedStepId,
+		blockedReason: row.blockedReason
 	};
 
 	if (row.jobTypeId === JobType.TrainingRun) {
@@ -323,7 +334,10 @@ export function insertJob(db: Database.Database, params: InsertJobParams): Job {
 			createdAt: params.createdAt,
 			startedAt: null,
 			heartbeatOn: null,
-			completedAt: null
+			completedAt: null,
+			interventionOwner: null,
+			blockedStepId: null,
+			blockedReason: null
 		};
 
 		if (params.jobType === JobType.TrainingRun) {
@@ -423,11 +437,46 @@ export function claimNextJobForRunner(
 }
 
 // No-op (0 rows affected) if the Job is already in a terminal status — an ended Job's
-// status/timestamp must not be overwritten by a late or mismatched call.
+// status/timestamp must not be overwritten by a late or mismatched call. Any status written here
+// releases intervention ownership; only takeJobControl ever sets an owner.
 export function updateJobStatus(db: Database.Database, jobId: number, status: JobStatus, completedAt: Date | null = null): void {
 	db.prepare(
-		`UPDATE job SET job_status_id = ?, completed_at = ? WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
+		`UPDATE job SET job_status_id = ?, completed_at = ?, intervention_owner = NULL WHERE id = ? AND job_status_id NOT IN (${TERMINAL_JOB_STATUSES.join(",")})`
 	).run(status, toDbDate(completedAt), jobId);
+}
+
+// Take Control is one conditional update: only an unowned Intervention-Requested Job can be taken,
+// so the affected-row count arbitrates a race between two operators (false = this caller lost).
+export function takeJobControl(db: Database.Database, jobId: number, operatorId: string, now: Date): boolean {
+	return db.transaction(() => {
+		const { changes } = db
+			.prepare("UPDATE job SET job_status_id = ?, intervention_owner = ? WHERE id = ? AND job_status_id = ? AND intervention_owner IS NULL")
+			.run(JobStatus.InteractiveUser, operatorId, jobId, JobStatus.InterventionRequested);
+		if (changes === 0) {
+			return false;
+		}
+		appendTranscriptEntry(db, jobId, nextTranscriptSequence(db, jobId), TranscriptKind.Status, `Control taken by operator ${operatorId}`, now, JobStatus.InteractiveUser);
+		return true;
+	})();
+}
+
+// Owner-only: ends the Job as Completed-Failed only while it is still Interactive-User and still
+// owned by this operator, and clears the owner with the terminal status.
+export function endJobAsOwner(db: Database.Database, jobId: number, operatorId: string, now: Date): boolean {
+	return db.transaction(() => {
+		const { changes } = db
+			.prepare("UPDATE job SET job_status_id = ?, completed_at = ?, intervention_owner = NULL WHERE id = ? AND job_status_id = ? AND intervention_owner = ?")
+			.run(JobStatus.CompletedFailed, toDbDate(now), jobId, JobStatus.InteractiveUser, operatorId);
+		if (changes === 0) {
+			return false;
+		}
+		appendTranscriptEntry(db, jobId, nextTranscriptSequence(db, jobId), TranscriptKind.Status, `Job ended by operator ${operatorId}`, now, JobStatus.CompletedFailed);
+		return true;
+	})();
+}
+
+export function setJobBlocked(db: Database.Database, jobId: number, blockedStepId: string | null, blockedReason: string): void {
+	db.prepare("UPDATE job SET blocked_step_id = ?, blocked_reason = ? WHERE id = ?").run(blockedStepId, blockedReason, jobId);
 }
 
 export function updateJobHeartbeat(db: Database.Database, jobId: number, when: Date): void {

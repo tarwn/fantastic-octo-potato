@@ -33,7 +33,8 @@ export const JOB_STATUS_LABELS: Record<number, string> = {
 	4: "Completed-Failed",
 	5: "Completed-Cancelled",
 	6: "Intervention-Requested",
-	7: "Completed-Error"
+	7: "Completed-Error",
+	8: "Interactive-User"
 };
 
 export interface RegisteredApplicationSummary {

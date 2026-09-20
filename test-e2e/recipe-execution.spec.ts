@@ -35,7 +35,8 @@ const JOB_STATUS_LABELS: Record<number, string> = {
 	4: "Completed-Failed",
 	5: "Completed-Cancelled",
 	6: "Intervention-Requested",
-	7: "Completed-Error"
+	7: "Completed-Error",
+	8: "Interactive-User"
 };
 
 interface RecipeSummary {
@@ -166,9 +167,9 @@ test.describe("recipe execution against a real target application (spec 0007)", 
 
 			await pollJobStatus(request, created.id, "Intervention-Requested", 60_000);
 
-			// RUNNER_INTERVENTION_TIMEOUT_SECONDS=5 (test-e2e/playwright.config.ts): left unattended,
+			// RUNNER_INTERVENTION_TIMEOUT_SECONDS=20 (test-e2e/playwright.config.ts): left unattended,
 			// the Runner reports Completed-Failed and exits (R011) well within this poll window.
-			await pollJobStatus(request, created.id, "Completed-Failed", 30_000);
+			await pollJobStatus(request, created.id, "Completed-Failed", 45_000);
 		}
 		finally {
 			runner.kill();

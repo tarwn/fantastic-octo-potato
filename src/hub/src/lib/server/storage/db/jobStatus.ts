@@ -7,5 +7,6 @@ export enum JobStatus {
 	CompletedFailed = 4,
 	CompletedCancelled = 5,
 	InterventionRequested = 6,
-	CompletedError = 7
+	CompletedError = 7,
+	InteractiveUser = 8
 }

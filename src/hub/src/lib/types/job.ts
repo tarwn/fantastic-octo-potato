@@ -31,6 +31,9 @@ interface JobBase {
 	startedAt: Date | null;
 	heartbeatOn: Date | null;
 	completedAt: Date | null;
+	interventionOwner: string | null;
+	blockedStepId: string | null;
+	blockedReason: string | null;
 }
 
 export type Job =

@@ -39,7 +39,7 @@ type SequenceOutcome =
 	| { type: "goto"; target: string }
 	| { type: "finish" }
 	| { type: "fail"; error: { code: string; message: string } }
-	| { type: "intervention" }
+	| { type: "intervention"; stepId: string }
 	| { type: "error"; message: string };
 
 interface Position {
@@ -140,7 +140,7 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 				return recovered.type === "ran" ? { type: "advance" } : recovered.outcome;
 			}
 		}
-		return { type: "intervention" };
+		return { type: "intervention", stepId: step.id };
 	}
 
 	await reportChildOutcome(deps, step.id, "succeeded", parentStepId, extractions, actionResult.targetDescription);
@@ -240,18 +240,15 @@ async function runRecovery(deps: LoopDeps, recipe: RecipeDefinition, recovery: R
 	if (outcome.type === "advance") {
 		return { type: "ran" };
 	}
-	if (outcome.type === "intervention") {
-		// A recovery Step's own ordinary failure counts as the recovery itself failing, which
-		// escalates straight to intervention rather than attempting a nested recovery.
-		return { type: "outcome", outcome: { type: "intervention" } };
-	}
+	// A recovery Step's own ordinary failure escalates straight to intervention (still naming that
+	// Step) rather than attempting a nested recovery.
 	return { type: "outcome", outcome };
 }
 
 // The shared Automatic Loop interpreter: walks the Recipe's top-level Steps, descending into
 // group/if children and reconstructing goto continuations, until a terminal SequenceOutcome
 // (finish/fail/intervention/error) is reached.
-async function runProgram(deps: LoopDeps, recipe: RecipeDefinition): Promise<SequenceOutcome> {
+async function runProgram(deps: LoopDeps, recipe: RecipeDefinition): Promise<Exclude<SequenceOutcome, { type: "advance" | "goto" }>> {
 	const locationIndex = buildLocationIndex(recipe.steps);
 	let pos: Position = { topIndex: 0 };
 
@@ -305,32 +302,36 @@ async function runProgram(deps: LoopDeps, recipe: RecipeDefinition): Promise<Seq
 
 type InterventionResult = "timeout" | "terminal" | "unexpectedChange";
 
-// Keeps the same browser/page open and polls Hub for an externally changed status until either
-// the intervention timeout elapses or Hub reports a status this Runner didn't set itself. There is
-// no human "take control" input to wait for yet, so only the timeout and external-change branches
-// apply here.
+// Keeps the same browser/page open and follows the Hub-owned status. The timeout is a wait for a
+// human until an operator takes control, then restarts as an idle timeout once they do. Status is
+// read before the deadline is judged so a takeover just before expiry is never failed by mistake.
 async function waitForIntervention(deps: LoopDeps, interventionTimeoutSeconds: number): Promise<InterventionResult> {
-	const deadline = Date.now() + interventionTimeoutSeconds * 1000;
+	const timeoutMs = interventionTimeoutSeconds * 1000;
+	let deadline = Date.now() + timeoutMs;
+	let takenOver = false;
 	for (;;) {
-		const remainingMs = deadline - Date.now();
-		if (remainingMs <= 0) {
-			await reportStatus(deps.config, deps.job.id, JobStatus.CompletedFailed, "Intervention timed out with no human recovery");
-			return "timeout";
-		}
-		await sleep(Math.min(RECOVERY_POLL_INTERVAL_MS, remainingMs));
-		if (Date.now() >= deadline) {
-			await reportStatus(deps.config, deps.job.id, JobStatus.CompletedFailed, "Intervention timed out with no human recovery");
-			return "timeout";
-		}
+		await sleep(Math.min(RECOVERY_POLL_INTERVAL_MS, Math.max(deadline - Date.now(), 0)));
 		const statusId = await fetchJobStatus(deps.config, deps.job.comms.statusUrl);
-		if (statusId === JobStatus.InterventionRequested) {
-			continue;
-		}
 		if (TERMINAL_JOB_STATUSES.includes(statusId)) {
 			return "terminal";
 		}
-		await reportStatus(deps.config, deps.job.id, JobStatus.CompletedError, `Unexpected status change to ${statusId} during intervention`);
-		return "unexpectedChange";
+		if (statusId !== JobStatus.InterventionRequested && statusId !== JobStatus.InteractiveUser) {
+			await reportStatus(deps.config, deps.job.id, JobStatus.CompletedError, `Unexpected status change to ${statusId} during intervention`);
+			return "unexpectedChange";
+		}
+		if (statusId === JobStatus.InteractiveUser && !takenOver) {
+			takenOver = true;
+			deadline = Date.now() + timeoutMs;
+		}
+		if (Date.now() >= deadline) {
+			await reportStatus(
+				deps.config,
+				deps.job.id,
+				JobStatus.CompletedFailed,
+				takenOver ? "Interactive session idle timed out" : "Intervention timed out with no human recovery"
+			);
+			return "timeout";
+		}
 	}
 }
 
@@ -385,7 +386,13 @@ export async function runRecipeJobLoop(config: RunnerConfig, job: ClaimedRecipeJ
 			await reportStatus(config, job.id, JobStatus.CompletedSuccess, "Recipe finished");
 		}
 		else {
-			await reportStatus(config, job.id, JobStatus.InterventionRequested, "A Step failed with no matching recoverable scenario");
+			await reportStatus(
+				config,
+				job.id,
+				JobStatus.InterventionRequested,
+				redactKnownSecrets(`Step ${outcome.stepId} failed with no matching recoverable scenario`, secrets),
+				outcome.stepId
+			);
 			await waitForIntervention(deps, interventionTimeoutSeconds);
 		}
 	}

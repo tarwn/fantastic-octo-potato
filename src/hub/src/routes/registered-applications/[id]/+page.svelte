@@ -8,12 +8,16 @@
 	import StartTrainingModal from "./_components/StartTrainingModal.svelte";
 
 	import { page } from "$app/state";
+	import { fetchJobs } from "$lib/api/jobsApi";
 	import { fetchRecipes, type RecipeSummary } from "$lib/api/recipesApi";
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
+	import InterventionJobsPanel from "$lib/components/InterventionJobsPanel.svelte";
+	import type { Job } from "$lib/types/job";
 	import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
 
 	let registeredApplication = $state<RegisteredApplicationDetail | null>(null);
 	let recipes = $state<RecipeSummary[]>([]);
+	let jobs = $state<Job[]>([]);
 	let loadError = $state<string | null>(null);
 	let trainingModalOpen = $state(false);
 	let recipeModalMode = $state<"Trial" | "Execute" | null>(null);
@@ -25,6 +29,7 @@
 		try {
 			registeredApplication = await fetchRegisteredApplication(Number(page.params.id));
 			recipes = await fetchRecipes(registeredApplication.id);
+			jobs = (await fetchJobs()).filter((job) => job.customerApplicationXrefId === registeredApplication?.id);
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load registered application";
@@ -88,6 +93,7 @@
 				<button type="button" class="btn btn-primary" onclick={beginTrainingRun}>Begin a Training Run</button>
 			</div>
 		</div>
+		<InterventionJobsPanel {jobs} />
 		<RunnersPanel
 			runners={registeredApplication.runners}
 			xrefId={registeredApplication.id}

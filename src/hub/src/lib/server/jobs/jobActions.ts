@@ -12,6 +12,7 @@ import {
 	getJobById,
 	getJobStepArtifactById,
 	insertJobStepArtifact,
+	INTERVENTION_JOB_STATUSES,
 	type Job,
 	JOB_CLAIMED_SEQUENCE,
 	listJobs,
@@ -20,6 +21,7 @@ import {
 	listSafeJobResults,
 	listTrainingRunJobSteps,
 	listTranscriptEntries,
+	setJobBlocked,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
 	updateJobHeartbeat,
@@ -59,7 +61,13 @@ function parseReportStepBody(body: unknown): ParseResult {
 			if (message === undefined) {
 				return { ok: false, error: "message is required" };
 			}
-			return { ok: true, value: { kind: "status", status: body.status, message } };
+			if (body.blockedStepId !== undefined && (typeof body.blockedStepId !== "string" || body.blockedStepId.trim() === "")) {
+				return { ok: false, error: "blockedStepId must be a non-empty string" };
+			}
+			return {
+				ok: true,
+				value: { kind: "status", status: body.status, message, ...(body.blockedStepId !== undefined ? { blockedStepId: body.blockedStepId } : {}) }
+			};
 		}
 		case "info":
 		case "recover":
@@ -169,21 +177,25 @@ export function cancelJob(db: Database.Database, rawId: string): JobActionResult
 	if (TERMINAL_JOB_STATUSES.includes(job.jobStatusId)) {
 		return { status: 409, body: { error: `Job ${rawId} is already in a terminal status` } };
 	}
-	if (job.jobType !== JobType.TrainingRun) {
-		throw new Error(`Job ${rawId} is not a Training Run Job — Recipe Jobs are not cancellable`);
-	}
-
 	const completedAt = new Date();
-	updateJobStatus(db, job.id, JobStatus.CompletedCancelled, completedAt);
-	appendTranscriptEntry(
-		db,
-		job.id,
-		terminalTranscriptSequence(job.details.maxSteps),
-		TranscriptKind.Status,
-		"Cancelled by operator",
-		completedAt,
-		JobStatus.CompletedCancelled
-	);
+	if (job.jobType === JobType.TrainingRun) {
+		updateJobStatus(db, job.id, JobStatus.CompletedCancelled, completedAt);
+		appendTranscriptEntry(
+			db,
+			job.id,
+			terminalTranscriptSequence(job.details.maxSteps),
+			TranscriptKind.Status,
+			"Cancelled by operator",
+			completedAt,
+			JobStatus.CompletedCancelled
+		);
+	}
+	else if (INTERVENTION_JOB_STATUSES.includes(job.jobStatusId)) {
+		appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Status, "Cancelled by operator", completedAt, JobStatus.CompletedCancelled);
+	}
+	else {
+		return { status: 409, body: { error: `Recipe Job ${rawId} can only be cancelled while it is awaiting or receiving human intervention` } };
+	}
 
 	return { status: 200, body: { data: getJobById(db, job.id) } };
 }
@@ -261,6 +273,9 @@ export async function reportJobStep(db: Database.Database, job: Job, runnerId: n
 
 	if (parsed.value.kind === "status") {
 		appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Status, parsed.value.message, now, parsed.value.status);
+		if (parsed.value.status === JobStatus.InterventionRequested) {
+			setJobBlocked(db, job.id, parsed.value.blockedStepId ?? null, parsed.value.message);
+		}
 		updateJobHeartbeat(db, job.id, now);
 		updateRunnerHeartbeat(db, runnerId, now);
 		return { status: 200, body: { data: { jobStatusId: parsed.value.status } } };

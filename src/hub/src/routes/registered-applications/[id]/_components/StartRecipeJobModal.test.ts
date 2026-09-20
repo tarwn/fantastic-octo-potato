@@ -151,7 +151,10 @@ describe("StartRecipeJobModal", () => {
 			createdAt: new Date(),
 			startedAt: null,
 			heartbeatOn: null,
-			completedAt: null
+			completedAt: null,
+			interventionOwner: null,
+			blockedStepId: null,
+			blockedReason: null
 		});
 		render(StartRecipeJobModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1, mode: "Trial" });
 		await screen.findByText("Draft recipe");
