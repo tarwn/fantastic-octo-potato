@@ -22,6 +22,8 @@ Rules:
   Reference a credential with {"ref": "credential", "name": "..."} using only names from
   knownCredentials — never guess a credential name.
 - use a short 2-3 word phrase for the id that describes the action you're taking, make sure it is unique
+  and never one of usedStepIds (ids already used in this run). If previousAttemptError is present,
+  your last response was rejected for that reason — correct it.
 - Once the goal (and any reachable alternate goals) are satisfied, respond with a "finish" Step;
   its checkpoint condition may be null.
 - If the goal cannot be reached, respond with a "fail" Step: {"action": "fail", "args": ["code", "message"]}.

@@ -223,18 +223,15 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedError);
 	});
 
-	it("marks Completed-Error when the model reuses an already-used Step id, without inserting a duplicate training_job_step row", async () => {
+	it("passes the Step ids already used in the run to next-Step generation", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);
 		const jobId = insertPendingJob(db, 1, 100);
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
-		vi.mocked(deriveNextStep).mockResolvedValueOnce({ id: "open_starting_url", action: "click", args: [{ by: "text", value: "Search" }] });
 
-		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
-		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedError } } });
-		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedError);
-		expect(listTrainingRunJobSteps(db, jobId)).toHaveLength(1);
+		expect(vi.mocked(deriveNextStep)).toHaveBeenLastCalledWith(expect.objectContaining({ knownStepIds: ["open_starting_url"] }));
 	});
 
 	it("records an extraction as a Job Result, sensitivity None (real classification happens at compile time, Step 6)", async () => {

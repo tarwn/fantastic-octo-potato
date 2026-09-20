@@ -96,7 +96,8 @@ export async function reportDslStep(
 			maskedScreenshotPngBase64,
 			knownInputNames,
 			knownOutputNames,
-			knownCredentialNames
+			knownCredentialNames,
+			knownStepIds: listTrainingRunJobSteps(db, job.id).map((trainingStep) => trainingStep.stepId)
 		});
 	}
 	catch (err) {
@@ -110,25 +111,6 @@ export async function reportDslStep(
 			terminalTranscriptSequence(job.details.maxSteps),
 			TranscriptKind.Status,
 			`Next-Step generation failed: ${err.message}`,
-			now,
-			JobStatus.CompletedError
-		);
-		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedError } } };
-	}
-
-	// validateAtomicStep checks one Step in isolation and has no visibility into ids already used
-	// this run — a repeat id would otherwise only surface as training_job_step's UNIQUE constraint
-	// throwing after the writes above already committed. Caught here instead, before any of that,
-	// and treated the same as an invalid LLM response (steps-dsl.md: "IDs are unique across main
-	// steps").
-	if (listTrainingRunJobSteps(db, job.id).some((existing) => existing.stepId === next.id)) {
-		updateJobStatus(db, job.id, JobStatus.CompletedError, now);
-		appendTranscriptEntry(
-			db,
-			job.id,
-			terminalTranscriptSequence(job.details.maxSteps),
-			TranscriptKind.Status,
-			`Next-Step generation failed: LLM reused an already-used Step id: ${next.id}`,
 			now,
 			JobStatus.CompletedError
 		);
