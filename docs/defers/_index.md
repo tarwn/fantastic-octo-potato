@@ -9,4 +9,4 @@ Deferred features, capabilities, or decisions.
 | 3 | [Human Intervention producing a revised/improved Recipe](./0003-intervention-to-revised-recipe.md) |
 | 4 | [training-run.md's hypothesis-tracking model](./0004-training-run-hypothesis-tracking.md) |
 | 5 | [Masking a sensitive value embedded in goal text](./0005-goal-text-masking.md) |
-
+| 6 | [User communication on Trial success](./0006-trial-success-communication.md) |

@@ -6,6 +6,7 @@ Reference: [jobRepository.ts](../../../src/hub/src/lib/server/storage/repositori
 
 Notable:
 * A base/extension table split (`job` + `training_job`/`recipe_job` on `job_type_id`) always reads through a repository join, never `job` alone — an extension row is required, not optional, for the row's type.
+* `job.name` is set once at insertion (the Recipe's name for Trial/Execute, "Training Run" for Training) and never updated, so a Job keeps its creation-time name even after its Recipe is renamed or archived.
 * Claim-on-poll must select-then-conditionally-update in one transaction and trust the `UPDATE`'s affected-row count (not the earlier `SELECT`) to detect a lost race — that's what makes two concurrent claims on the same Job safe.
 * Every terminal-status write (`updateJobStatus`) must no-op once a Job is already terminal — never let a late/duplicate call revive or overwrite a finished Job.
 * Transcript sequence numbers are append-only and idempotent (`INSERT OR IGNORE` on `UNIQUE(job_id, sequence)`) — a repeated/late report must be a silent no-op, never a duplicate row or an error.

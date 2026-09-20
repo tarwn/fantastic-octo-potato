@@ -297,6 +297,8 @@ In `Trial` mode, the goal is to validate the recipe from `Training` mode before 
 
 **Promote:**
 
+A draft Recipe is eligible to publish only when a Trial Job of this exact Recipe completed successfully.
+
 1. User opens the Hub's Registered Application screen
 2. In addition to "Start Trial" button, the draft recipe now has a "Publish" button too
     - When tapped, the Publish button toggles the Recipe from draft to published
