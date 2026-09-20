@@ -178,6 +178,10 @@ async function runAction(page: Page, step: ChildStep, ctx: ExecutionContext, des
 			}
 			case "read": {
 				const [target, mode, destination] = step.args;
+				if (typeof mode !== "string") {
+					// Temporary until spec 0015 task 3 implements extraction.
+					throw new Error("Structured read is not yet supported");
+				}
 				const value = isPointTarget(target) ? await readAtPoint(page, target, mode) : await readElementValue(await resolveRequiredLocator(page, target, ctx, described), mode);
 				setOutput(ctx.outputs, destination.name, value);
 				return { outcome: "succeeded", extraction: { fieldName: destination.name, value } };

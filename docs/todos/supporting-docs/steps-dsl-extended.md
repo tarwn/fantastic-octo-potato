@@ -13,7 +13,6 @@ Sources: [ARCHITECTURE.md](../../../ARCHITECTURE.md), then code-example.js (not 
 | Title | `{by:"title",value:"Help"}` | getByTitle |
 | Test ID | `{by:"testId",value:"balance"}` | getByTestId |
 | XPath | `{by:"xpath",value:"//input[@name='account']"}` | locator with explicit XPath |
-| Substring matching | `{by:"text",value:"Search",exact:false}` | Optional exact flag on text-like targets |
 | Scoped target | `{by:"text",value:"Edit",within:{by:"css",value:"#account-panel"}}` | Scope before matching |
 | Match index | `{by:"text",value:"Edit",nth:0}` | Explicit zero-based selection |
 | Frames | `{by:"css",value:"#balance",frames:["iframe#legacy"]}` | Explicit frame path, outermost first |
@@ -37,7 +36,7 @@ Point remains a coordinate on the captured full-page image, including scrollable
 
 Adding check's destination changes that action's arity; introduce it through an explicit schema version/profile rather than guessing optional positions. Existing POC check still reports a boolean in the transcript. `fill` remains the default human “type into” task; `type` handles the narrower append/event case. See [Playwright input actions](https://playwright.dev/docs/input).
 
-Numeric parsing may eventually require explicit locale, currency, grouping, rounding, and null/error rules. Add typed options to read rather than guessing from arbitrary page text. Date conversion needs declared source format, timezone provenance, daylight-saving/ambiguity rules, and desired output representation. Raw strings plus runnerTimezone metadata in the POC are not a date system; a native HTML date input does not solve that design.
+Numeric parsing may eventually require explicit locale, currency, grouping, rounding, and null/error rules. Add explicit options rather than guessing from arbitrary page text. Date conversion needs declared source format, timezone provenance, daylight-saving/ambiguity rules, and desired output representation. Raw strings plus runnerTimezone metadata in the POC are not a date system; a native HTML date input does not solve that design.
 
 ## Additional conditions
 

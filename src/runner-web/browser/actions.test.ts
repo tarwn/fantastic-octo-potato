@@ -132,6 +132,12 @@ describe("executeAction: interaction", () => {
 });
 
 describe("executeAction: read/assign", () => {
+	it("fails a structured read until extraction is implemented", async () => {
+		const spec = { source: "text", extract: { by: "regex", pattern: "(\\d+)", group: 1 } } as const;
+		const result = await executeAction(fixture.page, { id: "s", action: "read", args: [{ by: "css", value: "#balance" }, spec, { ref: "output", name: "balance" }] }, newContext());
+		expect(result).toMatchObject({ outcome: "failed", error: { code: "ACTION_FAILED", message: "Structured read is not yet supported" } });
+	});
+
 	it("read text copies innerText into the destination output", async () => {
 		const ctx = newContext();
 		const result = await executeAction(fixture.page, { id: "s", action: "read", args: [{ by: "css", value: "#balance" }, "text", { ref: "output", name: "balance" }] }, ctx);

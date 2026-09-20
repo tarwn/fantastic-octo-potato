@@ -27,12 +27,56 @@ const CONDITION_TESTS = new Set(["exists", "visible", "enabled", "disabled", "as
 const COMPOSITE_TESTS = new Set(["all", "any"]);
 const TARGET_BY = new Set(["text", "label", "placeholder", "css", "point"]);
 const READ_TYPES = new Set(["text", "value", "number"]);
+const READ_SPEC_SOURCES = new Set(["text", "value"]);
+const READ_SPEC_PARSES = new Set(["string", "number"]);
+const READ_SPEC_KEYS = new Set(["source", "extract", "parse"]);
+const EXTRACT_KEYS = new Set(["by", "pattern", "group"]);
+// Mirrored by runner-web's own copy; patterns are only length-capped, not safe-regex checked.
+export const MAX_EXTRACTION_PATTERN_LENGTH = 200;
 
 type StepLike = { id?: unknown; action?: unknown; args?: unknown[] };
 type IfCaseLike = { when?: unknown; steps?: unknown[] };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object";
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+	return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function isValidGroup(group: unknown): boolean {
+	return (typeof group === "number" && Number.isInteger(group) && group >= 0) || (typeof group === "string" && group !== "");
+}
+
+function isCompilablePattern(pattern: string): boolean {
+	try {
+		new RegExp(pattern);
+		return true;
+	}
+	catch {
+		return false;
+	}
+}
+
+function isValidReadSpec(spec: unknown): boolean {
+	if (!isRecord(spec) || !hasOnlyKeys(spec, READ_SPEC_KEYS) || !READ_SPEC_SOURCES.has(spec.source as string)) {
+		return false;
+	}
+	if (spec.parse !== undefined && !READ_SPEC_PARSES.has(spec.parse as string)) {
+		return false;
+	}
+	const extract = spec.extract;
+	return (
+		isRecord(extract) &&
+		hasOnlyKeys(extract, EXTRACT_KEYS) &&
+		extract.by === "regex" &&
+		typeof extract.pattern === "string" &&
+		extract.pattern !== "" &&
+		extract.pattern.length <= MAX_EXTRACTION_PATTERN_LENGTH &&
+		isCompilablePattern(extract.pattern) &&
+		isValidGroup(extract.group)
+	);
 }
 
 // Shared by validateRecipeDefinition (a full Recipe, finish requires a non-null checkpoint) and
@@ -53,9 +97,19 @@ function checkStepShape(
 	// validateRecipeDefinition passes its own checkValueRef here too.
 	checkDestination: (value: unknown) => void
 ): void {
+	let currentStepId = "<missing id>";
+
 	function checkTarget(target: unknown): void {
 		if (!isRecord(target)) {
 			return;
+		}
+		if ("exact" in target) {
+			if (target.by !== "text") {
+				errors.push(`Step ${currentStepId}: 'exact' is only valid on text targets`);
+			}
+			else if (typeof target.exact !== "boolean") {
+				errors.push(`Step ${currentStepId}: 'exact' must be a boolean`);
+			}
 		}
 		if (!TARGET_BY.has(String(target.by))) {
 			errors.push(`Invalid target 'by' value: ${String(target.by)}`);
@@ -100,6 +154,7 @@ function checkStepShape(
 		}
 		const s = step as StepLike;
 		const id = typeof s.id === "string" ? s.id : "<missing id>";
+		currentStepId = id;
 
 		if (typeof s.action !== "string" || !ACTIONS.has(s.action)) {
 			errors.push(`Step ${id}: invalid action: ${String(s.action)}`);
@@ -135,7 +190,12 @@ function checkStepShape(
 				break;
 			case "read":
 				checkTarget(args[0]);
-				if (!READ_TYPES.has(args[1] as string)) {
+				if (isRecord(args[1])) {
+					if (!isValidReadSpec(args[1])) {
+						errors.push(`Step ${id}: invalid read spec`);
+					}
+				}
+				else if (!READ_TYPES.has(args[1] as string)) {
 					errors.push(`Step ${id}: invalid read type: ${String(args[1])}`);
 				}
 				checkDestination(args[2]);
