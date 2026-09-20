@@ -1,5 +1,7 @@
 An application that can learn how to navigate an application interface to achieve a goal and turn that into a repeatable, deterministic recipe for completing a task or extracting data on an ongoing basis, with LLM or human intervention to adjust to changing circumstances.
 
+![example transcript during live run](./assets/AnimatedDemo.gif)
+
 # Background
 
 - [Systems Architecture](./ARCHITECTURE.md)

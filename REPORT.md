@@ -54,11 +54,26 @@ Recipe, Job Inputs, and Job Outputs are transmitted as JSON. Hub stores Recipes 
 
 **[Example Recipe](#)**
 ```json
-TODO: cut an example from the seeded Recipes once merged + export button is added
-...truncated
+{
+    "schemaVersion": 1,
+    "inputs": {
+        "invoiceNumber": {"type": "string", "description": "Invoice number to look up",
+                            "required": true, "nullable": false, "sensitive": false}
+    },
+    "outputs": {
+        "clientName": {"type": "string", "description": "Client name on the invoice",
+                        "required": true, "nullable": false, "sensitive": false}
+    },
+    "steps": [
+        {"id": "start", "action": "open", "args": ["http://localhost:8089/"], "intent": "Open BambooInvoice"},
+        {"id": "login_fill_user", "action": "fill", "args": [{"by": "css", "value": "#username"}, {"ref": "credential", "name": "username"}],"intent": "Enter login email"},
+        "...truncated..."
+    ]
+    "...truncated..."
+}
 ```
 
-- [How a Runner processes a Recipe](#)
+- [How a Runner processes a Recipe](./docs/context/runner-web/recipe-automatic-loop.md)
 - [How Hub works with the LLM](#)
 - [How Human Intervention translates to Recipe Steps](#)
 
