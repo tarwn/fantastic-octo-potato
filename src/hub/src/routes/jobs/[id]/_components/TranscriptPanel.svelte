@@ -1,12 +1,16 @@
 <script lang="ts">
+	import ScreenshotOverlay from "./ScreenshotOverlay.svelte";
+
 	import RedactedValue from "$lib/components/RedactedValue.svelte";
 	import StatusBadge from "$lib/components/StatusBadge.svelte";
 	import { JOB_STATUS_LABELS, JOB_STATUS_VARIANTS } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
 	import { SensitivityType } from "$lib/sensitivityType";
-	import type { JobTranscriptEntry, StepTranscriptText, TranscriptFieldRef } from "$lib/types/job";
+	import type { JobStepArtifact, JobTranscriptEntry, StepTranscriptText, TranscriptFieldRef } from "$lib/types/job";
 
-	let { entries }: { entries: JobTranscriptEntry[] } = $props();
+	let { entries, jobId, artifacts }: { entries: JobTranscriptEntry[]; jobId: number; artifacts: JobStepArtifact[] } = $props();
+
+	let overlay = $state<{ text: string; imageUrl: string } | null>(null);
 
 	interface TranscriptDay {
 		dateLabel: string;
@@ -33,6 +37,15 @@
 	function stepMessage({ stepId, action, targetDescription }: StepTranscriptText): string {
 		const selector = targetDescription.selector === "" ? "" : `(${targetDescription.selector})`;
 		return `${stepId}: ${action} on ${targetDescription.component}${selector}`;
+	}
+
+	// Artifacts are ordered oldest-to-newest, so the last match is the latest for that Step.
+	function artifactFor(stepId: string): JobStepArtifact | undefined {
+		return artifacts.findLast((artifact) => artifact.stepId === stepId);
+	}
+
+	function openScreenshot(text: StepTranscriptText, artifact: JobStepArtifact) {
+		overlay = { text: stepMessage(text), imageUrl: `/api/hub/jobs/${jobId}/artifacts/${artifact.id}` };
 	}
 
 	function kindName(kind: TranscriptKind): string {
@@ -73,7 +86,14 @@
 					<span class={`transcript-kind-${kindName(entry.kind).toLowerCase()}`}>{kindName(entry.kind).toUpperCase()}</span>
 					<span class="transcript-text">
 						{#if entry.kind === TranscriptKind.Step}
-							<span class="transcript-step-message">{stepMessage(entry.text)}</span>
+							{@const step = entry.text}
+							{@const artifact = artifactFor(step.stepId)}
+							<span class="transcript-step-message">
+								{stepMessage(step)}
+								{#if artifact}
+									<button type="button" class="transcript-screenshot-button" aria-label={`View screenshot for ${step.stepId}`} onclick={() => openScreenshot(step, artifact)}>🖼</button>
+								{/if}
+							</span>
 							{#each entry.text.inputs as field (field.fieldName)}
 								{@render transcriptStepField("input", field)}
 							{/each}
@@ -94,6 +114,8 @@
 		</div>
 	{/each}
 </div>
+
+<ScreenshotOverlay open={overlay !== null} onClose={() => (overlay = null)} text={overlay?.text ?? ""} imageUrl={overlay?.imageUrl ?? ""} />
 
 <style lang="scss">
 	@use "../../../../lib/styles/mixins" as *;
@@ -219,6 +241,15 @@
 
 	.transcript-step-message {
 		display: block;
+	}
+
+	.transcript-screenshot-button {
+		padding: 0;
+		margin-left: $space-xs;
+		font-size: inherit;
+		background: none;
+		border: 0;
+		cursor: pointer;
 	}
 
 	.transcript-step-field {
