@@ -12,12 +12,9 @@ import type { ChildStep, RecipeDefinition } from "$lib/types/recipeDefinition";
 
 // The local target-app (docs/context/tools/target-app.md): reachable at localhost:8089, seeded
 // login admin@targetapp.local / targetapp-seed-pw, one seeded invoice (INV-1001) against client
-// "Contoso Consulting". Step targets below can only be literal strings, not the invoiceNumber
-// input, so these hand-authored Steps navigate to the one seeded invoice by its known link text
-// rather than searching for an arbitrary number.
+// "Contoso Consulting".
 const TARGET_APP_URL = "http://localhost:8089/";
 const INVOICES_LIST_URL = "http://localhost:8089/index.php/invoices";
-const SEEDED_INVOICE_LINK_TEXT = "INV-1001";
 
 const INVOICE_NUMBER_INPUT: RecipeDefinition["inputs"] = {
 	invoiceNumber: { type: "string", description: "Invoice number to look up", required: true, nullable: false, sensitive: false }
@@ -53,8 +50,8 @@ function happyPathDefinition(): RecipeDefinition {
 			{
 				id: "open_invoice",
 				action: "click",
-				args: [{ by: "text", value: SEEDED_INVOICE_LINK_TEXT }],
-				intent: "Open the seeded invoice"
+				args: [{ by: "text", value: { ref: "input", name: "invoiceNumber" } }],
+				intent: "Open the invoice"
 			},
 			{
 				id: "wait_invoice",

@@ -20,7 +20,7 @@ An enumerated action and typed args array avoid parsing instruction strings. IDs
 | CSS | `{"by":"css","value":"button[name=search]"}` | `locator(value)` |
 | Point | `{"by":"point","x":240,"y":1180}` | Map full-page screenshot coordinates to browser coordinates |
 
-Text matching is exact in the POC. CSS covers button/link identity and editable HTML nodes. These map to [Playwright locators](https://playwright.dev/docs/locators).
+A text/label/placeholder/CSS target's `value` is a string or an `input` reference (`{"by":"text","value":{"ref":"input","name":"invoiceNumber"}}`), resolved by the runner at execution; `output` and `credential` references are not allowed in targets, and a sensitive input is masked wherever the target is reported. Text matching is exact in the POC. CSS covers button/link identity and editable HTML nodes. These map to [Playwright locators](https://playwright.dev/docs/locators).
 
 - **Exactly one match:** click, focus, fill, select, scrollIntoView, read; state tests require one match when an element is present.
 - **1+ matches:** `exists` is true when any match exists.

@@ -233,7 +233,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go failed: ACTION_FAILED: login rejected for password ••••••");
 	}, 20000);
 
-	it("reports Completed-Error on an allowlist violation, without reporting the triggering Step", async () => {
+	it("reports Completed-Error on an allowlist violation, after reporting the triggering Step as failed", async () => {
 		const recipe: RecipeDefinition = {
 			schemaVersion: 1,
 			inputs: {},
@@ -246,11 +246,11 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		await runRecipeJobLoop(config, job, 300);
 
-		expect(reportDslStep).not.toHaveBeenCalled();
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "open_fixture", outcome: "failed" }));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
 	}, 20000);
 
-	it("reports Completed-Error when the allowlist route handler blocks a navigation request, without reporting the triggering Step", async () => {
+	it("reports Completed-Error when the allowlist route handler blocks a navigation request, after reporting the triggering Step as failed", async () => {
 		const recipe: RecipeDefinition = {
 			schemaVersion: 1,
 			inputs: {},
@@ -269,7 +269,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		await runRecipeJobLoop(config, job, 300);
 
-		expect(reportDslStep).not.toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "click_go" }));
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "click_go", outcome: "failed" }));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
 	}, 20000);
 
@@ -316,7 +316,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		await runRecipeJobLoop(config, job, 300);
 
-		expect(reportDslStep).not.toHaveBeenCalled();
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "s1", outcome: "failed", extractions: [], targetDescription: { component: "browser", selector: "" } });
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("boom"));
 	}, 20000);
 

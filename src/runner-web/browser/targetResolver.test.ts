@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { ExecutionContext } from "../dsl/executionContext.ts";
+import { createOutputsState } from "../dsl/outputsState.ts";
+
 import { closeFixtureBrowser, type FixtureBrowser, openFixturePage } from "./_test/testPage.ts";
-import { resolveElementAtPoint, resolveElementTarget, resolveViewportPoint } from "./targetResolver.ts";
+import { resolveElementAtPoint, resolveElementTarget, resolveTargetValue, resolveViewportPoint } from "./targetResolver.ts";
 
 let fixture: FixtureBrowser;
 
@@ -11,6 +14,30 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await closeFixtureBrowser(fixture);
+});
+
+describe("resolveTargetValue", () => {
+	const ctx = (): ExecutionContext => ({
+		ingredients: { search: "Search" },
+		outputs: createOutputsState(),
+		stepTimeoutMs: 300,
+		resolveCredential: () => "unused",
+		secrets: []
+	});
+
+	it("keeps a literal value", () => {
+		expect(resolveTargetValue({ by: "text", value: "Search" }, ctx())).toEqual({ by: "text", value: "Search" });
+	});
+
+	it("resolves an input reference to the supplied ingredient", async () => {
+		const resolved = resolveTargetValue({ by: "text", value: { ref: "input", name: "search" } }, ctx());
+
+		expect((await resolveElementTarget(fixture.page, resolved)).status).toBe("found");
+	});
+
+	it("throws when the referenced input was not provided", () => {
+		expect(() => resolveTargetValue({ by: "text", value: { ref: "input", name: "missing" } }, ctx())).toThrow("Input \"missing\" was not provided");
+	});
 });
 
 describe("resolveElementTarget", () => {

@@ -60,6 +60,14 @@ function checkStepShape(
 		if (!TARGET_BY.has(String(target.by))) {
 			errors.push(`Invalid target 'by' value: ${String(target.by)}`);
 		}
+		if (isRecord(target.value) && "ref" in target.value) {
+			if (target.value.ref === "input") {
+				checkValueRef(target.value);
+			}
+			else {
+				errors.push(`Target value may only reference an input, not: ${String(target.value.ref)}`);
+			}
+		}
 	}
 
 	function checkCondition(condition: unknown, allowComposite = true): void {

@@ -18,6 +18,7 @@ import {
 	listJobStepArtifactsForJob,
 	listSafeJobIngredients,
 	listSafeJobResults,
+	listTrainingRunJobSteps,
 	listTranscriptEntries,
 	TERMINAL_JOB_STATUSES,
 	terminalTranscriptSequence,
@@ -28,7 +29,7 @@ import { type Runner, updateRunnerHeartbeat } from "../storage/repositories/runn
 
 import { reportDslStep as reportRecipeJobDslStep } from "./recipeJobs/reportDslStep";
 import { reportDslStep as reportTrainingRunJobDslStep } from "./trainingRunJobs/reportDslStep";
-import { createStepActionResolver } from "./stepActionResolver";
+import { createStepActionResolver, requireRecipeDefinition } from "./stepActionResolver";
 import { isJobStatus, isRecord, type JobActionResult, type ParseResult } from "./types";
 
 const NON_STEP_TRANSCRIPT_KIND: Record<"info" | "recover" | "observe" | "plan", Exclude<TranscriptKind, TranscriptKind.Step>> = {
@@ -132,11 +133,17 @@ export function getJobDetail(db: Database.Database, rawId: string): JobActionRes
 
 	const actionOf = createStepActionResolver(db, job);
 
+	const definition =
+		job.jobType === JobType.TrainingRun
+			? { steps: listTrainingRunJobSteps(db, job.id).map((step) => step.definition) }
+			: { recipe: requireRecipeDefinition(db, job) };
+
 	return {
 		status: 200,
 		body: {
 			data: {
 				...job,
+				...definition,
 				transcript: listTranscriptEntries(db, job.id).map((entry) =>
 					entry.kind === TranscriptKind.Step ? { ...entry, text: { ...entry.text, action: actionOf(entry.text.stepId) } } : entry
 				),

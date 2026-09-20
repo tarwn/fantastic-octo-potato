@@ -251,12 +251,20 @@ $panel-row-padding-y: 9px;
 $panel-row-padding-x: $space-m;
 
 // == transcript
-// a grid, not a table: [status rail] [time] [kind] [text] [affordance].
-// the last track is auto so it can hold either a status badge or an icon button.
-$transcript-grid-columns: 16px 80px 72px minmax(0, 1fr) auto;
+// a grid, not a table: [status rail] [time] [kind] [text] [status badge] [screenshot] [toggle].
+// the screenshot and toggle tracks are fixed so they align down the whole list.
+$transcript-rail-column-width: 16px;
+$transcript-time-column-width: 80px;
+$transcript-kind-column-width: 72px;
+$transcript-action-column-width: 24px;
+$transcript-grid-columns: $transcript-rail-column-width $transcript-time-column-width $transcript-kind-column-width minmax(0, 1fr) auto $transcript-action-column-width $transcript-action-column-width;
 $transcript-grid-gap: 12px;
 $transcript-row-padding-y: 7px;
 $transcript-row-padding-x: $space-m;
+// text column start (padding + rail/time/kind columns + their 3 gaps) plus one level of indent; keep in sync with $transcript-grid-columns
+$transcript-detail-indent: $transcript-row-padding-x + $transcript-rail-column-width + $transcript-time-column-width + $transcript-kind-column-width + 3 * $transcript-grid-gap + $space-l;
+$transcript-action-color: $color-stone-600;
+$transcript-action-hover-color: $color-stone-800;
 $transcript-row-emphasis-padding-y: $space-s;
 $transcript-font-family: $font-family-mono;
 $transcript-font-size: $text-mono-small-size;

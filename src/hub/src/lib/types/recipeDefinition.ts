@@ -11,7 +11,7 @@ export interface FieldDeclaration {
 	enum?: string[];
 }
 
-export type TargetElement = { by: "text" | "label" | "placeholder" | "css"; value: string };
+export type TargetElement = { by: "text" | "label" | "placeholder" | "css"; value: StringValue };
 export type TargetPoint = { by: "point"; x: number; y: number };
 export type Target = TargetElement | TargetPoint;
 

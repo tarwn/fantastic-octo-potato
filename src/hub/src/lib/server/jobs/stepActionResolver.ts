@@ -44,7 +44,7 @@ export function createStepActionResolver(db: Database.Database, job: Job): (step
 	};
 }
 
-function requireRecipeDefinition(db: Database.Database, job: Extract<Job, { jobType: JobType.Recipe }>): RecipeDefinition {
+export function requireRecipeDefinition(db: Database.Database, job: Extract<Job, { jobType: JobType.Recipe }>): RecipeDefinition {
 	if (job.details.recipeId === null) {
 		throw new Error(`Job ${job.id} is a Recipe Job with no recipe_id set`);
 	}

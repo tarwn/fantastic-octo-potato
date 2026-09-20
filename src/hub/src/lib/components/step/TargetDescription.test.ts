@@ -10,6 +10,13 @@ describe("TargetDescription", () => {
 		expect(screen.getByTestId("target-element")).toHaveTextContent("label \"Email\"");
 	});
 
+	it("renders an element target whose value is an input reference", () => {
+		render(TargetDescription, { locator: { by: "text", value: { ref: "input", name: "invoiceNumber" } } });
+
+		expect(screen.getByTestId("target-element")).toHaveTextContent("text");
+		expect(screen.getByTestId("value-input")).toHaveTextContent("input: invoiceNumber");
+	});
+
 	it("renders a point target as coordinates", () => {
 		render(TargetDescription, { locator: { by: "point", x: 10, y: 20 } });
 

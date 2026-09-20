@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 - 2026-09-20
+
+Transcript nits (spec 0012): Target values can carry a ValueRef, the Job screen labels Job type by mode and exports the Job with its definition, and Transcript rows show the Step intent with a screenshot button and a step-detail toggle. LLM-compiled draft Recipes now require an intent per Step, and the Runner reports every executed Step, including one that fails on an allowlist violation or an unexpected error, before the status change, so failures always appear in the Transcript.
+
 ## 0.11.0 - 2026-09-20
 
 Qualify and Publish a draft Recipe (spec 0011): a draft Recipe is qualified once a Trial Job of that exact Recipe completes successfully, and the Registered Application Recipes panel and Recipe review screen show not-yet-qualified / Trial passed (linking the Trial Job) / Published / Archived state. An operator can then publish a qualified draft with a name, optionally replacing a published Recipe, which is archived and linked in one atomic transaction and drops out of the Start Job list. Jobs now carry a `name` assigned at creation (the Recipe name, or "Training Run") shown on the Job screen and Jobs listing, and Training → Trial → Publish → Execute with changed ingredients is proven end to end with zero LLM calls after training.

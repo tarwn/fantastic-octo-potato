@@ -17,9 +17,10 @@
 	import { fetchRegisteredApplication } from "$lib/api/registeredApplicationsApi";
 	import RefreshIndicator from "$lib/components/RefreshIndicator.svelte";
 	import { formatJobDisplayId } from "$lib/jobDisplayId";
-	import { isTerminalJobStatus, JobStatus } from "$lib/jobStatus";
+	import { buildJobExport } from "$lib/jobExport";
+	import { isTerminalJobStatus } from "$lib/jobStatus";
 	import { TranscriptKind } from "$lib/jobTranscriptKind";
-	import { JOB_TYPE_LABELS, JobType } from "$lib/jobType";
+	import { JobType, jobTypeLabel } from "$lib/jobType";
 	import type { JobDetail } from "$lib/types/job";
 	import type { RegisteredApplicationDetail } from "$lib/types/registeredApplication";
 
@@ -73,7 +74,7 @@
 	function exportJson() {
 		if (!job) return;
 
-		const blob = new Blob([JSON.stringify(job, null, 2)], { type: "application/json" });
+		const blob = new Blob([JSON.stringify(buildJobExport(job), null, 2)], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement("a");
 		link.href = url;
@@ -93,7 +94,7 @@
 	{:else if job && registeredApplication && job.jobType === JobType.TrainingRun}
 		<div class="job-page-content">
 			<div class="job-page-eyebrow">
-				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>
+				<span class="job-page-mode">{jobTypeLabel(job).toUpperCase()}</span>
 				<span class="job-page-divider">|</span>
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
@@ -105,9 +106,7 @@
 						<button type="button" class="btn" onclick={handleCancel}>Cancel job</button>
 					{/if}
 					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>
-					{#if job.jobStatusId === JobStatus.CompletedFailed || job.jobStatusId === JobStatus.CompletedError}
-						<button type="button" class="btn" onclick={() => (retryModalOpen = true)}>Retry Job</button>
-					{/if}
+					<button type="button" class="btn" onclick={() => (retryModalOpen = true)}>Retry Job</button>
 				</div>
 			</div>
 			{#if cancelError}
@@ -124,7 +123,7 @@
 			<CompiledRecipeLink recipe={compiledRecipe} registeredApplicationId={job.customerApplicationXrefId} />
 
 			<div class="job-page-panels">
-				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} />
+				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} steps={job.steps} recoveries={[]} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
@@ -140,7 +139,7 @@
 	{:else if job && registeredApplication && job.jobType === JobType.Recipe}
 		<div class="job-page-content">
 			<div class="job-page-eyebrow">
-				<span class="job-page-mode">{JOB_TYPE_LABELS[job.jobType].toUpperCase()}</span>
+				<span class="job-page-mode">{jobTypeLabel(job).toUpperCase()}</span>
 				<span class="job-page-divider">|</span>
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
@@ -160,7 +159,7 @@
 			/>
 
 			<div class="job-page-panels">
-				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} />
+				<TranscriptPanel entries={job.transcript} jobId={job.id} artifacts={job.artifacts} steps={job.recipe.steps} recoveries={job.recipe.recoveries} />
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<ScreenshotPanel jobId={job.id} artifacts={job.artifacts} />

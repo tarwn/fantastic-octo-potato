@@ -4,7 +4,7 @@ import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl, SA
 import { type ActionOutcome, executeAction } from "../browser/actions.ts";
 import { closeBrowserSession, launchBrowserSession } from "../browser/browserSession.ts";
 import { evaluateCondition } from "../browser/conditions.ts";
-import type { TargetDescription } from "../browser/targetDescription.ts";
+import { BROWSER_TARGET_DESCRIPTION, type TargetDescription } from "../browser/targetDescription.ts";
 import type { RunnerConfig } from "../config.ts";
 import { resolveCredential } from "../credentials.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
@@ -93,6 +93,14 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	}
 	catch (err: unknown) {
 		await reportBlockedRequests(stepReportingDeps(deps), step.id);
+		// No ActionOutcome exists, so the target is unknown; "browser" matches what `open` reports.
+		await reportDslStep(deps.config, deps.job.id, {
+			stepId: step.id,
+			outcome: "failed",
+			...(parentStepId !== undefined ? { parentStepId } : {}),
+			extractions: [],
+			targetDescription: BROWSER_TARGET_DESCRIPTION
+		});
 		const rawMessage = err instanceof Error ? err.message : String(err);
 		return { type: "error", message: redactKnownSecrets(`Unexpected error executing step ${step.id}: ${rawMessage}`, deps.secrets) };
 	}
@@ -102,6 +110,14 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	// see at all (data:/about:/blob:), so both are checked here.
 	const blockedNavigationUrl = await reportBlockedRequests(stepReportingDeps(deps), step.id);
 	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [...deps.job.controls.allowedOrigins, ...SAFE_ALLOWED_ORIGINS])) {
+		// Not reportChildOutcome: it screenshots, and the page is on a disallowed origin.
+		await reportDslStep(deps.config, deps.job.id, {
+			stepId: step.id,
+			outcome: "failed",
+			...(parentStepId !== undefined ? { parentStepId } : {}),
+			extractions: [],
+			targetDescription: actionResult.targetDescription
+		});
 		return { type: "error", message: redactKnownSecrets(`Step ${step.id} navigated to a disallowed origin: ${blockedNavigationUrl ?? deps.page.url()}`, deps.secrets) };
 	}
 

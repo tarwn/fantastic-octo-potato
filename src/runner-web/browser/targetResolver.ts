@@ -1,16 +1,26 @@
 import type { ElementHandle, Locator, Page } from "playwright";
 
+import type { ExecutionContext } from "../dsl/executionContext.ts";
 import type { Target, TargetElement, TargetPoint } from "../dsl/types.ts";
+import { resolveStringValue } from "../dsl/valueResolver.ts";
 
 // Actions that operate on a single element need exactly one match — missing and ambiguous (2+
 // matches) are distinct, reported outcomes, never a silent first-match pick.
 export type TargetResolution = { status: "found"; locator: Locator } | { status: "missing" } | { status: "ambiguous"; count: number };
 
+export type ResolvedTargetElement = { by: TargetElement["by"]; value: string };
+
+// A ref'd value may be a sensitive input, so the resolved value must only reach a locator —
+// callers that put it in a message redact it against ctx.secrets first.
+export function resolveTargetValue(target: TargetElement, ctx: ExecutionContext): ResolvedTargetElement {
+	return { by: target.by, value: resolveStringValue(target.value, ctx) };
+}
+
 export function isPointTarget(target: Target): target is TargetPoint {
 	return target.by === "point";
 }
 
-function toLocator(page: Page, target: TargetElement): Locator {
+function toLocator(page: Page, target: ResolvedTargetElement): Locator {
 	switch (target.by) {
 		case "text":
 			return page.getByText(target.value, { exact: true });
@@ -23,7 +33,7 @@ function toLocator(page: Page, target: TargetElement): Locator {
 	}
 }
 
-export async function resolveElementTarget(page: Page, target: TargetElement): Promise<TargetResolution> {
+export async function resolveElementTarget(page: Page, target: ResolvedTargetElement): Promise<TargetResolution> {
 	const locator = toLocator(page, target);
 	const count = await locator.count();
 	if (count === 0) {

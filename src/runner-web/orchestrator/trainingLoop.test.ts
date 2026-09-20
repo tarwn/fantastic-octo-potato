@@ -140,16 +140,16 @@ describe("runTrainingJobLoop: happy path", () => {
 });
 
 describe("runTrainingJobLoop: terminal outcome mapping", () => {
-	it("reports Completed-Error on an allowlist violation, without reporting the triggering Step", async () => {
+	it("reports Completed-Error on an allowlist violation, after reporting the triggering Step as failed", async () => {
 		const job = buildJob({ allowlist: "https://only-this-origin.example.com" });
 
 		await runTrainingJobLoop(config, job);
 
-		expect(reportDslStep).not.toHaveBeenCalled();
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "open_fixture", outcome: "failed" }));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
 	}, 20000);
 
-	it("reports Completed-Error when the allowlist route handler blocks a navigation request, without reporting the triggering Step", async () => {
+	it("reports Completed-Error when the allowlist route handler blocks a navigation request, after reporting the triggering Step as failed", async () => {
 		const job = buildJob({ nextStep: openStep("<button id=\"go\">Go</button>") });
 		vi.mocked(reportDslStep).mockResolvedValueOnce({
 			jobStatusId: JobStatus.Running,
@@ -164,7 +164,7 @@ describe("runTrainingJobLoop: terminal outcome mapping", () => {
 
 		await runTrainingJobLoop(config, job);
 
-		expect(reportDslStep).not.toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "click_go" }));
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "click_go", outcome: "failed" }));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("disallowed origin"));
 	}, 20000);
 
@@ -202,7 +202,7 @@ describe("runTrainingJobLoop: terminal outcome mapping", () => {
 
 		await runTrainingJobLoop(config, job);
 
-		expect(reportDslStep).not.toHaveBeenCalled();
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ outcome: "failed", targetDescription: { component: "browser", selector: "" } }));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("boom"));
 	}, 20000);
 

@@ -3,6 +3,7 @@ import type { Page } from "playwright";
 import { type BlockedRequestEvent, createAllowListRouteHandler, isAllowedUrl, SAFE_ALLOWED_ORIGINS } from "../allowList.ts";
 import { type ActionOutcome, executeAction } from "../browser/actions.ts";
 import { closeBrowserSession, launchBrowserSession } from "../browser/browserSession.ts";
+import { BROWSER_TARGET_DESCRIPTION } from "../browser/targetDescription.ts";
 import type { RunnerConfig } from "../config.ts";
 import { listAvailableCredentialNames, resolveCredential } from "../credentials.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
@@ -62,6 +63,14 @@ async function runOneStep(deps: LoopDeps, step: ChildStep): Promise<ChildStep | 
 	}
 	catch (err: unknown) {
 		await reportBlockedRequests(stepReportingDeps(deps), step.id);
+		// No ActionOutcome exists, so the target is unknown; "browser" matches what `open` reports.
+		await reportDslStep(deps.config, deps.job.id, {
+			stepId: step.id,
+			outcome: "failed",
+			extractions: [],
+			targetDescription: BROWSER_TARGET_DESCRIPTION,
+			credentialNames: deps.credentialNames
+		});
 		const rawMessage = err instanceof Error ? err.message : String(err);
 		await reportStatus(deps.config, deps.job.id, JobStatus.CompletedError, redactKnownSecrets(`Unexpected error executing step ${step.id}: ${rawMessage}`, deps.secrets));
 		return undefined;
@@ -69,6 +78,13 @@ async function runOneStep(deps: LoopDeps, step: ChildStep): Promise<ChildStep | 
 
 	const blockedNavigationUrl = await reportBlockedRequests(stepReportingDeps(deps), step.id);
 	if (blockedNavigationUrl !== undefined || !isAllowedUrl(deps.page.url(), [deps.job.allowlist, ...SAFE_ALLOWED_ORIGINS])) {
+		await reportDslStep(deps.config, deps.job.id, {
+			stepId: step.id,
+			outcome: "failed",
+			extractions: [],
+			targetDescription: actionResult.targetDescription,
+			credentialNames: deps.credentialNames
+		});
 		await reportStatus(
 			deps.config,
 			deps.job.id,
