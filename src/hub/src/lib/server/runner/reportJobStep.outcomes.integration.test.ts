@@ -181,7 +181,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
@@ -201,7 +201,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		const recipes = listRecipesForApplication(db, 1);
 		expect(recipes).toHaveLength(1);
@@ -218,7 +218,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 		vi.mocked(compileRecipe).mockRejectedValueOnce(new RecipeCompilationInvalidResponseError("still invalid"));
 
-		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
@@ -308,7 +308,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		expect(listTrainingRunJobSteps(db, jobId)).toContainEqual(expect.objectContaining({ stepId: "s2", definition: FINISH_STEP }));
 	});

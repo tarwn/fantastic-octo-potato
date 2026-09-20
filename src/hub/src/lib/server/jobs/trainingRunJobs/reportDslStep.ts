@@ -27,7 +27,7 @@ import {
 } from "../../storage/repositories/jobRepository";
 import { createDraftRecipe } from "../../storage/repositories/recipeRepository";
 import { updateRunnerHeartbeat } from "../../storage/repositories/runnerRepository";
-import { summarizeTranscriptForLlm } from "../transcriptSummary";
+import { buildJournal, summarizeTranscriptForLlm } from "../transcriptSummary";
 import type { JobActionResult, ReportStepBody } from "../types";
 
 import type { ChildStep } from "$lib/types/recipeDefinition";
@@ -156,7 +156,7 @@ export async function reportDslStep(
 			const definition = await compileRecipe({
 				goal: job.details.goal,
 				transcriptSummary,
-				executedSteps: listTrainingRunJobSteps(db, job.id).map((trainingStep) => trainingStep.definition),
+				journal: buildJournal(transcriptEntries, listTrainingRunJobSteps(db, job.id)),
 				ingredients: listSafeJobIngredients(db, job.id),
 				results: listSafeJobResults(db, job.id),
 				credentialNames: knownCredentialNames
