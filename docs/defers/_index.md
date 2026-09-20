@@ -10,3 +10,6 @@ Deferred features, capabilities, or decisions.
 | 4 | [training-run.md's hypothesis-tracking model](./0004-training-run-hypothesis-tracking.md) |
 | 5 | [Masking a sensitive value embedded in goal text](./0005-goal-text-masking.md) |
 | 6 | [User communication on Trial success](./0006-trial-success-communication.md) |
+| 7 | [Pretty 404/500 pages and API 404 messaging](./0007-pretty-error-pages.md) |
+| 8 | [`plan` transcript kind](./0008-plan-transcript-kind.md) |
+| 9 | [`observe` transcript kind](./0009-observe-transcript-kind.md) |
