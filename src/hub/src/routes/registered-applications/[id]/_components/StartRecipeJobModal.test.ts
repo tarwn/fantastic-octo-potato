@@ -138,6 +138,7 @@ describe("StartRecipeJobModal", () => {
 			id: 42,
 			customerApplicationXrefId: 1,
 			jobType: JobType.Recipe,
+			name: "Draft recipe",
 			jobStatusId: 1,
 			details: { recipeId: 1, mode: "Trial", allowlist: "https://example.test", stepTimeoutMs: 15000 },
 			runnerId: null,

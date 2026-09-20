@@ -70,6 +70,7 @@ async function createRunningRecipeJob(db: Database.Database, runnerId: number): 
 	const recipe = publishRecipe(db, draft.id, new Date("2026-09-15T00:00:01.000Z"))!;
 	const job = insertJob(db, {
 		jobType: JobType.Recipe,
+		name: "Sample recipe",
 		customerApplicationXrefId: 1,
 		recipeId: recipe.id,
 		mode: "Execute",
@@ -205,6 +206,7 @@ describe("uploadJobStepArtifact (Recipe Job screenshots)", () => {
 		const runnerId = seedRunner(db);
 		const job = insertJob(db, {
 			jobType: JobType.TrainingRun,
+			name: "Training Run",
 			customerApplicationXrefId: 1,
 			goal: "Extract",
 			startingUrl: "https://example.test",

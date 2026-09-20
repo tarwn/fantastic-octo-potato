@@ -59,6 +59,7 @@ export function createRecipeJob(db: Database.Database, rawRecipeId: string, body
 	const createdAt = new Date();
 	const job = insertJob(db, {
 		jobType: JobType.Recipe,
+		name: recipe.name,
 		customerApplicationXrefId: recipe.customerApplicationXrefId,
 		recipeId: recipe.id,
 		mode: body.mode,

@@ -48,6 +48,7 @@
 					<li class="panel-row">
 						<a href={resolve("/jobs/[id]", { id: String(job.id) })} class="job-link">
 							<span class="job-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
+							<span class="job-name">{job.name}</span>
 							<span class="job-context">
 								{registeredApplication ? `${registeredApplication.customerName} — ${registeredApplication.applicationName}` : ""}
 							</span>
@@ -118,6 +119,10 @@
 
 	.job-id {
 		font-family: $font-family-mono;
+	}
+
+	.job-name {
+		font-weight: 600;
 	}
 
 	.job-context {

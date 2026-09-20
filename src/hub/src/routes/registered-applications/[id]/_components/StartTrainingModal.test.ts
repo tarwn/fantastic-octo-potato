@@ -34,6 +34,7 @@ describe("StartTrainingModal", () => {
 			id: 42,
 			customerApplicationXrefId: 1,
 			jobType: JobType.TrainingRun,
+			name: "Training Run",
 			jobStatusId: 1,
 			details: {
 				goal: "Extract invoices",

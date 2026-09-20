@@ -98,7 +98,7 @@
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
 			<div class="job-page-header">
-				<h1>Training Run</h1>
+				<h1>{job.name}</h1>
 				<div class="job-page-actions">
 					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
 					{#if !isTerminalJobStatus(job.jobStatusId)}
@@ -145,7 +145,7 @@
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
 			<div class="job-page-header">
-				<h1>{job.details.mode} Job</h1>
+				<h1>{job.name}</h1>
 				<div class="job-page-actions">
 					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
 					<button type="button" class="btn" onclick={exportJson}>Export JSON</button>

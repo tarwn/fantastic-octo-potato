@@ -57,6 +57,7 @@ describe("runnerActions Recipe Job dispatch", () => {
 		const recipe = publishRecipe(db, draft.id, new Date("2026-09-15T00:00:01.000Z"))!;
 		const job = insertJob(db, {
 			jobType: JobType.Recipe,
+			name: "Sample recipe",
 			customerApplicationXrefId: 1,
 			recipeId: recipe.id,
 			mode: "Execute",
@@ -106,6 +107,7 @@ describe("runnerActions Recipe Job dispatch", () => {
 		const recipe = publishRecipe(db, draft.id, new Date("2026-09-15T00:00:01.000Z"))!;
 		insertJob(db, {
 			jobType: JobType.Recipe,
+			name: "Sample recipe",
 			customerApplicationXrefId: 1,
 			recipeId: recipe.id,
 			mode: "Trial",
@@ -144,6 +146,7 @@ describe("runnerActions Recipe Job dispatch", () => {
 		const recipe = publishRecipe(db, draft.id, new Date("2026-09-15T00:00:01.000Z"))!;
 		const job = insertJob(db, {
 			jobType: JobType.Recipe,
+			name: "Sample recipe",
 			customerApplicationXrefId: 1,
 			recipeId: recipe.id,
 			mode: "Execute",

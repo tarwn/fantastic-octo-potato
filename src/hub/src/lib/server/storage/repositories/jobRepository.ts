@@ -66,6 +66,7 @@ export interface RecipeJob {
 
 interface JobBase {
 	id: number;
+	name: string;
 	customerApplicationXrefId: number;
 	jobStatusId: JobStatus;
 	runnerId: number | null;
@@ -82,6 +83,7 @@ export type Job =
 export type InsertJobParams =
 	| {
 			jobType: JobType.TrainingRun;
+			name: string;
 			customerApplicationXrefId: number;
 			goal: string;
 			startingUrl: string;
@@ -94,6 +96,7 @@ export type InsertJobParams =
 	  }
 	| {
 			jobType: JobType.Recipe;
+			name: string;
 			customerApplicationXrefId: number;
 			recipeId: number | null;
 			mode: "Trial" | "Execute";
@@ -149,6 +152,7 @@ export type SensitiveResult = SafeResult & { rawValue: string };
 
 interface JobRow {
 	id: number;
+	name: string;
 	customerApplicationXrefId: number;
 	jobTypeId: number;
 	jobStatusId: number;
@@ -197,7 +201,7 @@ interface JobResultRow {
 }
 
 const JOB_SELECT = `
-	SELECT job.id, job.customer_application_xref_id AS customerApplicationXrefId, job.job_type_id AS jobTypeId,
+	SELECT job.id, job.name, job.customer_application_xref_id AS customerApplicationXrefId, job.job_type_id AS jobTypeId,
 	       job.job_status_id AS jobStatusId, job.runner_id AS runnerId, job.created_at AS createdAt,
 	       job.started_at AS startedAt, job.heartbeat_on AS heartbeatOn, job.completed_at AS completedAt,
 	       training_job.goal AS trainingGoal, training_job.starting_url AS trainingStartingUrl,
@@ -216,6 +220,7 @@ const JOB_SELECT = `
 function mapJobRow(row: JobRow): Job {
 	const base: JobBase = {
 		id: row.id,
+		name: row.name,
 		customerApplicationXrefId: row.customerApplicationXrefId,
 		jobStatusId: row.jobStatusId,
 		runnerId: row.runnerId,
@@ -305,12 +310,13 @@ function mapSensitiveResultRow(row: JobResultRow): SensitiveResult {
 export function insertJob(db: Database.Database, params: InsertJobParams): Job {
 	return db.transaction((): Job => {
 		const { lastInsertRowid } = db
-			.prepare("INSERT INTO job (customer_application_xref_id, job_type_id, job_status_id, created_at) VALUES (?, ?, ?, ?)")
-			.run(params.customerApplicationXrefId, params.jobType, JobStatus.Pending, toDbDate(params.createdAt));
+			.prepare("INSERT INTO job (name, customer_application_xref_id, job_type_id, job_status_id, created_at) VALUES (?, ?, ?, ?, ?)")
+			.run(params.name, params.customerApplicationXrefId, params.jobType, JobStatus.Pending, toDbDate(params.createdAt));
 		const jobId = Number(lastInsertRowid);
 
 		const base: JobBase = {
 			id: jobId,
+			name: params.name,
 			customerApplicationXrefId: params.customerApplicationXrefId,
 			jobStatusId: JobStatus.Pending,
 			runnerId: null,

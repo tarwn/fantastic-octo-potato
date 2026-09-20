@@ -134,6 +134,7 @@ describe("recipeRepository", () => {
 		publishRecipe(getDb(), draft.id, new Date("2026-09-16T01:00:00.000Z"));
 		insertJob(getDb(), {
 			jobType: JobType.Recipe,
+			name: "Sample recipe",
 			customerApplicationXrefId: 1,
 			recipeId: draft.id,
 			mode: "Execute",

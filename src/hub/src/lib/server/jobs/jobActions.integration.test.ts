@@ -35,6 +35,7 @@ function seedRegisteredApplication(db: Database.Database, id = 1): number {
 function insertTrainingRunJob(db: Database.Database, xrefId: number) {
 	return insertJob(db, {
 		jobType: JobType.TrainingRun,
+		name: "Training Run",
 		customerApplicationXrefId: xrefId,
 		goal: "Goal",
 		startingUrl: "https://example.com/start",
@@ -139,6 +140,7 @@ describe("jobActions", () => {
 				const recipe = publishRecipe(getDb(), draft.id, now)!;
 				const job = insertJob(getDb(), {
 					jobType: JobType.Recipe,
+					name: "Sample recipe",
 					customerApplicationXrefId: xrefId,
 					recipeId: recipe.id,
 					mode: "Execute",
@@ -270,6 +272,7 @@ describe("jobActions", () => {
 			const recipe = publishRecipe(db, draft.id, new Date("2026-09-15T00:00:01.000Z"))!;
 			const job = insertJob(db, {
 				jobType: JobType.Recipe,
+				name: "Sample recipe",
 				customerApplicationXrefId: 1,
 				recipeId: recipe.id,
 				mode: "Execute",

@@ -40,6 +40,7 @@ function seedXref(db: Database.Database, id: number): void {
 function insertPendingJob(db: Database.Database, xrefId: number, maxSteps = 10): number {
 	const job = insertJob(db, {
 		jobType: JobType.TrainingRun,
+		name: "Training Run",
 		customerApplicationXrefId: xrefId,
 		goal: "Extract invoice total",
 		startingUrl: "https://example.com/start",
