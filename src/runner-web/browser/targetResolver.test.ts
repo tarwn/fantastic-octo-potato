@@ -1,3 +1,4 @@
+import type { Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { ExecutionContext } from "../dsl/executionContext.ts";
@@ -52,6 +53,43 @@ describe("resolveElementTarget", () => {
 		if (result.status === "found") {
 			expect(await result.locator.inputValue()).toBe("ACCT-1042");
 		}
+	});
+
+	describe("label targets against BambooInvoice login markup", () => {
+		let loginPage: Page;
+
+		beforeAll(async () => {
+			loginPage = await fixture.browser.newPage();
+			await loginPage.setContent(`
+				<form>
+					<p><label for="username"><span>Email:</span></label> <input type="text" id="username"></p>
+					<p><label for="password"><span>Password:</span></label> <input type="password" id="password"></p>
+					<p><label for="confirm"><span>Confirm password:</span></label> <input type="password" id="confirm"></p>
+				</form>`);
+		});
+
+		afterAll(async () => {
+			await loginPage.close();
+		});
+
+		it.each([["Email"], ["Email:"], ["  email "], ["EMAIL:"]])("finds the input for label %j despite the trailing colon and case", async (value) => {
+			const result = await resolveElementTarget(loginPage, { by: "label", value });
+			expect(result.status).toBe("found");
+			if (result.status === "found") {
+				await result.locator.fill("someone@example.com");
+				expect(await result.locator.inputValue()).toBe("someone@example.com");
+			}
+		});
+
+		it("does not match a label that merely contains the value", async () => {
+			const result = await resolveElementTarget(loginPage, { by: "label", value: "Pass" });
+			expect(result.status).toBe("missing");
+		});
+
+		it("treats regex characters in the value literally", async () => {
+			const result = await resolveElementTarget(loginPage, { by: "label", value: "Email.*" });
+			expect(result.status).toBe("missing");
+		});
 	});
 
 	it("resolves a placeholder target with exactly one match", async () => {

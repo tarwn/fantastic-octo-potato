@@ -167,7 +167,7 @@ test.describe("recipe execution against a real target application (spec 0007)", 
 
 			await pollJobStatus(request, created.id, "Intervention-Requested", 60_000);
 
-			// RUNNER_INTERVENTION_TIMEOUT_SECONDS=20 (test-e2e/playwright.config.ts): left unattended,
+			// RUNNER_INTERVENTION_TIMEOUT_SECONDS=8 (test-e2e/playwright.config.ts): left unattended,
 			// the Runner reports Completed-Failed and exits (R011) well within this poll window.
 			await pollJobStatus(request, created.id, "Completed-Failed", 45_000);
 		}

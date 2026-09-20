@@ -133,10 +133,12 @@ async function runStepAndReport(deps: LoopDeps, recipe: RecipeDefinition, step: 
 	const extractions = toWireExtractions(actionResult);
 
 	if (actionResult.outcome === "failed") {
+		let error: string | undefined;
 		if (actionResult.error) {
-			await reportInfo(deps.config, deps.job.id, redactKnownSecrets(`Step ${step.id} failed: ${actionResult.error.code}: ${actionResult.error.message}`, deps.secrets));
+			error = redactKnownSecrets(`${actionResult.error.code}: ${actionResult.error.message}`, deps.secrets);
+			await reportInfo(deps.config, deps.job.id, `Step ${step.id} failed: ${error}`);
 		}
-		await reportChildOutcome(deps, step.id, "failed", parentStepId, extractions, actionResult.targetDescription);
+		await reportChildOutcome(deps, step.id, "failed", parentStepId, extractions, actionResult.targetDescription, error);
 		if (!insideRecovery) {
 			const recovered = await runRecoveryScan(deps, recipe);
 			if (recovered) {
@@ -196,14 +198,16 @@ async function reportChildOutcome(
 	outcome: "succeeded" | "failed",
 	parentStepId: string | undefined,
 	extractions: Array<{ fieldName: string; value: string }>,
-	targetDescription: TargetDescription
+	targetDescription: TargetDescription,
+	error?: string
 ): Promise<void> {
 	await reportDslStep(deps.config, deps.job.id, {
 		stepId,
 		outcome,
 		...(parentStepId !== undefined ? { parentStepId } : {}),
 		extractions,
-		targetDescription
+		targetDescription,
+		...(error !== undefined ? { error } : {})
 	});
 	await captureAndUploadArtifact(stepReportingDeps(deps), stepId);
 }

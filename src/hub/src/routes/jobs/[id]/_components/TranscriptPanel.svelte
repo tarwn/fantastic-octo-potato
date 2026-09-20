@@ -83,6 +83,10 @@
 		return `${action} on ${targetDescription.component}${selector}`;
 	}
 
+	function observedDetail(step: StepTranscriptText): string {
+		return step.error === undefined ? observedMessage(step) : `${observedMessage(step)} — ${step.error}`;
+	}
+
 	function stepMessage(step: StepTranscriptText): string {
 		return `${step.stepId}: ${observedMessage(step)}`;
 	}
@@ -178,7 +182,7 @@
 							{#if definition}
 								<div><span class="transcript-detail-label">recipe step:</span> <StepDescription step={definition} /></div>
 							{/if}
-							<div><span class="transcript-detail-label">observed:</span> {observedMessage(step)}</div>
+							<div><span class="transcript-detail-label">observed:</span> {observedDetail(step)}</div>
 						</div>
 					{/if}
 				</div>

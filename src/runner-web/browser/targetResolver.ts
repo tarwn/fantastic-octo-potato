@@ -20,12 +20,20 @@ export function isPointTarget(target: Target): target is TargetPoint {
 	return target.by === "point";
 }
 
+// Forms commonly render labels as "Email:" while a model reads them as "Email", so a label matches
+// whole-text ignoring case, surrounding whitespace and a trailing colon — never as a substring,
+// which would make "Password" ambiguous with "Confirm password".
+function labelPattern(value: string): RegExp {
+	const bare = value.trim().replace(/\s*:$/, "");
+	return new RegExp(`^\\s*${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:?\\s*$`, "i");
+}
+
 function toLocator(page: Page, target: ResolvedTargetElement): Locator {
 	switch (target.by) {
 		case "text":
 			return page.getByText(target.value, { exact: true });
 		case "label":
-			return page.getByLabel(target.value, { exact: true });
+			return page.getByLabel(labelPattern(target.value));
 		case "placeholder":
 			return page.getByPlaceholder(target.value, { exact: true });
 		case "css":

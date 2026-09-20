@@ -65,6 +65,7 @@ export async function reportDslStep(
 			...(step.parentStepId !== undefined ? { parentStepId: step.parentStepId } : {}),
 			targetDescription: step.targetDescription,
 			inputs: [],
+			...(step.error !== undefined ? { error: step.error } : {}),
 			outputs
 		},
 		now

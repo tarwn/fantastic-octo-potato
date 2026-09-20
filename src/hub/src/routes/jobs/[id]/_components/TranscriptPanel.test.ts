@@ -186,6 +186,23 @@ describe("TranscriptPanel", () => {
 		expect(screen.queryByText("id: open_home")).not.toBeInTheDocument();
 	});
 
+	it("shows a failed Step's error in the expanded observed line only", async () => {
+		const entry = stepEntry(1, {
+			stepId: "fill_user",
+			outcome: "failed",
+			action: "fill",
+			targetDescription: { component: "element", selector: "" },
+			error: "TARGET_NOT_FOUND: No element matched {by: \"label\", value: \"Username\"}"
+		});
+		const fillStep: Step = { id: "fill_user", action: "fill", args: [{ by: "label", value: "Username" }, "someone"] };
+		render(TranscriptPanel, props([entry], [fillStep]));
+
+		expect(screen.getByText("fill_user: fill on element")).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole("button", { name: "Toggle details for fill_user" }));
+
+		expect(screen.getByText(/fill on element — TARGET_NOT_FOUND: No element matched/)).toBeInTheDocument();
+	});
+
 	it("keeps a row expanded when the entries refresh", async () => {
 		const { rerender } = render(TranscriptPanel, props([stepEntry(1, { stepId: "open_home" })], [openStep("open_home")]));
 		await fireEvent.click(screen.getByRole("button", { name: "Toggle details for open_home" }));

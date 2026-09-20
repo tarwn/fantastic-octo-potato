@@ -193,7 +193,14 @@ describe("runTrainingJobLoop: terminal outcome mapping", () => {
 		await runTrainingJobLoop(config, job);
 
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, expect.stringContaining("Step click_missing failed: TARGET_NOT_FOUND"));
-		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "click_missing", outcome: "failed", extractions: [], targetDescription: { component: "element", selector: "" }, credentialNames: [] });
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, {
+			stepId: "click_missing",
+			outcome: "failed",
+			extractions: [],
+			targetDescription: { component: "element", selector: "" },
+			credentialNames: [],
+			error: expect.stringContaining("TARGET_NOT_FOUND")
+		});
 	}, 20000);
 
 	it("reports Completed-Error on an unexpected technical error the DSL driver lets propagate", async () => {

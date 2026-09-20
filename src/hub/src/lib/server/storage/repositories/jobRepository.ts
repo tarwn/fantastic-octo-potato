@@ -125,6 +125,7 @@ export interface StepTranscriptText {
 	targetDescription: StepTargetDescription;
 	inputs: TranscriptFieldRef[];
 	outputs: TranscriptFieldRef[];
+	error?: string;
 }
 
 interface TranscriptEntryBase {

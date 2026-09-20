@@ -25,13 +25,13 @@ const LOGIN_STEPS: ChildStep[] = [
 	{
 		id: "login_fill_user",
 		action: "fill",
-		args: [{ by: "css", value: "#username" }, { ref: "credential", name: "username" }],
+		args: [{ by: "label", value: "Email" }, { ref: "credential", name: "username" }],
 		intent: "Enter login email"
 	},
 	{
 		id: "login_fill_pass",
 		action: "fill",
-		args: [{ by: "css", value: "#password" }, { ref: "credential", name: "password" }],
+		args: [{ by: "label", value: "Password" }, { ref: "credential", name: "password" }],
 		intent: "Enter login password"
 	},
 	{ id: "login_submit", action: "click", args: [{ by: "css", value: "#login" }], intent: "Submit login" }

@@ -107,6 +107,22 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.Running);
 	});
 
+	it("keeps a failed Step's reported error on its transcript row", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			...dslStepBody("click_search"),
+			outcome: "failed",
+			error: "TARGET_NOT_FOUND: No element matched"
+		});
+
+		const stepEntry = listTranscriptEntries(db, jobId).find((entry) => entry.kind === TranscriptKind.Step && entry.text.stepId === "click_search");
+		expect(stepEntry?.text).toMatchObject({ outcome: "failed", error: "TARGET_NOT_FOUND: No element matched" });
+	});
+
 	it("applies a status-kind submission's status change and records it on the transcript row", async () => {
 		const db = getDb();
 		const runnerId = seedRunner(db);

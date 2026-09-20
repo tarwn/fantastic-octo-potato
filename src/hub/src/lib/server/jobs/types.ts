@@ -27,6 +27,7 @@ export type ReportStepBody =
 			targetDescription: StepTargetDescription;
 			extractions: Array<{ fieldName: string; value: string }>;
 			credentialNames?: string[];
+			error?: string;
 	  }
 	| { kind: "recover"; message: string }
 	| { kind: "observe"; message: string }
