@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import TranscriptPanel from "./TranscriptPanel.svelte";
 
+import { JobStatus } from "$lib/jobStatus";
 import { TranscriptKind } from "$lib/jobTranscriptKind";
 import { SensitivityType } from "$lib/sensitivityType";
 import type { JobTranscriptEntry } from "$lib/types/job";
@@ -50,5 +51,21 @@ describe("TranscriptPanel", () => {
 		expect(screen.getByText("Northwind")).toBeInTheDocument();
 		expect(screen.getByText("output: ssn")).toBeInTheDocument();
 		expect(screen.getByText("••••••")).toBeInTheDocument();
+	});
+
+	it.each([
+		[JobStatus.InterventionRequested, "intervention"],
+		[JobStatus.CompletedSuccess, "success"],
+		[JobStatus.CompletedFailed, "failed"],
+		[JobStatus.CompletedError, "error"]
+	])("styles the row and rail for status %s with the %s variant", (jobStatusId, variant) => {
+		const entries: JobTranscriptEntry[] = [
+			{ id: 1, jobId: 1, sequence: 1, kind: TranscriptKind.Status, text: "Status changed", createdAt: new Date(), jobStatusId }
+		];
+
+		const { container } = render(TranscriptPanel, { entries });
+
+		expect(container.querySelector(`.transcript-rail-${variant}`)).not.toBeNull();
+		expect(container.querySelector(`.transcript-row-${variant}`)).not.toBeNull();
 	});
 });

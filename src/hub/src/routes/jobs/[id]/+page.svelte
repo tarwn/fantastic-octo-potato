@@ -95,7 +95,7 @@
 				<span class="job-page-id">{formatJobDisplayId(job.customerApplicationXrefId, job.id)}</span>
 			</div>
 			<div class="job-page-header">
-				<h1>{job.details.goal}</h1>
+				<h1>Training Run</h1>
 				<div class="job-page-actions">
 					<RefreshIndicator intervalSeconds={REFRESH_INTERVAL_SECONDS} {lastRefreshedOn} onRefresh={refresh} />
 					{#if !isTerminalJobStatus(job.jobStatusId)}

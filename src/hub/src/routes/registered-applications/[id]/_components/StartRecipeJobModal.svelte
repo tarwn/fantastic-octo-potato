@@ -24,6 +24,7 @@
 	let dialogEl = $state<HTMLDialogElement | undefined>();
 
 	let recipes = $state<RecipeSummary[]>([]);
+	let loading = $state(true);
 	let loadError = $state<string | null>(null);
 	let selectedRecipeId = $state<number | null>(null);
 	let ingredientValues = $state<Record<string, string>>({});
@@ -47,6 +48,7 @@
 
 	async function load() {
 		loadError = null;
+		loading = true;
 		try {
 			const all = await fetchRecipes(registeredApplicationId);
 			recipes = all.filter((recipe) => recipe.state === recipeState);
@@ -55,6 +57,9 @@
 		}
 		catch (err) {
 			loadError = err instanceof Error ? err.message : "Failed to load Recipes";
+		}
+		finally {
+			loading = false;
 		}
 	}
 
@@ -139,7 +144,9 @@
 	<form class="modal-form" novalidate onsubmit={handleSubmit}>
 		<h2>{title}</h2>
 
-		{#if loadError}
+		{#if loading}
+			<p class="modal-empty">Loading Recipes...</p>
+		{:else if loadError}
 			<span class="field-error">{loadError}</span>
 		{:else if recipes.length === 0}
 			<p class="modal-empty">No {recipeState.toLowerCase()} Recipes are available.</p>

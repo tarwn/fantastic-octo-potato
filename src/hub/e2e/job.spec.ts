@@ -17,7 +17,7 @@ test("Job detail page shows strip, stage, transcript, results, and goals from re
 
 	await page.goto(`/jobs/${job.id}`);
 
-	await expect(page.getByRole("heading", { name: "Extract the closing balance" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Training Run", exact: true })).toBeVisible();
 	await expect(page.getByText(`job-ca${registeredApplication.id}-${job.id}`)).toBeVisible();
 	await expect(page.getByText("Pending", { exact: true }).first()).toBeVisible();
 	await expect(page.getByText("Acme", { exact: true })).toBeVisible();

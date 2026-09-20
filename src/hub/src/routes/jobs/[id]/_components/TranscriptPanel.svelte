@@ -58,7 +58,7 @@
 		<div class="transcript-date">{day.dateLabel}</div>
 		<div class="transcript transcript-rows">
 			{#each day.entries as entry (entry.sequence)}
-				<div class="transcript-row">
+				<div class={["transcript-row", entry.jobStatusId !== null && `transcript-row-${JOB_STATUS_VARIANTS[entry.jobStatusId]}`]}>
 					{#if entry.jobStatusId !== null}
 						<span class={`transcript-rail transcript-rail-${JOB_STATUS_VARIANTS[entry.jobStatusId]}`}></span>
 					{:else}
@@ -148,12 +148,36 @@
 		@include transcript-rail($status-cancelled-color);
 	}
 
+	.transcript-rail-intervention {
+		@include transcript-rail($status-intervention-color);
+	}
+
+	.transcript-rail-error {
+		@include transcript-rail($status-error-color);
+	}
+
 	.transcript-time {
 		@include transcript-cell-time;
 	}
 
 	.transcript-row {
 		@include transcript-row;
+	}
+
+	.transcript-row-intervention {
+		@include transcript-row-emphasis($status-intervention-surface, $status-intervention-border);
+	}
+
+	.transcript-row-success {
+		@include transcript-row-emphasis($status-success-surface, $status-success-border);
+	}
+
+	.transcript-row-failed {
+		@include transcript-row-emphasis($status-failed-surface, $status-failed-border);
+	}
+
+	.transcript-row-error {
+		@include transcript-row-emphasis($status-error-surface, $status-error-border);
 	}
 
 	.transcript-kind-status {
