@@ -202,7 +202,7 @@ describe("runTrainingJobLoop: terminal outcome mapping", () => {
 
 		await runTrainingJobLoop(config, job);
 
-		expect(reportDslStep).not.toHaveBeenCalled();
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ outcome: "failed", targetDescription: { component: "browser", selector: "" } }));
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("boom"));
 	}, 20000);
 

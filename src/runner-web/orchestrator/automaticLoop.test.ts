@@ -316,7 +316,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 
 		await runRecipeJobLoop(config, job, 300);
 
-		expect(reportDslStep).not.toHaveBeenCalled();
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, { stepId: "s1", outcome: "failed", extractions: [], targetDescription: { component: "browser", selector: "" } });
 		expect(reportStatus).toHaveBeenCalledWith(config, 42, JobStatus.CompletedError, expect.stringContaining("boom"));
 	}, 20000);
 
