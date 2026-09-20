@@ -99,6 +99,19 @@ describe("executeAction: interaction", () => {
 		expect(result).toMatchObject({ outcome: "failed", error: { code: "TARGET_NOT_FOUND", message: expect.any(String) } });
 	});
 
+	it("clicks a target whose value is an input reference", async () => {
+		const ctx = newContext({ ingredients: { selector: "#balance" } });
+		const result = await executeAction(fixture.page, { id: "s", action: "click", args: [{ by: "css", value: { ref: "input", name: "selector" } }] }, ctx);
+		expect(result.outcome).toBe("succeeded");
+	});
+
+	it("masks a sensitive resolved target value in the failure message and description", async () => {
+		const ctx = newContext({ ingredients: { selector: "#secret-nope" }, secrets: ["#secret-nope"] });
+		const result = await executeAction(fixture.page, { id: "s", action: "click", args: [{ by: "css", value: { ref: "input", name: "selector" } }] }, ctx);
+		expect(result.outcome).toBe("failed");
+		expect(JSON.stringify(result)).not.toContain("#secret-nope");
+	});
+
 	it("reports TARGET_AMBIGUOUS, never a silent first-match pick", async () => {
 		const result = await executeAction(fixture.page, { id: "s", action: "click", args: [{ by: "css", value: ".duplicate" }] }, newContext());
 		expect(result).toMatchObject({ outcome: "failed", error: { code: "TARGET_AMBIGUOUS", message: expect.any(String) } });

@@ -30,6 +30,11 @@ afterAll(async () => {
 });
 
 describe("evaluateCondition", () => {
+	it("resolves an input-referenced target in a condition", async () => {
+		const ctx = { ...newContext(), ingredients: { selector: ".duplicate" } };
+		expect(await evaluateCondition(fixture.page, { test: "exists", args: [{ by: "css", value: { ref: "input", name: "selector" } }] }, ctx)).toBe(true);
+	});
+
 	it("exists is true for any match, even when there are multiple", async () => {
 		const result = await evaluateCondition(fixture.page, { test: "exists", args: [{ by: "css", value: ".duplicate" }] }, newContext());
 		expect(result).toBe(true);

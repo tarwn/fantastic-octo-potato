@@ -46,6 +46,35 @@ describe("validateRecipeDefinition", () => {
 		expect(errors).toContain("Unknown input reference: doesNotExist");
 	});
 
+	it("accepts a target whose value references a known input", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([{ id: "s1", action: "click", args: [{ by: "text", value: { ref: "input", name: Object.keys(validDefinition.inputs)[0] } }] }])
+		);
+
+		expect(errors).toEqual([]);
+	});
+
+	it("rejects a target whose value references an unknown input", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([{ id: "s1", action: "click", args: [{ by: "text", value: { ref: "input", name: "doesNotExist" } }] }])
+		);
+
+		expect(errors).toContain("Unknown input reference: doesNotExist");
+	});
+
+	it("rejects a target whose value references an output or credential", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([
+				{ id: "s1", action: "click", args: [{ by: "text", value: { ref: "output", name: "status" } }] },
+				{ id: "s2", action: "click", args: [{ by: "text", value: { ref: "credential", name: "username" } }] }
+			]),
+			new Set(["username"])
+		);
+
+		expect(errors).toContain("Target value may only reference an input, not: output");
+		expect(errors).toContain("Target value may only reference an input, not: credential");
+	});
+
 	it("rejects an unknown output reference", () => {
 		const errors = validateRecipeDefinition(
 			withSteps([{ id: "s1", action: "assign", args: [{ ref: "output", name: "doesNotExist" }, "value"] }])

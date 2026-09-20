@@ -5,7 +5,7 @@ import type { ExecutionContext } from "../dsl/executionContext.ts";
 import { isAssigned } from "../dsl/outputsState.ts";
 import type { AtomicCondition, Condition } from "../dsl/types.ts";
 
-import { resolveElementTarget } from "./targetResolver.ts";
+import { resolveElementTarget, resolveTargetValue } from "./targetResolver.ts";
 
 // "exists" is true for any number of matches — presence alone is enough, so it never needs an
 // ambiguity check. The other state tests (visible/enabled/disabled) do need exactly one match to
@@ -15,10 +15,11 @@ async function evaluateAtomic(page: Page, condition: AtomicCondition, ctx: Execu
 		return isAssigned(ctx.outputs, condition.args[0].name);
 	}
 
-	const target = condition.args[0];
-	if (target.by === "point") {
+	const element = condition.args[0];
+	if (element.by === "point") {
 		throw new DslActionError("ACTION_FAILED", `"${condition.test}" does not support point targets`);
 	}
+	const target = resolveTargetValue(element, ctx);
 
 	if (condition.test === "exists") {
 		return (await resolveElementTarget(page, target)).status !== "missing";

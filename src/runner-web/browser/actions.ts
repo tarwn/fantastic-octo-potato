@@ -3,12 +3,13 @@ import type { ElementHandle, Locator, Page } from "playwright";
 import { DslActionError } from "../dsl/errors.ts";
 import type { ExecutionContext } from "../dsl/executionContext.ts";
 import { setOutput } from "../dsl/outputsState.ts";
-import type { ChildStep, ScalarValue } from "../dsl/types.ts";
+import type { ChildStep, ScalarValue, TargetElement } from "../dsl/types.ts";
 import { resolveStringValue, resolveValue } from "../dsl/valueResolver.ts";
+import { redactKnownSecrets } from "../textRedaction.ts";
 
 import { evaluateCondition } from "./conditions.ts";
 import { BROWSER_TARGET_DESCRIPTION, describeTarget, NO_TARGET_DESCRIPTION, type TargetDescription } from "./targetDescription.ts";
-import { isPointTarget, resolveElementAtPoint, resolveElementTarget, resolveViewportPoint } from "./targetResolver.ts";
+import { isPointTarget, resolveElementAtPoint, resolveElementTarget, resolveTargetValue, resolveViewportPoint } from "./targetResolver.ts";
 
 // A step reports exactly one of these; `kind: "businessFailure"` distinguishes the `fail` action's
 // deliberate stop-the-Job outcome from an ordinary technical/resolution failure that a calling
@@ -33,13 +34,15 @@ function sleep(ms: number): Promise<void> {
 }
 
 // Described before the action runs — a click can navigate away, leaving nothing to describe.
-async function resolveRequiredLocator(page: Page, target: Parameters<typeof resolveElementTarget>[1], ctx: ExecutionContext, described: { value: TargetDescription }): Promise<Locator> {
+async function resolveRequiredLocator(page: Page, element: TargetElement, ctx: ExecutionContext, described: { value: TargetDescription }): Promise<Locator> {
+	const target = resolveTargetValue(element, ctx);
+	const shownValue = redactKnownSecrets(target.value, ctx.secrets);
 	const resolution = await resolveElementTarget(page, target);
 	if (resolution.status === "missing") {
-		throw new DslActionError("TARGET_NOT_FOUND", `No element matched {by: "${target.by}", value: "${target.value}"}`);
+		throw new DslActionError("TARGET_NOT_FOUND", `No element matched {by: "${target.by}", value: "${shownValue}"}`);
 	}
 	if (resolution.status === "ambiguous") {
-		throw new DslActionError("TARGET_AMBIGUOUS", `${resolution.count} elements matched {by: "${target.by}", value: "${target.value}"}, expected exactly one`);
+		throw new DslActionError("TARGET_AMBIGUOUS", `${resolution.count} elements matched {by: "${target.by}", value: "${shownValue}"}, expected exactly one`);
 	}
 	described.value = await describeTarget(resolution.locator, ctx.secrets);
 	return resolution.locator;
