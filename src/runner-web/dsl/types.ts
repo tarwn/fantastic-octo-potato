@@ -14,7 +14,12 @@ export interface FieldDeclaration {
 	enum?: string[];
 }
 
-export type TargetElement = { by: "text" | "label" | "placeholder" | "css"; value: StringValue };
+export type TargetElement = { by: "text"; value: StringValue; exact?: boolean } | { by: "label" | "placeholder" | "css"; value: StringValue };
+export type ReadSpec = {
+	source: "text" | "value";
+	extract: { by: "regex"; pattern: string; group: number | string };
+	parse?: "string" | "number";
+};
 export type TargetPoint = { by: "point"; x: number; y: number };
 export type Target = TargetElement | TargetPoint;
 
@@ -48,7 +53,7 @@ export type ChildStep =
 	| (StepBase & { action: "select"; args: [TargetElement, SelectOption[]] })
 	| (StepBase & { action: "scrollIntoView"; args: [TargetElement] })
 	| (StepBase & { action: "scroll"; args: [number, number] })
-	| (StepBase & { action: "read"; args: [Target, "text" | "value" | "number", Destination] })
+	| (StepBase & { action: "read"; args: [Target, "text" | "value" | "number" | ReadSpec, Destination] })
 	| (StepBase & { action: "check"; args: [Condition] })
 	| (StepBase & { action: "verify"; args: [Condition] })
 	| (StepBase & { action: "assign"; args: [Destination, Value] })

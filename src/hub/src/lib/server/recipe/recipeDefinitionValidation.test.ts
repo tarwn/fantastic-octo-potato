@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { validateAtomicStep, validateRecipeDefinition } from "./recipeDefinitionValidation";
+import { MAX_EXTRACTION_PATTERN_LENGTH, validateAtomicStep, validateRecipeDefinition } from "./recipeDefinitionValidation";
 
 import type { RecipeDefinition } from "$lib/types/recipeDefinition";
 
@@ -272,5 +272,78 @@ describe("validateAtomicStep", () => {
 		);
 
 		expect(errors).toContain("Unknown credential reference: guessed");
+	});
+});
+
+describe("structured read and exact targets", () => {
+	const validSpec = { source: "text", extract: { by: "regex", pattern: "Amount:\\s*(?<value>\\S+)", group: "value" }, parse: "string" };
+	const amountTarget = { by: "text", value: "Amount:", exact: false };
+
+	function validate(target: unknown, spec: unknown): string[] {
+		return validateAtomicStep({ id: "s1", action: "read", args: [target, spec, { ref: "output", name: "amount" }] }, new Set(), new Set());
+	}
+
+	function specWith(overrides: Record<string, unknown>): unknown {
+		return { ...validSpec, ...overrides };
+	}
+
+	function extractWith(overrides: Record<string, unknown>): unknown {
+		return specWith({ extract: { ...validSpec.extract, ...overrides } });
+	}
+
+	it("accepts a structured read with a named group and exact:false text target", () => {
+		expect(validate(amountTarget, validSpec)).toEqual([]);
+	});
+
+	it("accepts a numbered group, a value source, parse number and no parse", () => {
+		expect(validate(amountTarget, extractWith({ group: 1 }))).toEqual([]);
+		expect(validate(amountTarget, specWith({ source: "value" }))).toEqual([]);
+		expect(validate(amountTarget, specWith({ parse: "number" }))).toEqual([]);
+		expect(validate(amountTarget, { source: "text", extract: validSpec.extract })).toEqual([]);
+	});
+
+	it("accepts a structured read inside a full Recipe definition", () => {
+		const errors = validateRecipeDefinition(
+			withSteps([{ id: "s1", action: "read", args: [amountTarget, validSpec, { ref: "output", name: "status" }] }] as RecipeDefinition["steps"])
+		);
+
+		expect(errors).toEqual([]);
+	});
+
+	it.each([
+		["source", specWith({ source: "number" })],
+		["extract kind", extractWith({ by: "glob" })],
+		["empty pattern", extractWith({ pattern: "" })],
+		["non-string pattern", extractWith({ pattern: 5 })],
+		["uncompilable pattern", extractWith({ pattern: "(unclosed" })],
+		["over-long pattern", extractWith({ pattern: "a".repeat(MAX_EXTRACTION_PATTERN_LENGTH + 1) })],
+		["negative group", extractWith({ group: -1 })],
+		["non-integer group", extractWith({ group: 1.5 })],
+		["empty group name", extractWith({ group: "" })],
+		["boolean group", extractWith({ group: true })],
+		["parse", specWith({ parse: "date" })],
+		["extra spec property", specWith({ flags: "i" })],
+		["extra extract property", extractWith({ flags: "i" })],
+		["missing extract", { source: "text" }]
+	])("rejects a structured read with a bad %s", (_name, spec) => {
+		expect(validate(amountTarget, spec)).toContain("Step s1: invalid read spec");
+	});
+
+	it("still rejects an unknown string read type", () => {
+		expect(validate(amountTarget, "date")).toContain("Step s1: invalid read type: date");
+	});
+
+	it.each(["label", "placeholder", "css"])("rejects exact on a %s target", (by) => {
+		expect(validate({ by, value: "x", exact: false }, "text")).toContain("Step s1: 'exact' is only valid on text targets");
+	});
+
+	it("rejects a non-boolean exact on a text target", () => {
+		expect(validate({ by: "text", value: "x", exact: "no" }, "text")).toContain("Step s1: 'exact' must be a boolean");
+	});
+
+	it("checks exact on targets used in conditions too", () => {
+		const errors = validateAtomicStep({ id: "s1", action: "verify", args: [{ test: "exists", args: [{ by: "css", value: "x", exact: true }] }] }, new Set(), new Set());
+
+		expect(errors).toContain("Step s1: 'exact' is only valid on text targets");
 	});
 });

@@ -93,6 +93,9 @@ function parseReportStepBody(body: unknown): ParseResult {
 			if (!isRecord(target) || typeof target.component !== "string" || target.component.trim() === "" || typeof target.selector !== "string") {
 				return { ok: false, error: "targetDescription is required as { component, selector }" };
 			}
+			if (body.error !== undefined && typeof body.error !== "string") {
+				return { ok: false, error: "error must be a string" };
+			}
 			const extractions = body.extractions ?? [];
 			if (
 				!Array.isArray(extractions) ||
@@ -119,7 +122,8 @@ function parseReportStepBody(body: unknown): ParseResult {
 					...(body.parentStepId !== undefined ? { parentStepId: body.parentStepId } : {}),
 					targetDescription: { component: target.component, selector: target.selector },
 					extractions,
-					...(body.credentialNames !== undefined ? { credentialNames: body.credentialNames as string[] } : {})
+					...(body.credentialNames !== undefined ? { credentialNames: body.credentialNames as string[] } : {}),
+					...(body.error !== undefined ? { error: body.error } : {})
 				}
 			};
 		}

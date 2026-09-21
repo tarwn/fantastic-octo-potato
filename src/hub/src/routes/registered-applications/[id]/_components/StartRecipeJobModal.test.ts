@@ -129,6 +129,22 @@ describe("StartRecipeJobModal", () => {
 		expect(await screen.findByText("Irreversible")).toBeInTheDocument();
 	});
 
+	it("renders a structured read Step in the preview", async () => {
+		const readRecipe: RecipeSummary = {
+			...DRAFT_RECIPE,
+			definition: {
+				...DRAFT_RECIPE.definition,
+				steps: [{ id: "read_amount", action: "read", args: [{ by: "text", value: "Amount:", exact: false }, { source: "text", extract: { by: "regex", pattern: "(\\S+)", group: 1 } }, { ref: "output", name: "amount" }], intent: "Read the amount" }]
+			}
+		};
+		vi.mocked(fetchRecipes).mockResolvedValue([readRecipe]);
+
+		render(StartRecipeJobModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1, mode: "Trial" });
+
+		expect(await screen.findByText("Read the amount")).toBeInTheDocument();
+		expect(screen.getByTestId("step-description")).toHaveTextContent("capture group 1 to output: amount");
+	});
+
 	it("rejects submission missing a required Ingredient", async () => {
 		render(StartRecipeJobModal, { open: true, onClose: vi.fn(), registeredApplicationId: 1, mode: "Trial" });
 		await screen.findByText("Draft recipe");

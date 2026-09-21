@@ -53,7 +53,8 @@ export function reportDslStep(
 			...(step.parentStepId !== undefined ? { parentStepId: step.parentStepId } : {}),
 			targetDescription: step.targetDescription,
 			inputs: [],
-			outputs
+			outputs,
+			...(step.error !== undefined ? { error: step.error } : {})
 		},
 		now
 	);

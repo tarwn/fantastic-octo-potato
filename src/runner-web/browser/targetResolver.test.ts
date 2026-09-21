@@ -1,3 +1,4 @@
+import type { Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { ExecutionContext } from "../dsl/executionContext.ts";
@@ -52,6 +53,60 @@ describe("resolveElementTarget", () => {
 		if (result.status === "found") {
 			expect(await result.locator.inputValue()).toBe("ACCT-1042");
 		}
+	});
+
+	describe("label targets against BambooInvoice login markup", () => {
+		let loginPage: Page;
+
+		beforeAll(async () => {
+			loginPage = await fixture.browser.newPage();
+			await loginPage.setContent(`
+				<form>
+					<p><label for="username"><span>Email:</span></label> <input type="text" id="username"></p>
+					<p><label for="password"><span>Password:</span></label> <input type="password" id="password"></p>
+					<p><label for="confirm"><span>Confirm password:</span></label> <input type="password" id="confirm"></p>
+				</form>`);
+		});
+
+		afterAll(async () => {
+			await loginPage.close();
+		});
+
+		it.each([["Email"], ["Email:"], ["  email "], ["EMAIL:"]])("finds the input for label %j despite the trailing colon and case", async (value) => {
+			const result = await resolveElementTarget(loginPage, { by: "label", value });
+			expect(result.status).toBe("found");
+			if (result.status === "found") {
+				await result.locator.fill("someone@example.com");
+				expect(await result.locator.inputValue()).toBe("someone@example.com");
+			}
+		});
+
+		it("does not match a label that merely contains the value", async () => {
+			const result = await resolveElementTarget(loginPage, { by: "label", value: "Pass" });
+			expect(result.status).toBe("missing");
+		});
+
+		it("treats regex characters in the value literally", async () => {
+			const result = await resolveElementTarget(loginPage, { by: "label", value: "Email.*" });
+			expect(result.status).toBe("missing");
+		});
+	});
+
+	describe("text substring (exact: false)", () => {
+		it("finds one element by a case-insensitive, whitespace-normalized substring", async () => {
+			const resolved = resolveTargetValue({ by: "text", value: "sales   TAX", exact: false }, { ingredients: {}, outputs: createOutputsState(), stepTimeoutMs: 300, resolveCredential: () => "unused", secrets: [] });
+			expect(resolved).toEqual({ by: "text", value: "sales   TAX", exact: false });
+			expect((await resolveElementTarget(fixture.page, resolved)).status).toBe("found");
+		});
+
+		it("does not match a substring when exact is true or omitted", async () => {
+			expect((await resolveElementTarget(fixture.page, { by: "text", value: "Sales Tax" })).status).toBe("missing");
+			expect((await resolveElementTarget(fixture.page, { by: "text", value: "Sales Tax", exact: true })).status).toBe("missing");
+		});
+
+		it("reports ambiguous when the substring matches several elements", async () => {
+			expect((await resolveElementTarget(fixture.page, { by: "text", value: "$", exact: false })).status).toBe("ambiguous");
+		});
 	});
 
 	it("resolves a placeholder target with exactly one match", async () => {

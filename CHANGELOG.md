@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0 - 2026-09-20
+
+Read substring extraction (spec 0015): a Recipe can locate a text block by a contained label (`{"by":"text","value":"Amount:","exact":false}`) and publish one regex capture from it via a structured `read` spec (`source`, `extract`, `parse`), deterministically and without LLM involvement on replay. Hub and the Runner both validate the spec, failures use dedicated `EXTRACTION_*` codes that never echo page text, and observations report the requested target instead of the element's text. The next-Step and compilation prompts teach the form, and Step descriptions summarize it in plain language with the regex under technical details.
+
 ## 0.13.0 - 2026-09-20
 
 Live Human Intervention (spec 0013): an operator can Take Control of a Recipe Job stuck in `Intervention-Requested`, see its masked screenshot and Transcript in an owner-locked overlay, and direct the still-open Runner browser with a click on the screenshot, an output assignment, or a prompt that Hub converts into one atomic Step. The operator then hands control back to resume at a chosen Recipe Step, or ends the Job. Commands travel over a Hub-persisted single pending command that the Runner pulls, and run through the normal allowlist and masking path.

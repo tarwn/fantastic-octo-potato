@@ -34,7 +34,16 @@
 			{option.by} <ValueDescription value={option.value} />
 		{/each}
 	{:else if step.action === "read"}
-		read <TargetDescription locator={step.args[0]} /> to <ValueDescription value={step.args[2]} />
+		{@const spec = step.args[1]}
+		{#if typeof spec === "string"}
+			read <TargetDescription locator={step.args[0]} /> to <ValueDescription value={step.args[2]} />
+		{:else}
+			read <TargetDescription locator={step.args[0]} /> and capture {typeof spec.extract.group === "number" ? `group ${spec.extract.group}` : `"${spec.extract.group}"`} to <ValueDescription value={step.args[2]} />
+			<details data-testid="step-technical">
+				<summary>technical details</summary>
+				{spec.source} regex <code>{spec.extract.pattern}</code>{#if spec.parse}, parse {spec.parse}{/if}
+			</details>
+		{/if}
 	{:else if step.action === "check" || step.action === "verify"}
 		{step.action}: {@render conditionBox(step.args[0])}
 	{:else if step.action === "assign"}

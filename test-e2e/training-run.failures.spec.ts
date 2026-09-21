@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { resetLlmStub, scriptLlmResponses } from "./llm-stub/client";
 import {
-	compiledRecipeResponse,
+	compiledRecipeResponses,
 	fetchRecipes,
 	findBambooInvoiceApp,
 	ingredientsResponse,
@@ -66,7 +66,7 @@ test.describe("training run failure and correction outcomes (spec 0009)", () => 
 			{ content: "not a valid JSON Step" },
 			firstLoginStep,
 			...remainingSteps,
-			compiledRecipeResponse()
+			...compiledRecipeResponses()
 		]);
 
 		const output: string[] = [];

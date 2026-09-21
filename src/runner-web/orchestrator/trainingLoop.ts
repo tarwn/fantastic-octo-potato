@@ -94,8 +94,10 @@ async function runOneStep(deps: LoopDeps, step: ChildStep): Promise<ChildStep | 
 		return undefined;
 	}
 
+	let error: string | undefined;
 	if (actionResult.outcome === "failed" && actionResult.error) {
-		await reportInfo(deps.config, deps.job.id, redactKnownSecrets(`Step ${step.id} failed: ${actionResult.error.code}: ${actionResult.error.message}`, deps.secrets));
+		error = redactKnownSecrets(`${actionResult.error.code}: ${actionResult.error.message}`, deps.secrets);
+		await reportInfo(deps.config, deps.job.id, `Step ${step.id} failed: ${error}`);
 	}
 
 	const extractions = actionResult.extraction ? [{ fieldName: actionResult.extraction.fieldName, value: scalarToWireValue(actionResult.extraction.value) }] : [];
@@ -105,7 +107,8 @@ async function runOneStep(deps: LoopDeps, step: ChildStep): Promise<ChildStep | 
 		outcome: actionResult.outcome,
 		extractions,
 		targetDescription: actionResult.targetDescription,
-		credentialNames: deps.credentialNames
+		credentialNames: deps.credentialNames,
+		...(error !== undefined ? { error } : {})
 	});
 	await captureAndUploadArtifact(stepReportingDeps(deps), step.id, deps.job.syntheticDataConfirmed);
 

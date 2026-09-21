@@ -238,6 +238,7 @@ describe("runRecipeJobLoop: unrecoverable outcome mapping", () => {
 		await runRecipeJobLoop(config, job, -1);
 
 		expect(reportInfo).toHaveBeenCalledWith(config, 42, "Step click_go failed: ACTION_FAILED: login rejected for password ••••••");
+		expect(reportDslStep).toHaveBeenCalledWith(config, 42, expect.objectContaining({ stepId: "click_go", outcome: "failed", error: "ACTION_FAILED: login rejected for password ••••••" }));
 	}, 20000);
 
 	it("reports Completed-Error on an allowlist violation, after reporting the triggering Step as failed", async () => {

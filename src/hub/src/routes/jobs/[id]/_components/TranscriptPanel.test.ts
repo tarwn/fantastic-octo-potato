@@ -186,6 +186,40 @@ describe("TranscriptPanel", () => {
 		expect(screen.queryByText("id: open_home")).not.toBeInTheDocument();
 	});
 
+	it("shows the intent collapsed and the structured read summary expanded", async () => {
+		const read: Step = {
+			id: "read_amount",
+			action: "read",
+			args: [{ by: "text", value: "Amount:", exact: false }, { source: "text", extract: { by: "regex", pattern: "(\\S+)", group: 1 } }, { ref: "output", name: "amount" }],
+			intent: "Read the amount"
+		};
+
+		render(TranscriptPanel, props([stepEntry(1, { stepId: "read_amount", action: "read" })], [read]));
+		expect(screen.getByText("Read the amount")).toBeInTheDocument();
+		expect(screen.queryByTestId("step-description")).not.toBeInTheDocument();
+
+		await fireEvent.click(screen.getByRole("button", { name: "Toggle details for read_amount" }));
+
+		expect(screen.getByTestId("step-description")).toHaveTextContent("read text containing \"Amount:\" and capture group 1");
+	});
+
+	it("shows a failed Step's error in the expanded observed line only", async () => {
+		const entry = stepEntry(1, {
+			stepId: "fill_user",
+			outcome: "failed",
+			action: "fill",
+			targetDescription: { component: "element", selector: "" },
+			error: "TARGET_NOT_FOUND: No element matched {by: \"label\", value: \"Username\"}"
+		});
+		const fillStep: Step = { id: "fill_user", action: "fill", args: [{ by: "label", value: "Username" }, "someone"] };
+		render(TranscriptPanel, props([entry], [fillStep]));
+
+		expect(screen.getByText("fill_user: fill on element")).toBeInTheDocument();
+		await fireEvent.click(screen.getByRole("button", { name: "Toggle details for fill_user" }));
+
+		expect(screen.getByText(/fill on element — TARGET_NOT_FOUND: No element matched/)).toBeInTheDocument();
+	});
+
 	it("keeps a row expanded when the entries refresh", async () => {
 		const { rerender } = render(TranscriptPanel, props([stepEntry(1, { stepId: "open_home" })], [openStep("open_home")]));
 		await fireEvent.click(screen.getByRole("button", { name: "Toggle details for open_home" }));

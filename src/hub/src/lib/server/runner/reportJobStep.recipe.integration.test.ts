@@ -5,6 +5,7 @@ import { buildOpenStartingUrlStep } from "../jobs/startingUrlInput";
 import { deriveNextStep } from "../llm/nextStep";
 import { readJobStepArtifact } from "../storage/artifactStorage";
 import { useIntegrationTestDb } from "../storage/db/_test/integrationTestDb";
+import { TranscriptKind } from "../storage/db/jobTranscriptKind";
 import { JobType } from "../storage/db/jobType";
 import { SensitivityType } from "../storage/db/sensitivityType";
 import {
@@ -116,6 +117,41 @@ describe("reportJobStep DSL-shaped reports (Recipe Jobs)", () => {
 				})
 			})
 		);
+	});
+
+	it("keeps a failed Step's reported error on its transcript row", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			kind: "dslStep",
+			stepId: "fill_user",
+			outcome: "failed",
+			targetDescription: { component: "element", selector: "" },
+			extractions: [],
+			error: "TARGET_NOT_FOUND: No element matched"
+		});
+
+		const stepEntry = listTranscriptEntries(db, jobId).find((entry) => entry.kind === TranscriptKind.Step);
+		expect(stepEntry?.text).toMatchObject({ stepId: "fill_user", error: "TARGET_NOT_FOUND: No element matched" });
+	});
+
+	it("rejects a non-string error", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const { jobId } = await createRunningRecipeJob(db, runnerId);
+
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			kind: "dslStep",
+			stepId: "fill_user",
+			outcome: "failed",
+			targetDescription: { component: "element", selector: "" },
+			extractions: [],
+			error: 42
+		});
+
+		expect(result).toEqual({ status: 400, body: { error: "error must be a string" } });
 	});
 
 	it("persists the extracted value as a Job Result through the masked-upsert path", async () => {

@@ -38,6 +38,18 @@ describe("deriveNextStep", () => {
 		expect(mockedSendChatCompletion).toHaveBeenCalledTimes(1);
 	});
 
+	it("passes through a valid structured read and retries a malformed one", async () => {
+		const spec = { source: "text", extract: { by: "regex", pattern: "Amount:\\s*(?<value>\\S+)", group: "value" }, parse: "string" };
+		const step = (extract: unknown) => JSON.stringify({ id: "read_amount", action: "read", args: [{ by: "text", value: "Amount:", exact: false }, { ...spec, extract }, { ref: "output", name: "amount" }] });
+		mockedSendChatCompletion.mockResolvedValueOnce(step({ by: "regex", pattern: "", group: "value" })).mockResolvedValueOnce(step(spec.extract));
+		const { deriveNextStep } = await import("./nextStep");
+
+		const result = await deriveNextStep(baseContext());
+
+		expect(result.args[1]).toEqual(spec);
+		expect(mockedSendChatCompletion).toHaveBeenCalledTimes(2);
+	});
+
 	it("includes known credential names (never values) in the user prompt", async () => {
 		mockedSendChatCompletion.mockResolvedValue(JSON.stringify({ id: "fill_username", action: "fill", args: [{ by: "label", value: "Username" }, { ref: "credential", name: "loginUser" }] }));
 		const { deriveNextStep } = await import("./nextStep");

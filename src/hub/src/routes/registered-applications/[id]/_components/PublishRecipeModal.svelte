@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { publishRecipe, type RecipeSummary } from "$lib/api/recipesApi";
+	import { MAX_RECIPE_NAME_LENGTH } from "$lib/recipeName";
 
 	let {
 		open,
@@ -71,7 +72,7 @@
 
 		<label class="field">
 			<span class="field-label">Name</span>
-			<input class="field-input" type="text" bind:value={name} aria-invalid={!!nameError} />
+			<input class="field-input" type="text" maxlength={MAX_RECIPE_NAME_LENGTH} bind:value={name} aria-invalid={!!nameError} />
 			{#if nameError}<span class="field-error">{nameError}</span>{/if}
 		</label>
 

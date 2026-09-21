@@ -104,7 +104,7 @@ describe("publishRecipeAction", () => {
 		["missing", undefined],
 		["not a string", 5],
 		["blank", "   "],
-		["too long", "x".repeat(101)]
+		["too long", "x".repeat(41)]
 	])("400s for a %s name", (_label, name) => {
 		seed(getDb());
 		const { recipe } = qualifiedDraft(getDb());

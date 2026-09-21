@@ -47,7 +47,7 @@ const FINISH_STEP: ChildStep = { id: "s2", action: "finish", args: [null] };
 
 beforeEach(() => {
 	vi.mocked(deriveNextStep).mockReset().mockResolvedValue(CLICK_SEARCH_STEP);
-	vi.mocked(compileRecipe).mockReset().mockResolvedValue(COMPILED_DEFINITION);
+	vi.mocked(compileRecipe).mockReset().mockResolvedValue({ definition: COMPILED_DEFINITION, name: "Compiled name" });
 });
 
 function seedRunner(db: Database.Database): number {
@@ -105,6 +105,22 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 			expect.objectContaining({ kind: TranscriptKind.Observe, text: "Looked at the page", jobStatusId: null })
 		);
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.Running);
+	});
+
+	it("keeps a failed Step's reported error on its transcript row", async () => {
+		const db = getDb();
+		const runnerId = seedRunner(db);
+		const jobId = insertPendingJob(db, 1);
+		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
+
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, {
+			...dslStepBody("click_search"),
+			outcome: "failed",
+			error: "TARGET_NOT_FOUND: No element matched"
+		});
+
+		const stepEntry = listTranscriptEntries(db, jobId).find((entry) => entry.kind === TranscriptKind.Step && entry.text.stepId === "click_search");
+		expect(stepEntry?.text).toMatchObject({ outcome: "failed", error: "TARGET_NOT_FOUND: No element matched" });
 	});
 
 	it("applies a status-kind submission's status change and records it on the transcript row", async () => {
@@ -165,7 +181,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
@@ -185,12 +201,12 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		const recipes = listRecipesForApplication(db, 1);
 		expect(recipes).toHaveLength(1);
 		expect(recipes[0]).toEqual(
-			expect.objectContaining({ goal: "Extract invoice total", definition: COMPILED_DEFINITION, sourceTrainingRunId: String(jobId) })
+			expect.objectContaining({ name: "Compiled name", goal: "Extract invoice total", definition: COMPILED_DEFINITION, sourceTrainingRunId: String(jobId) })
 		);
 	});
 
@@ -202,7 +218,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 		vi.mocked(compileRecipe).mockRejectedValueOnce(new RecipeCompilationInvalidResponseError("still invalid"));
 
-		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		const result = await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		expect(result).toEqual({ status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } });
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
@@ -292,7 +308,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		await runnerPoll(db, String(runnerId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET);
 		vi.mocked(deriveNextStep).mockResolvedValueOnce(FINISH_STEP);
 
-		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("click_search"));
+		await reportJobStep(db, String(runnerId), String(jobId), `Bearer ${SHARED_SECRET}`, SHARED_SECRET, dslStepBody("open_starting_url"));
 
 		expect(listTrainingRunJobSteps(db, jobId)).toContainEqual(expect.objectContaining({ stepId: "s2", definition: FINISH_STEP }));
 	});

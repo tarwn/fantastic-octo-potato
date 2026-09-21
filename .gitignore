@@ -21,3 +21,4 @@ test-results
 # le sigh
 .DS_Store
 Thumbs.db
+test-e2e/llm-stub/.llm-stub.pid

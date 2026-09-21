@@ -302,7 +302,7 @@ test.describe("live human intervention shell (spec 0013 Step 1)", () => {
 		await page.getByRole("button", { name: "Take Control" }).click({ timeout: 60_000 });
 		await expect(page.getByRole("dialog").getByText("Owner: you")).toBeVisible();
 
-		// RUNNER_INTERVENTION_TIMEOUT_SECONDS=20 (playwright.config.ts) restarts as an idle timeout at takeover.
+		// RUNNER_INTERVENTION_TIMEOUT_SECONDS=8 (playwright.config.ts) restarts as an idle timeout at takeover.
 		await expect(page.getByText("Job is now Completed-Failed")).toBeVisible({ timeout: 45_000 });
 		await expect(page.getByRole("dialog")).toHaveCount(0);
 		const detail = (await (await request.get(`/api/hub/jobs/${blocked.jobId}`)).json()) as {

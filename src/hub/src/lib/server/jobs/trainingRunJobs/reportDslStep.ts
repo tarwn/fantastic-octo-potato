@@ -27,7 +27,7 @@ import {
 } from "../../storage/repositories/jobRepository";
 import { createDraftRecipe } from "../../storage/repositories/recipeRepository";
 import { updateRunnerHeartbeat } from "../../storage/repositories/runnerRepository";
-import { summarizeTranscriptForLlm } from "../transcriptSummary";
+import { buildJournal, summarizeTranscriptForLlm } from "../transcriptSummary";
 import type { JobActionResult, ReportStepBody } from "../types";
 
 import type { ChildStep } from "$lib/types/recipeDefinition";
@@ -65,6 +65,7 @@ export async function reportDslStep(
 			...(step.parentStepId !== undefined ? { parentStepId: step.parentStepId } : {}),
 			targetDescription: step.targetDescription,
 			inputs: [],
+			...(step.error !== undefined ? { error: step.error } : {}),
 			outputs
 		},
 		now
@@ -152,17 +153,17 @@ export async function reportDslStep(
 		// status, and never leaves a partially-written/updated draft Recipe (R007) — createDraftRecipe
 		// itself re-validates before persisting.
 		try {
-			const definition = await compileRecipe({
+			const { definition, name } = await compileRecipe({
 				goal: job.details.goal,
 				transcriptSummary,
-				executedSteps: listTrainingRunJobSteps(db, job.id).map((trainingStep) => trainingStep.definition),
+				journal: buildJournal(transcriptEntries, listTrainingRunJobSteps(db, job.id)),
 				ingredients: listSafeJobIngredients(db, job.id),
 				results: listSafeJobResults(db, job.id),
 				credentialNames: knownCredentialNames
 			});
 			createDraftRecipe(db, {
 				customerApplicationXrefId: job.customerApplicationXrefId,
-				name: job.details.goal,
+				name,
 				goal: job.details.goal,
 				definition,
 				sourceTrainingRunId: String(job.id),

@@ -202,62 +202,74 @@ export function ingredientsResponse(): { content: string } {
 	return { content: JSON.stringify([{ name: "invoiceNumber", value: "INV-1001", type: "string", sensitive: false }]) };
 }
 
-export function compiledRecipeResponse(): { content: string } {
+export function compiledRecipe() {
 	return {
-		content: JSON.stringify({
-			schemaVersion: 1,
-			inputs: {
-				// createTrainingRunJob.ts always seeds a "startingUrl" Ingredient itself (startingUrlInput.ts)
-				// — never asked of the goal-ingredients LLM step, but still one of the compiled schema's
-				// expected input names (recipeCompilationPrompt.ts: "exactly one entry per name given in inputs").
-				startingUrl: { type: "string", description: "Where the Recipe starts", required: true, nullable: false, sensitive: false },
-				invoiceNumber: { type: "string", description: "Invoice number to look up", required: true, nullable: false, sensitive: false }
+		schemaVersion: 1,
+		inputs: {
+			// createTrainingRunJob.ts always seeds a "startingUrl" Ingredient itself (startingUrlInput.ts)
+			// — never asked of the goal-ingredients LLM step, but still one of the compiled schema's
+			// expected input names (recipeCompilationPrompt.ts: "exactly one entry per name given in inputs").
+			startingUrl: { type: "string", description: "Where the Recipe starts", required: true, nullable: false, sensitive: false },
+			invoiceNumber: { type: "string", description: "Invoice number to look up", required: true, nullable: false, sensitive: false }
+		},
+		outputs: {
+			clientName: { type: "string", description: "Client name on the invoice", required: true, nullable: false, sensitive: false }
+		},
+		steps: [
+			{ id: "start", action: "open", args: [TARGET_APP_URL], intent: "Open BambooInvoice" },
+			{
+				id: "login_fill_user",
+				action: "fill",
+				args: [{ by: "css", value: "#username" }, { ref: "credential", name: "username" }],
+				intent: "Enter login email"
 			},
-			outputs: {
-				clientName: { type: "string", description: "Client name on the invoice", required: true, nullable: false, sensitive: false }
+			{
+				id: "login_fill_pass",
+				action: "fill",
+				args: [{ by: "css", value: "#password" }, { ref: "credential", name: "password" }],
+				intent: "Enter login password"
 			},
-			steps: [
-				{ id: "start", action: "open", args: [TARGET_APP_URL], intent: "Open BambooInvoice" },
-				{
-					id: "login_fill_user",
-					action: "fill",
-					args: [{ by: "css", value: "#username" }, { ref: "credential", name: "username" }],
-					intent: "Enter login email"
-				},
-				{
-					id: "login_fill_pass",
-					action: "fill",
-					args: [{ by: "css", value: "#password" }, { ref: "credential", name: "password" }],
-					intent: "Enter login password"
-				},
-				{ id: "login_submit", action: "click", args: [{ by: "css", value: "#login" }], intent: "Submit login" },
-				{ id: "open_invoices", action: "open", args: [INVOICES_LIST_URL], intent: "Open the Invoices list" },
-				{
-					id: "open_invoice",
-					action: "click",
-					args: [{ by: "text", value: SEEDED_INVOICE_LINK_TEXT }],
-					intent: "Open the seeded invoice"
-				},
-				{
-					id: "wait_invoice",
-					action: "verify",
-					args: [{ test: "visible", args: [{ by: "css", value: ".invoiceViewHold" }] }],
-					intent: "Wait for invoice details to load"
-				},
-				{
-					id: "copy_client",
-					action: "read",
-					args: [{ by: "css", value: ".invoiceViewHold h3" }, "text", { ref: "output", name: "clientName" }],
-					intent: "Copy the client name"
-				},
-				{
-					id: "complete",
-					action: "finish",
-					args: [{ test: "assigned", args: [{ ref: "output", name: "clientName" }] }],
-					intent: "Confirm the client name was collected"
-				}
-			],
-			recoveries: []
-		})
+			{ id: "login_submit", action: "click", args: [{ by: "css", value: "#login" }], intent: "Submit login" },
+			{ id: "open_invoices", action: "open", args: [INVOICES_LIST_URL], intent: "Open the Invoices list" },
+			{
+				id: "open_invoice",
+				action: "click",
+				args: [{ by: "text", value: SEEDED_INVOICE_LINK_TEXT }],
+				intent: "Open the seeded invoice"
+			},
+			{
+				id: "wait_invoice",
+				action: "verify",
+				args: [{ test: "visible", args: [{ by: "css", value: ".invoiceViewHold" }] }],
+				intent: "Wait for invoice details to load"
+			},
+			{
+				id: "copy_client",
+				action: "read",
+				args: [{ by: "css", value: ".invoiceViewHold h3" }, "text", { ref: "output", name: "clientName" }],
+				intent: "Copy the client name"
+			},
+			{
+				id: "complete",
+				action: "finish",
+				args: [{ test: "assigned", args: [{ ref: "output", name: "clientName" }] }],
+				intent: "Confirm the client name was collected"
+			}
+		],
+		recoveries: [] as unknown[]
 	};
+}
+
+let compiledRecipeCount = 0;
+
+type CompiledRecipe = Record<"inputs" | "outputs" | "steps" | "recoveries", unknown>;
+
+// Compilation is four LLM stages, answered in order; the name is unique because specs find Recipes by link text.
+export function compiledRecipeResponses(recipe: CompiledRecipe = compiledRecipe()): { content: string }[] {
+	return [
+		{ content: JSON.stringify({ inputs: recipe.inputs, outputs: recipe.outputs }) },
+		{ content: JSON.stringify({ steps: recipe.steps }) },
+		{ content: JSON.stringify({ recoveries: recipe.recoveries }) },
+		{ content: JSON.stringify({ name: `Look up invoice client ${process.pid}-${++compiledRecipeCount}` }) }
+	];
 }

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { resetLlmStub, scriptLlmResponses } from "./llm-stub/client";
 import {
-	compiledRecipeResponse,
+	compiledRecipeResponses,
 	fetchRecipes,
 	findBambooInvoiceApp,
 	ingredientsResponse,
@@ -37,7 +37,7 @@ test.describe("training run against a real target application (spec 0009)", () =
 			throw new Error("baseURL is not set");
 		}
 
-		await scriptLlmResponses([ingredientsResponse(), ...loginAndCopyClientNameSteps(), compiledRecipeResponse()]);
+		await scriptLlmResponses([ingredientsResponse(), ...loginAndCopyClientNameSteps(), ...compiledRecipeResponses()]);
 
 		const output: string[] = [];
 		const runner = spawnRunner(baseURL, output);
@@ -66,7 +66,7 @@ test.describe("training run against a real target application (spec 0009)", () =
 			expect(jobDetail.artifacts.length).toBeGreaterThan(0);
 
 			const recipes = await fetchRecipes(request, bambooInvoice.id);
-			const draftRecipe = recipes.find((recipe) => recipe.state === "Draft");
+			const draftRecipe = recipes.find((recipe) => recipe.sourceTrainingRunId === String(jobId));
 			if (!draftRecipe) {
 				throw new Error("no draft Recipe was created from the completed Training Run");
 			}

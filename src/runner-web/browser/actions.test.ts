@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ExecutionContext } from "../dsl/executionContext.ts";
 import { createOutputsState, getOutput } from "../dsl/outputsState.ts";
-import type { ChildStep } from "../dsl/types.ts";
+import type { ChildStep, ReadSpec, Target } from "../dsl/types.ts";
 
 import { closeFixtureBrowser, type FixtureBrowser, openFixturePage } from "./_test/testPage.ts";
 import { executeAction } from "./actions.ts";
@@ -132,6 +132,115 @@ describe("executeAction: interaction", () => {
 });
 
 describe("executeAction: read/assign", () => {
+	describe("structured read", () => {
+		const amountSpec = (overrides: Partial<ReadSpec> = {}, group: number | string = "amount"): ReadSpec => ({
+			source: "text",
+			extract: { by: "regex", pattern: "Amount:\\s*(?<amount>\\S+)", group },
+			...overrides
+		});
+		const readStep = (target: Target, spec: ReadSpec): ChildStep => ({ id: "s", action: "read", args: [target, spec, { ref: "output", name: "amount" }] });
+		const invoiceTarget: Target = { by: "text", value: "Amount:", exact: false };
+
+		it("extracts a named group from a substring-matched paragraph and keeps the formatting", async () => {
+			const ctx = newContext();
+			const result = await executeAction(fixture.page, readStep(invoiceTarget, amountSpec()), ctx);
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { fieldName: "amount", value: "$1200.00" } });
+			expect(getOutput(ctx.outputs, "amount")).toBe("$1200.00");
+		});
+
+		it("extracts a numbered group", async () => {
+			const result = await executeAction(fixture.page, readStep(invoiceTarget, amountSpec({}, 1)), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: "$1200.00" } });
+		});
+
+		it("reports the requested substring, never the element's text", async () => {
+			const result = await executeAction(fixture.page, readStep(invoiceTarget, amountSpec()), newContext());
+			expect(result.targetDescription).toEqual({ component: "element", selector: "text contains 'Amount:'" });
+			for (const pageText of ["$1200.00", "$75.00", "$0.00"]) {
+				expect(JSON.stringify(result.targetDescription)).not.toContain(pageText);
+			}
+		});
+
+		it("reports an empty selector when the requested substring matches a secret", async () => {
+			const result = await executeAction(fixture.page, readStep(invoiceTarget, amountSpec()), newContext({ secrets: ["Amount:"] }));
+			expect(result).toMatchObject({ outcome: "succeeded", targetDescription: { component: "element", selector: "" } });
+		});
+
+		it("keeps the exact-target description unchanged", async () => {
+			const result = await executeAction(fixture.page, readStep({ by: "text", value: "Total: $0.00" }, amountSpec({}, 0)), newContext());
+			expect(result.targetDescription.selector).toBe("id='invoiceTotal'");
+		});
+
+		it("matches a substring case-insensitively across normalized whitespace", async () => {
+			const target: Target = { by: "text", value: "sales   TAX", exact: false };
+			const spec: ReadSpec = { source: "text", extract: { by: "regex", pattern: "Tax:\\s*(\\S+)", group: 1 } };
+			const result = await executeAction(fixture.page, readStep(target, spec), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: "$75.00" } });
+		});
+
+		it("fails an ambiguous substring target without assigning an output", async () => {
+			const ctx = newContext();
+			const result = await executeAction(fixture.page, readStep({ by: "text", value: "$", exact: false }, amountSpec()), ctx);
+			expect(result).toMatchObject({ outcome: "failed", error: { code: "TARGET_AMBIGUOUS" } });
+			expect(() => getOutput(ctx.outputs, "amount")).toThrow("has not been assigned");
+		});
+
+		it("turns <br> into newlines for element text sources", async () => {
+			const spec: ReadSpec = { source: "text", extract: { by: "regex", pattern: "Ref: (\\S+)\\nOwner: (\\w+)", group: 2 } };
+			const result = await executeAction(fixture.page, readStep({ by: "css", value: "#twoLines" }, spec), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: "Pat" } });
+		});
+
+		it("extracts from a value source", async () => {
+			const spec: ReadSpec = { source: "value", extract: { by: "regex", pattern: "ACCT-(\\d+)", group: 1 } };
+			const result = await executeAction(fixture.page, readStep({ by: "css", value: "#accountNumber" }, spec), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: "1042" } });
+		});
+
+		it("parses the capture as a number when asked", async () => {
+			const spec: ReadSpec = { source: "text", parse: "number", extract: { by: "regex", pattern: "Tax: \\$(\\S+)", group: 1 } };
+			const result = await executeAction(fixture.page, readStep({ by: "css", value: "#invoiceTax" }, spec), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: 75 } });
+		});
+
+		it("fails INVALID_NUMBER without echoing the capture or assigning an output", async () => {
+			const ctx = newContext();
+			const result = await executeAction(fixture.page, readStep(invoiceTarget, amountSpec({ parse: "number" })), ctx);
+			expect(result).toMatchObject({ outcome: "failed", error: { code: "INVALID_NUMBER" } });
+			expect(result.error?.message).not.toContain("1200");
+			expect(() => getOutput(ctx.outputs, "amount")).toThrow("has not been assigned");
+		});
+
+		it("fails with an extraction error and assigns nothing when the pattern does not match", async () => {
+			const ctx = newContext();
+			const spec: ReadSpec = { source: "text", extract: { by: "regex", pattern: "Nope: (\\S+)", group: 1 } };
+			const result = await executeAction(fixture.page, readStep(invoiceTarget, spec), ctx);
+			expect(result).toMatchObject({ outcome: "failed", error: { code: "EXTRACTION_NOT_FOUND" } });
+			expect(() => getOutput(ctx.outputs, "amount")).toThrow("has not been assigned");
+		});
+
+		it("rejects a malformed dispatched spec before resolving the target", async () => {
+			const bad = { source: "text", extract: { by: "regex", pattern: "(a)", group: -1 } } as ReadSpec;
+			const result = await executeAction(fixture.page, readStep({ by: "css", value: "#does-not-exist" }, bad), newContext());
+			expect(result).toMatchObject({ outcome: "failed", error: { code: "INVALID_EXTRACTION_PATTERN" } });
+		});
+
+		it("extracts at a point using textContent", async () => {
+			const result = await executeAction(fixture.page, readStep({ by: "point", x: 205, y: 1805 }, { source: "text", extract: { by: "regex", pattern: "Below the (\\w+)", group: 1 } }), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: "fold" } });
+		});
+
+		it("extracts a value at a point", async () => {
+			const result = await executeAction(fixture.page, readStep({ by: "point", x: 205, y: 1905 }, { source: "value", extract: { by: "regex", pattern: "deep-(\\w+)", group: 1 } }), newContext());
+			expect(result).toMatchObject({ outcome: "succeeded", extraction: { value: "value" } });
+		});
+
+		it("fails a value source at a point with no value-bearing control", async () => {
+			const result = await executeAction(fixture.page, readStep({ by: "point", x: 205, y: 1805 }, { source: "value", extract: { by: "regex", pattern: "(a)", group: 1 } }), newContext());
+			expect(result).toMatchObject({ outcome: "failed", error: { code: "TARGET_NOT_FOUND" } });
+		});
+	});
+
 	it("read text copies innerText into the destination output", async () => {
 		const ctx = newContext();
 		const result = await executeAction(fixture.page, { id: "s", action: "read", args: [{ by: "css", value: "#balance" }, "text", { ref: "output", name: "balance" }] }, ctx);

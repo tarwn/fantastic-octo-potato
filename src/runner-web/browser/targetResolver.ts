@@ -8,24 +8,33 @@ import { resolveStringValue } from "../dsl/valueResolver.ts";
 // matches) are distinct, reported outcomes, never a silent first-match pick.
 export type TargetResolution = { status: "found"; locator: Locator } | { status: "missing" } | { status: "ambiguous"; count: number };
 
-export type ResolvedTargetElement = { by: TargetElement["by"]; value: string };
+export type ResolvedTargetElement = { by: TargetElement["by"]; value: string; exact?: boolean };
 
 // A ref'd value may be a sensitive input, so the resolved value must only reach a locator —
 // callers that put it in a message redact it against ctx.secrets first.
 export function resolveTargetValue(target: TargetElement, ctx: ExecutionContext): ResolvedTargetElement {
-	return { by: target.by, value: resolveStringValue(target.value, ctx) };
+	const value = resolveStringValue(target.value, ctx);
+	return target.by === "text" && target.exact !== undefined ? { by: target.by, value, exact: target.exact } : { by: target.by, value };
 }
 
 export function isPointTarget(target: Target): target is TargetPoint {
 	return target.by === "point";
 }
 
+// Forms commonly render labels as "Email:" while a model reads them as "Email", so a label matches
+// whole-text ignoring case, surrounding whitespace and a trailing colon — never as a substring,
+// which would make "Password" ambiguous with "Confirm password".
+function labelPattern(value: string): RegExp {
+	const bare = value.trim().replace(/\s*:$/, "");
+	return new RegExp(`^\\s*${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:?\\s*$`, "i");
+}
+
 function toLocator(page: Page, target: ResolvedTargetElement): Locator {
 	switch (target.by) {
 		case "text":
-			return page.getByText(target.value, { exact: true });
+			return page.getByText(target.value, { exact: target.exact ?? true });
 		case "label":
-			return page.getByLabel(target.value, { exact: true });
+			return page.getByLabel(labelPattern(target.value));
 		case "placeholder":
 			return page.getByPlaceholder(target.value, { exact: true });
 		case "css":

@@ -81,6 +81,8 @@ export interface ReportDslStepRequest {
 	extractions: Array<{ fieldName: string; value: string }>;
 	targetDescription: { component: string; selector: string };
 	credentialNames?: string[];
+	// Already redacted against the run's secrets — a fill error can echo the filled value.
+	error?: string;
 }
 
 export interface ReportStatusRequest {

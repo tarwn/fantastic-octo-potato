@@ -4,6 +4,16 @@ import { describe, expect, it } from "vitest";
 import TargetDescription from "./TargetDescription.svelte";
 
 describe("TargetDescription", () => {
+	it.each([
+		[false, "text containing \"Amount:\""],
+		[true, "text \"Amount:\""],
+		[undefined, "text \"Amount:\""]
+	])("renders a text target with exact=%s as %s", (exact, expected) => {
+		render(TargetDescription, { locator: { by: "text", value: "Amount:", exact } });
+
+		expect(screen.getByTestId("target-element").textContent?.replace(/\s+/g, " ").trim()).toBe(expected);
+	});
+
 	it("renders an element target with its locator kind and value", () => {
 		render(TargetDescription, { locator: { by: "label", value: "Email" } });
 

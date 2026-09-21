@@ -28,8 +28,8 @@ export default defineConfig({
 			// Runner-side config Hub hands back from `init` (runnerConfig.ts) — kept short here
 			// so the intervention specs wait on this rather than the real default; long enough for a UI-driven take of control.
 			RUNNER_SHARED_SECRET: "test-e2e-shared-secret",
-			RUNNER_POLL_INTERVAL_SECONDS: "1",
-			RUNNER_INTERVENTION_TIMEOUT_SECONDS: "20",
+			RUNNER_POLL_INTERVAL_SECONDS: "0.2",
+			RUNNER_INTERVENTION_TIMEOUT_SECONDS: "8",
 			// Points Hub's LLM client at the local stub server (llm-stub/, started by
 			// globalSetup.ts) instead of a real provider endpoint.
 			LLM_API_URL: `http://localhost:${DEFAULT_LLM_STUB_PORT}/v1`,
