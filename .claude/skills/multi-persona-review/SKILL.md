@@ -7,6 +7,8 @@ Perform a multi-persona code review of the current branch against a **comparison
 
 **Re-Review**: If this is a "re-review" request, expect a prior review result (<prior review report>) to be passed in with "action taken" indicated in the report. Only review changes since that prior review, do not re-review the full diff or produce new findings from older changes.
 
+**Always complete the review**. There are notes wheer steps can be skipped, but if you do not complete through Step 5 you will be required to repeat the work.
+
 ## Tooling
 
 All git interaction for this skill goes through fixed scripts in `tools/`. Never use raw `git` commands for the process, you may run into security blocks.
