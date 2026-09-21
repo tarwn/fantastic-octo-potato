@@ -202,9 +202,8 @@ export function ingredientsResponse(): { content: string } {
 	return { content: JSON.stringify([{ name: "invoiceNumber", value: "INV-1001", type: "string", sensitive: false }]) };
 }
 
-export function compiledRecipeResponse(): { content: string } {
+export function compiledRecipe() {
 	return {
-		content: JSON.stringify({
 			schemaVersion: 1,
 			inputs: {
 				// createTrainingRunJob.ts always seeds a "startingUrl" Ingredient itself (startingUrlInput.ts)
@@ -257,7 +256,18 @@ export function compiledRecipeResponse(): { content: string } {
 					intent: "Confirm the client name was collected"
 				}
 			],
-			recoveries: []
-		})
+			recoveries: [] as unknown[]
 	};
+}
+
+type CompiledRecipe = Record<"inputs" | "outputs" | "steps" | "recoveries", unknown>;
+
+// Compilation is four LLM stages, answered in order; the name is unique because specs find Recipes by link text.
+export function compiledRecipeResponses(recipe: CompiledRecipe = compiledRecipe()): { content: string }[] {
+	return [
+		{ content: JSON.stringify({ inputs: recipe.inputs, outputs: recipe.outputs }) },
+		{ content: JSON.stringify({ steps: recipe.steps }) },
+		{ content: JSON.stringify({ recoveries: recipe.recoveries }) },
+		{ content: JSON.stringify({ name: `Look up invoice client ${Date.now().toString(36)}` }) }
+	];
 }

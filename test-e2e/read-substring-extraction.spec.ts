@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { getLlmRequestCount, resetLlmStub, scriptLlmResponses } from "./llm-stub/client";
 import {
-	compiledRecipeResponse,
+	compiledRecipe,
+	compiledRecipeResponses,
 	fetchRecipes,
 	findBambooInvoiceApp,
 	ingredientsResponse,
@@ -44,15 +45,12 @@ function amountReadStep(id: string, args: unknown[]): { content: string } {
 }
 
 // The stock compiled Recipe with its client-name read swapped for the structured amount read.
-function compiledAmountRecipeResponse(): { content: string } {
-	const recipe = JSON.parse(compiledRecipeResponse().content) as {
-		outputs: Record<string, unknown>;
-		steps: { id: string; args: unknown[]; intent: string }[];
-	};
-	recipe.outputs = {
+function compiledAmountRecipeResponses(): { content: string }[] {
+	const recipe = compiledRecipe();
+	const outputs = {
 		amount: { type: "string", description: "Invoice amount", required: true, nullable: false, sensitive: false }
 	};
-	recipe.steps = recipe.steps.map((step) => {
+	const steps = recipe.steps.map((step) => {
 		if (step.id === "copy_client") {
 			return { ...step, id: "read_amount", args: AMOUNT_READ_ARGS, intent: "Copy the invoice amount" };
 		}
@@ -61,7 +59,7 @@ function compiledAmountRecipeResponse(): { content: string } {
 		}
 		return step;
 	});
-	return { content: JSON.stringify(recipe) };
+	return compiledRecipeResponses({ ...recipe, outputs, steps });
 }
 
 test.describe("read substring extraction against a real target application", () => {
@@ -84,7 +82,7 @@ test.describe("read substring extraction against a real target application", () 
 			...stepsUpToInvoiceView(),
 			amountReadStep("read_amount", AMOUNT_READ_ARGS),
 			finishAmountStep(),
-			compiledAmountRecipeResponse()
+			...compiledAmountRecipeResponses()
 		]);
 
 		const output: string[] = [];

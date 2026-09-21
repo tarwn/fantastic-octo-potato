@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { getLlmRequestCount, resetLlmStub, scriptLlmResponses } from "./llm-stub/client";
 import {
-	compiledRecipeResponse,
+	compiledRecipeResponses,
 	fetchRecipes,
 	findBambooInvoiceApp,
 	ingredientsResponse,
@@ -34,7 +34,7 @@ test.describe("train, Trial, publish, and Execute a Recipe (spec 0011)", () => {
 			throw new Error("baseURL is not set");
 		}
 
-		await scriptLlmResponses([ingredientsResponse(), ...loginAndCopyClientNameSteps(), compiledRecipeResponse()]);
+		await scriptLlmResponses([ingredientsResponse(), ...loginAndCopyClientNameSteps(), ...compiledRecipeResponses()]);
 
 		const output: string[] = [];
 		const runner = spawnRunner(baseURL, output);
