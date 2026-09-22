@@ -2,20 +2,20 @@
 
 ## Architecture
 
-This system learns how to automate a remote system that does not expose an API. The LLM model explores the system during Training to achieve goals, then again to convert that journey into a repeatable Recipe with defined Ingredients. The resulting typed, Recipe runs through an approval and Trial run process before being published for endless replay, with no LLM in the loop. Layered controls for sensitive data ensure customer credentials, inputs, outputs, and sensitive on-screen information follows clear policies for masking and transmission.
+This system learns how to automate a remote system that does not expose an API. The LLM model explores the system during Training to achieve goals, then again to convert that journey into a repeatable Recipe with defined Ingredients. The resulting typed, versioned Recipe runs through an approval and Trial run process before being published for endless replay, with no LLM in the loop. Layered controls for sensitive data ensure customer credentials, inputs, outputs, and sensitive on-screen information follow clear policies for masking and transmission.
 
 The system includes 5 key actors:
 - **Runner**: Operates one Customer's Target Application from inside its network. Holds the application credentials, executes validated Steps, performs data masking, and has no model credentials or access to other Customer's information.
 - **Hub**: Stores Recipes and Jobs, coordinates Training, manages outputs and masked artifacts, serves the operator UI.
 - **LLM**: Used for understanding state and identifying next steps towards a goal
 - **User**: Provides direction, oversight, and intervention when needed
-- **Target Application**: A local BambooInvoice installation representing a legacy application without API access
+- **Target Application**: A local BambooInvoice container representing a legacy application without API access that laughs at the idea of a clean DOM and easy identifiers
 
 ### Key Decisions
 
 | Decision                    | Reason and trade-off                                                                    |
 |-----------------------------|-----------------------------------------------------------------------------------------|
-| Hub and Runner services     | Security: Customer credentials stay in network, LLM access & keys stay in ours          |
+| Hub and Runner services     | Security: Customer credentials stay in network, LLM access & keys stay remain in ours   |
 | .                           | Heterogeneity support: One Hub, many Runners keyed to specific Customers x Applications |
 | .                           | Safety: Customer sensitive data managed close to the source                             |
 | .                           | Trade-offs: more coordination and software to support than a single process             |
@@ -27,7 +27,7 @@ The system includes 5 key actors:
 | SQLite                      | Realistic persistence, simple to implement, closer-to-parity integration tests          |
 | .                           | Trade-off: unsuitable for production (multi-instance, zero downtime deploy) without replacement. |
 | Playwright                  | Strong web automation and locator support; does not support desktop applications.       |
-| OpenRouter                  | Allows model comparison and budget control during Training.                             |
+| OpenRouter, GPT5.6 Sol      | Allows model comparison and budget control during Training.                             |
 | BambooInvoice               | Local, realistic legacy web app that offers full control and synthetic data seeding     |
 | .                           | Trade-offs: an additional developer dependency (docker/podman), setup time              |
 
@@ -42,7 +42,7 @@ A Recipe includes:
 - `inputs`: named fields with type and sensitivity
 - `outputs`: named fields with type and sensitivity
 - `steps`: ordered DSL actions, targets/selectors, and conditions
-- `recoveries`: array of conditions and Steps for known interruptions
+- `recoveries`: array of conditions and Steps for known interruptions (placeholder: see [Cuts](#cuts))
 - `schemaVersion`: DSL compatibility version
 - Hub metadata: identity, revision, status (draft, published, archived), goals, audit dates and FKs
 
@@ -52,7 +52,7 @@ The DSL is [limited](./docs/todos/supporting-docs/steps-dsl.md) in this version 
 
 Recipe, Job Inputs, and Job Outputs are transmitted as JSON. Hub stores Recipes as JSON in the database, as it retrieves them as a single immutable unit and does not query their internal structure.
 
-**[Example Recipe](#)**
+**Recipe Example**
 ```json
 {
     "schemaVersion": 1,
@@ -73,9 +73,10 @@ Recipe, Job Inputs, and Job Outputs are transmitted as JSON. Hub stores Recipes 
 }
 ```
 
+Example agent micro-context files:
 - [How a Runner processes a Recipe](./docs/context/runner-web/recipe-automatic-loop.md)
-- [How Hub works with the LLM](#)
-- [How Human Intervention translates to Recipe Steps](#)
+- [Hub LLM validation & prompt guidelines](./docs/context/hub/backend/llm-call-validation-retry.md)
+- [How Human Intervention works in the runner](./docs/context/runner-web/intervention-loop.md)
 
 ### Ingredients (and Controls)
 
@@ -107,7 +108,7 @@ flowchart LR
 
 **Train**: The Training Run is exploratory; the LLM is goal seeking in this mode. It is running an observe, decide, act cycle to reach the goal the user has selected, and some sub-goals we have provided, by analyzing the results of each Step it takes, until it reaches the step budget set by the user at the beginning of the run. 
 
-**Trial**: Once a Training Run is successful, the LLM is led through a re-processing phase to identify a short successful path for the Recipe, alternate conditional Steps (detecting and handling "Not Found", for instance), any series of events that appear to be a one-time recoverable sidetrip, and setting the final conditions or checkpoint to consider the goal reached successfully. These become the Trial Recipe. The user reviews the trial recipe for approval and begins a Trial Run, which runs the first replay without a model in the decision loop.
+**Trial**: Once a Training Run is successful, the LLM is led through a re-processing phase to identify a short successful path for the Recipe, alternate conditional Steps (detecting and handling "Not Found", for instance), any series of events that appear to be a one-time recoverable side-trip, and setting the final conditions or checkpoint to consider the goal reached successfully. These become the Trial Recipe. The user reviews the trial recipe for approval and begins a Trial Run, which runs the first replay without a model in the decision loop.
 
 **Execute**: A successful Trial Run presents the user with the option to publish the Recipe as a new Recipe or replacement version for an existing one. Once published, the Recipe is available for "Execute" job runs, which will replay that Recipe one, ten, or hundreds of times, as needed.
 
@@ -125,9 +126,9 @@ The Job flow and Trial->Execute progression connect to explicitly support both t
 | Scenario                        | Handling                                                                                  |
 |---------------------------------|-------------------------------------------------------------------------------------------|
 | Expected states ("Not Found")   | A conditional case and "goto" in Recipe Steps keeps this on track for `Completed-Success` |
-| Recoverable condition           | Recipe recovery scenarios are used, keeps this on track for `Completed-Success`           |
+| Recoverable condition           | Recovery scenarios designed but not validated, expected to lead to `Completed-Success`    |
 | Failed Step                     | Calls for assistance, `Intervention-Requested`                                            |
-| Failed checkpoint               | A necessary value or end state is missed, `Completed-Failed`                             |
+| Failed checkpoint               | A necessary value or end state is missed, `Completed-Failed`                              |
 | Blocked Navigation (allowlist)  | `Completed-Error`, this Job cannot proceed and the Recipe may need attention              |
 | Blocked sub request (allowlist) | Recorded in the Transcript; the affected Step may subsequently fail                       |
 | Runtime/Hard failure            | `Completed-Error` with details or a masked screenshot                                     |
@@ -135,21 +136,21 @@ The Job flow and Trial->Execute progression connect to explicitly support both t
 
 ## Heterogeneity & multi-tenant
 
-The DSL separates Recipe intent from the Runner's individual implementation. An alternate web application implementation would support the same DSL translated to its own implementation or constraints. A runner for a Desktop application would either share a common core of the DSL for forked specific web/app extensions or a parallel DSL, while still using similar LLM prompts, producing similar english descriptions for easy approval, and integration to the same Human Intervention mechanisms. `schemaVersion`, Runner capabilities, and Application registration make incompatibility explicit.
+The DSL separates Recipe intent from the Runner's individual implementation. An alternate web application implementation would support the same DSL translated to its own implementation or constraints. A runner for a Desktop application would either share a common core of the DSL for forked specific web/app extensions or a parallel DSL, while still using similar LLM prompts, producing similar English descriptions for easy approval, and integration to the same Human Intervention mechanisms. `schemaVersion`, Runner capabilities, and Application registration make incompatibility explicit.
 
 Recipes belong to a single Customer x Application. A future Application catalog could correlate these individual copies to offer an option to copy and Trial run across Customers, or present curated "golden" Recipes. Copies remain independent but carry provenance, enabling controlled Trial and rollout to Customers, minor adaptation of curated Recipes for specific Customer conditions, and independent test and review cycles that match Customer requirements and scheduling, if needed.
 
 ## Escalation & Handoff
 
-A Runner requests intervention when it is "Stuck"; a Step cannot be performed due to the screen or system being in a different state then expected and no Recoverable Scenario can resolve it. The Runner signals a Job status change to `Intervention-Requested` and waits for human intervention. It retains the live session, pausing for direct instructions.
+A Runner requests intervention when it is "Stuck"; a Step cannot be performed due to the screen or system being in a different state than expected and no Recoverable Scenario can resolve it. The Runner signals a Job status change to `Intervention-Requested` and waits for human intervention. It retains the live session, pausing for direct instructions.
 
-(TODO: screenshot)
+![animation: getting stuck and requesting help](./evidence/x-trial-run-intervention/InterventionAnimation.gif)
 
-The Intervention dialog on the Job Screen provides a user with controls to direct the Runner. The user attempts to get the Runner back on track so they can cede control back, or determines the Job cannot be completed and sends a signal to explicitly fail to `Completed-Failed` before existing the session. Every action and change of control is explicitly logged in the Transcript.
+The Intervention dialog on the Job Screen provides a user with controls to direct the Runner. The user attempts to get the Runner back on track so they can cede control back, or determines the Job cannot be completed and sends a signal to explicitly fail to `Completed-Failed` before exiting the session. Every action and change of control is explicitly logged in the Transcript.
 
 Control is exercised through Steps. The user can click the latest (masked) screenshot to send a "Click on x,y" Step to the Runner or enter a prompt for more complex behavior that an LLM translates into validated Steps for Hub to provide for the Runner. The Runner, while in Intervention mode, waits for these intervention Steps or a signal for status change. The signal to return to automated run mode can include a specific step to start back on as it leaves manual mode and returns to the Recipe Steps.
 
-(TODO: add a link to the context doc once merged)
+_Runner loops for Agent Context: [Training loop](./docs/context/runner-web/training-loop.md) [Automatic loop](./docs/context/runner-web/recipe-automatic-loop.md), [Intervention](./docs/context/runner-web/intervention-loop.md)_
 
 ## Safety
 
@@ -166,6 +167,8 @@ This lists the cuts made against the requirements and a few notable other places
 
 | Cut / Limitation                          | Next Step                                                                         |
 |-------------------------------------------|-----------------------------------------------------------------------------------|
+| Automated Recovery, present, unexercised  | Bamboo Invoice does not exercise the requirement, select an alternative with      |
+|                                           | pop-ups, finish validation and debugging of existing LLM and Runner capability.   |
 | URL policy, 1 origin match only           | Add route pattern options and Hub user capability to manage additional policies   |
 | Action policy limited only by DSL         | Add user-defined Action policy to Training/Recipe Jobs for fine-grained control   |
 | Intervention LLM Steps run w/out approval | Display the LLM generated Step for user approval ("is this what you meant?")      |

@@ -14,7 +14,7 @@
 
 <div class="panel">
 	<div class="panel-header">
-		<h2>Screenshot</h2>
+		<h2>Latest Screenshot</h2>
 		{#if latest !== null}
 			<button type="button" class="panel-view-larger" onclick={() => (overlayOpen = true)}>View larger</button>
 		{/if}

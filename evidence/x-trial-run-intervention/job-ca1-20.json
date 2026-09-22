@@ -1,0 +1,728 @@
+{
+  "id": 20,
+  "name": "Get active invoice details",
+  "customerApplicationXrefId": 1,
+  "jobStatusId": 3,
+  "runnerId": 1,
+  "createdAt": "2026-09-21T23:18:15.503Z",
+  "startedAt": "2026-09-21T23:18:44.132Z",
+  "heartbeatOn": "2026-09-21T23:22:24.450Z",
+  "completedAt": "2026-09-21T23:22:24.450Z",
+  "interventionOwner": null,
+  "blockedStepId": "filter_client",
+  "blockedReason": "Step filter_client failed with no matching recoverable scenario",
+  "resumeStepId": null,
+  "jobType": 2,
+  "details": {
+    "recipeId": 11,
+    "mode": "Trial",
+    "allowlist": "http://localhost:8089",
+    "stepTimeoutMs": 15000
+  },
+  "recipe": {
+    "schemaVersion": 1,
+    "inputs": {
+      "companyName": {
+        "type": "string",
+        "description": "The company name to check for an active invoice.",
+        "required": true,
+        "nullable": false,
+        "sensitive": false
+      },
+      "startingUrl": {
+        "type": "string",
+        "description": "The URL of the BambooInvoice application.",
+        "required": true,
+        "nullable": false,
+        "sensitive": false
+      }
+    },
+    "outputs": {
+      "invoice_amount": {
+        "type": "string",
+        "description": "The pre-tax amount of the active invoice, including its currency symbol.",
+        "required": true,
+        "nullable": true,
+        "sensitive": true
+      },
+      "invoice_id": {
+        "type": "string",
+        "description": "The identifier of the company's active invoice.",
+        "required": true,
+        "nullable": true,
+        "sensitive": true
+      },
+      "invoice_total": {
+        "type": "string",
+        "description": "The total amount of the active invoice, including taxes and its currency symbol.",
+        "required": true,
+        "nullable": true,
+        "sensitive": true
+      }
+    },
+    "steps": [
+      {
+        "id": "open_start",
+        "action": "open",
+        "args": [
+          {
+            "ref": "input",
+            "name": "startingUrl"
+          }
+        ],
+        "intent": "Open BambooInvoice"
+      },
+      {
+        "id": "fill_email",
+        "action": "fill",
+        "args": [
+          {
+            "by": "label",
+            "value": "Email:"
+          },
+          {
+            "ref": "credential",
+            "name": "username"
+          }
+        ],
+        "intent": "Enter login email"
+      },
+      {
+        "id": "fill_password",
+        "action": "fill",
+        "args": [
+          {
+            "by": "label",
+            "value": "Password:"
+          },
+          {
+            "ref": "credential",
+            "name": "password"
+          }
+        ],
+        "intent": "Enter login password"
+      },
+      {
+        "id": "submit_login",
+        "action": "click",
+        "args": [
+          {
+            "by": "css",
+            "value": "input[type=\"submit\"]"
+          }
+        ],
+        "intent": "Log in"
+      },
+      {
+        "id": "open_invoices",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": "Invoices"
+          }
+        ],
+        "intent": "Open invoice list"
+      },
+      {
+        "id": "filter_client",
+        "action": "select",
+        "args": [
+          {
+            "by": "label",
+            "value": "Select client"
+          },
+          [
+            {
+              "by": "label",
+              "value": {
+                "ref": "input",
+                "name": "companyName"
+              }
+            }
+          ]
+        ],
+        "intent": "Filter invoices by client"
+      },
+      {
+        "id": "handle_invoice_result",
+        "action": "if",
+        "args": [
+          [
+            {
+              "when": {
+                "test": "exists",
+                "args": [
+                  {
+                    "by": "css",
+                    "value": "a[href*=\"invoices/view\"]"
+                  }
+                ]
+              },
+              "steps": [
+                {
+                  "id": "capture_invoice_id",
+                  "action": "read",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "a[href*=\"invoices/view\"]"
+                    },
+                    {
+                      "source": "text",
+                      "extract": {
+                        "by": "regex",
+                        "pattern": "(?<value>INV-\\d+)",
+                        "group": "value"
+                      },
+                      "parse": "string"
+                    },
+                    {
+                      "ref": "output",
+                      "name": "invoice_id"
+                    }
+                  ],
+                  "intent": "Capture invoice ID"
+                },
+                {
+                  "id": "open_invoice_detail",
+                  "action": "click",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "a[href*=\"invoices/view\"]"
+                    }
+                  ],
+                  "intent": "Open active invoice"
+                },
+                {
+                  "id": "read_invoice_amount",
+                  "action": "read",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "body"
+                    },
+                    {
+                      "source": "text",
+                      "extract": {
+                        "by": "regex",
+                        "pattern": "Amount:\\s*(?<value>\\$[0-9,.]+)",
+                        "group": "value"
+                      },
+                      "parse": "string"
+                    },
+                    {
+                      "ref": "output",
+                      "name": "invoice_amount"
+                    }
+                  ],
+                  "intent": "Capture invoice amount"
+                },
+                {
+                  "id": "read_invoice_total",
+                  "action": "read",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "body"
+                    },
+                    {
+                      "source": "text",
+                      "extract": {
+                        "by": "regex",
+                        "pattern": "Total:\\s*(?<value>\\$[0-9,]+\\.\\d{2})",
+                        "group": "value"
+                      },
+                      "parse": "string"
+                    },
+                    {
+                      "ref": "output",
+                      "name": "invoice_total"
+                    }
+                  ],
+                  "intent": "Capture invoice total"
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "id": "assign_null_invoice_id",
+              "action": "assign",
+              "args": [
+                {
+                  "ref": "output",
+                  "name": "invoice_id"
+                },
+                null
+              ],
+              "intent": "Clear invoice ID"
+            },
+            {
+              "id": "assign_null_invoice_amount",
+              "action": "assign",
+              "args": [
+                {
+                  "ref": "output",
+                  "name": "invoice_amount"
+                },
+                null
+              ],
+              "intent": "Clear invoice amount"
+            },
+            {
+              "id": "assign_null_invoice_total",
+              "action": "assign",
+              "args": [
+                {
+                  "ref": "output",
+                  "name": "invoice_total"
+                },
+                null
+              ],
+              "intent": "Clear invoice total"
+            }
+          ]
+        ],
+        "intent": "Handle active invoice"
+      },
+      {
+        "id": "finish",
+        "action": "finish",
+        "args": [
+          {
+            "test": "all",
+            "args": [
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_amount"
+                  }
+                ]
+              },
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_id"
+                  }
+                ]
+              },
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_total"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "intent": "Finish invoice lookup"
+      }
+    ],
+    "recoveries": []
+  },
+  "transcript": [
+    {
+      "id": 378,
+      "jobId": 20,
+      "sequence": -2,
+      "createdAt": "2026-09-21T23:18:15.503Z",
+      "jobStatusId": 1,
+      "kind": 1,
+      "text": "Job created, queued for a Runner"
+    },
+    {
+      "id": 379,
+      "jobId": 20,
+      "sequence": -1,
+      "createdAt": "2026-09-21T23:18:44.132Z",
+      "jobStatusId": 2,
+      "kind": 1,
+      "text": "Picked up by Runner 1"
+    },
+    {
+      "id": 380,
+      "jobId": 20,
+      "sequence": 1,
+      "createdAt": "2026-09-21T23:18:45.073Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "open_start",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "browser",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "open"
+      }
+    },
+    {
+      "id": 381,
+      "jobId": 20,
+      "sequence": 2,
+      "createdAt": "2026-09-21T23:18:45.707Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "fill_email",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "text input",
+          "selector": "id='username'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "fill"
+      }
+    },
+    {
+      "id": 382,
+      "jobId": 20,
+      "sequence": 3,
+      "createdAt": "2026-09-21T23:18:46.291Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "fill_password",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "password input",
+          "selector": "id='password'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "fill"
+      }
+    },
+    {
+      "id": 383,
+      "jobId": 20,
+      "sequence": 4,
+      "createdAt": "2026-09-21T23:18:47.240Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "submit_login",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "button",
+          "selector": "id='login'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "click"
+      }
+    },
+    {
+      "id": 384,
+      "jobId": 20,
+      "sequence": 5,
+      "createdAt": "2026-09-21T23:18:47.879Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "open_invoices",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "link",
+          "selector": "text='Invoices'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "click"
+      }
+    },
+    {
+      "id": 385,
+      "jobId": 20,
+      "sequence": 6,
+      "createdAt": "2026-09-21T23:19:03.471Z",
+      "jobStatusId": null,
+      "kind": 2,
+      "text": "Step filter_client failed: ACTION_FAILED: locator.selectOption: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel(/^\\s*Select client\\s*:?\\s*$/i).first()\u001b[22m\n\u001b[2m    - locator resolved to <select id=\"client_id\" name=\"client_id\">…</select>\u001b[22m\n\u001b[2m  - attempting select option action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible and enabled\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying select option action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible and enabled\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying select option action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    29 × waiting for element to be visible and enabled\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying select option action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n"
+    },
+    {
+      "id": 386,
+      "jobId": 20,
+      "sequence": 7,
+      "createdAt": "2026-09-21T23:19:04.005Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "filter_client",
+        "outcome": "failed",
+        "targetDescription": {
+          "component": "Dropdown",
+          "selector": "id='client_id'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "error": "ACTION_FAILED: locator.selectOption: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel(/^\\s*Select client\\s*:?\\s*$/i).first()\u001b[22m\n\u001b[2m    - locator resolved to <select id=\"client_id\" name=\"client_id\">…</select>\u001b[22m\n\u001b[2m  - attempting select option action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible and enabled\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying select option action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible and enabled\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying select option action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    29 × waiting for element to be visible and enabled\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying select option action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n",
+        "action": "select"
+      }
+    },
+    {
+      "id": 387,
+      "jobId": 20,
+      "sequence": 8,
+      "createdAt": "2026-09-21T23:19:04.540Z",
+      "jobStatusId": 6,
+      "kind": 1,
+      "text": "Step filter_client failed with no matching recoverable scenario"
+    },
+    {
+      "id": 388,
+      "jobId": 20,
+      "sequence": 9,
+      "createdAt": "2026-09-21T23:21:09.383Z",
+      "jobStatusId": 8,
+      "kind": 1,
+      "text": "Control taken by operator 507905fb-77de-4ad8-822d-3eb20f82d74f"
+    },
+    {
+      "id": 389,
+      "jobId": 20,
+      "sequence": 10,
+      "createdAt": "2026-09-21T23:22:10.252Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "intervention-6",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "click"
+      }
+    },
+    {
+      "id": 390,
+      "jobId": 20,
+      "sequence": 11,
+      "createdAt": "2026-09-21T23:22:15.907Z",
+      "jobStatusId": 8,
+      "kind": 1,
+      "text": "Control handed back by operator 507905fb-77de-4ad8-822d-3eb20f82d74f, resuming at step handle_invoice_result"
+    },
+    {
+      "id": 391,
+      "jobId": 20,
+      "sequence": 12,
+      "createdAt": "2026-09-21T23:22:17.102Z",
+      "jobStatusId": 2,
+      "kind": 1,
+      "text": "Resuming at step handle_invoice_result"
+    },
+    {
+      "id": 392,
+      "jobId": 20,
+      "sequence": 13,
+      "createdAt": "2026-09-21T23:22:18.048Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "assign_null_invoice_id",
+        "outcome": "succeeded",
+        "parentStepId": "handle_invoice_result",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "fieldName": "invoice_id",
+            "safeValue": "••••••",
+            "sensitivityType": 3
+          }
+        ],
+        "action": "assign"
+      }
+    },
+    {
+      "id": 393,
+      "jobId": 20,
+      "sequence": 14,
+      "createdAt": "2026-09-21T23:22:19.694Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "assign_null_invoice_amount",
+        "outcome": "succeeded",
+        "parentStepId": "handle_invoice_result",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "fieldName": "invoice_amount",
+            "safeValue": "••••••",
+            "sensitivityType": 3
+          }
+        ],
+        "action": "assign"
+      }
+    },
+    {
+      "id": 394,
+      "jobId": 20,
+      "sequence": 15,
+      "createdAt": "2026-09-21T23:22:21.716Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "assign_null_invoice_total",
+        "outcome": "succeeded",
+        "parentStepId": "handle_invoice_result",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "fieldName": "invoice_total",
+            "safeValue": "••••••",
+            "sensitivityType": 3
+          }
+        ],
+        "action": "assign"
+      }
+    },
+    {
+      "id": 395,
+      "jobId": 20,
+      "sequence": 16,
+      "createdAt": "2026-09-21T23:22:23.198Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "finish",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "finish"
+      }
+    },
+    {
+      "id": 396,
+      "jobId": 20,
+      "sequence": 17,
+      "createdAt": "2026-09-21T23:22:24.450Z",
+      "jobStatusId": 3,
+      "kind": 1,
+      "text": "Recipe finished"
+    }
+  ],
+  "results": [
+    {
+      "fieldName": "invoice_amount",
+      "safeValue": "••••••",
+      "sensitivityType": 3
+    },
+    {
+      "fieldName": "invoice_id",
+      "safeValue": "••••••",
+      "sensitivityType": 3
+    },
+    {
+      "fieldName": "invoice_total",
+      "safeValue": "••••••",
+      "sensitivityType": 3
+    }
+  ],
+  "ingredients": [
+    {
+      "fieldName": "companyName",
+      "safeValue": "John Smith",
+      "sensitivityType": 1
+    },
+    {
+      "fieldName": "startingUrl",
+      "safeValue": "http://localhost:8089",
+      "sensitivityType": 1
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 260,
+      "stepId": "open_start",
+      "createdAt": "2026-09-21T23:18:45.543Z"
+    },
+    {
+      "id": 261,
+      "stepId": "fill_email",
+      "createdAt": "2026-09-21T23:18:46.158Z"
+    },
+    {
+      "id": 262,
+      "stepId": "fill_password",
+      "createdAt": "2026-09-21T23:18:46.782Z"
+    },
+    {
+      "id": 263,
+      "stepId": "submit_login",
+      "createdAt": "2026-09-21T23:18:47.629Z"
+    },
+    {
+      "id": 264,
+      "stepId": "open_invoices",
+      "createdAt": "2026-09-21T23:18:48.313Z"
+    },
+    {
+      "id": 265,
+      "stepId": "filter_client",
+      "createdAt": "2026-09-21T23:19:04.410Z"
+    },
+    {
+      "id": 266,
+      "stepId": "intervention-6",
+      "createdAt": "2026-09-21T23:22:10.753Z"
+    },
+    {
+      "id": 267,
+      "stepId": "assign_null_invoice_id",
+      "createdAt": "2026-09-21T23:22:19.375Z"
+    },
+    {
+      "id": 268,
+      "stepId": "assign_null_invoice_amount",
+      "createdAt": "2026-09-21T23:22:21.439Z"
+    },
+    {
+      "id": 269,
+      "stepId": "assign_null_invoice_total",
+      "createdAt": "2026-09-21T23:22:22.924Z"
+    },
+    {
+      "id": 270,
+      "stepId": "finish",
+      "createdAt": "2026-09-21T23:22:24.140Z"
+    },
+    {
+      "id": 271,
+      "stepId": "terminal",
+      "createdAt": "2026-09-21T23:22:25.488Z"
+    }
+  ]
+}

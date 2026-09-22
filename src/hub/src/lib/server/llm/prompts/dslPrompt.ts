@@ -25,9 +25,11 @@ An enumerated action and typed args array avoid parsing instruction strings. IDs
 - **1+ matches:** "exists" is true when any match exists.
 - **No matches:** state tests return false; actions/read fail. Multiple matches for a one-element operation are an error.
 
-Point x/y is relative to the full-page screenshot. Points support "click" and "read". For read, the HTML input will be resolved at the point and it's value read.
-
-Values are scalars or {"ref":"input"|"output"|"credential","name":"…"}. Inputs are Ingredients; outputs are collected fields; credentials resolve from a pre-defined set. Destinations are output references. Missing references fail; assigned null is still assigned.
+- Point x/y is relative to the full-page screenshot. Points support "click" and "read". For read, the HTML input will be resolved at the point and it's value read.
+- Values are scalars or {"ref":"input"|"output"|"credential","name":"…"}. 
+- Inputs are Ingredients; outputs are collected fields; credentials resolve from a pre-defined set. 
+- Destinations are output references. 
+- Missing references fail; assigned null is still assigned.
 
 ## Actions
 
@@ -52,7 +54,13 @@ Values are scalars or {"ref":"input"|"output"|"credential","name":"…"}. Inputs
 | finish | [C or null] | Confirm completion and validate Recipe outputs |
 | fail | [code,message] | Business failure / Completed-Failed |
 
-"fill" is "select this field and type into it," including editable HTML; clearing is fill with "". "text" copies innerText; "value" copies the raw input/textarea/select string. "number" reads a control value when available, otherwise innerText, trims it, and converts the entire string with "Number": empty → null, nonfinite/invalid → failure. No native number-input requirement or partial parsing. A ReadSpec {"source":"text"|"value","extract":{"by":"regex","pattern":"…","group":1|"name"},"parse":"string"|"number"} reads the source, requires exactly one regex match, and returns the selected capture unchanged ("parse" defaults to "string") or, for "number", converted like "number". "exact" is valid only on text targets. Date-like values use text/value unchanged; date types and interpretation are deferred. Results can include the runner timezone as separate metadata, without claiming it is the application's timezone.
+- "fill" is "select this field and type into it," including editable HTML; clearing is fill with "". 
+- "text" copies innerText; "value" copies the raw input/textarea/select string. 
+- "number" reads a control value when available, otherwise innerText, trims it, and converts the entire string with "Number": empty → null, nonfinite/invalid → failure. No native number-input requirement or partial parsing. 
+- A ReadSpec {"source":"text"|"value","extract":{"by":"regex","pattern":"…","group":1|"name"},"parse":"string"|"number"} reads the source, requires exactly one regex match, and returns the selected capture unchanged ("parse" defaults to "string") or, for "number", converted like "number". 
+- "exact" is valid only on text targets. Date-like values use text/value unchanged; date types and interpretation are deferred. 
+- Results can include the runner timezone as separate metadata, without claiming it is the application's timezone.
+- Groups cannot be nested. A set of steps with nested groups will be rejected.
 
 ## Conditions
 
@@ -69,4 +77,7 @@ Values are scalars or {"ref":"input"|"output"|"credential","name":"…"}. Inputs
 
 The search example verifies 'any(visible "No results", visible Open account button)' before branching, so the expected not-found page satisfies the wait too. Both all/any require a nonempty list.
 
-"check", branch guards, and recovery guards observe the current state. "verify" waits, using the Job's single "stepTimeoutMs". Visible does not guarantee enabled or unobstructed; click/fill perform their own actionability checks. Interactability is checked by attempting the action, without a separate test.`;
+- "check", branch guards, and recovery guards observe the current state. 
+- "verify" waits, using the Job's single "stepTimeoutMs". 
+- Visible does not guarantee enabled or unobstructed; click/fill perform their own actionability checks. 
+- Interactability is checked by attempting the action, without a separate test.`;

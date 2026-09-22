@@ -28,7 +28,7 @@ const BASE = {
 };
 
 describe("buildJobExport", () => {
-	it("pairs a Recipe Job's definition with its transcript", () => {
+	it("exports a Recipe Job as-is", () => {
 		const recipe: RecipeDefinition = { schemaVersion: 1, inputs: {}, outputs: {}, steps: [], recoveries: [] };
 		const job: JobDetail = {
 			...BASE,
@@ -37,10 +37,10 @@ describe("buildJobExport", () => {
 			recipe
 		};
 
-		expect(buildJobExport(job)).toEqual({ recipe, transcript: job });
+		expect(buildJobExport(job)).toEqual(job);
 	});
 
-	it("pairs a Training Run's saved Steps and ingredients with its transcript", () => {
+	it("wraps a Training Run's transcript", () => {
 		const steps: Step[] = [{ id: "open_home", action: "open", args: ["https://example.test"] }];
 		const job: JobDetail = {
 			...BASE,
@@ -57,6 +57,6 @@ describe("buildJobExport", () => {
 			steps
 		};
 
-		expect(buildJobExport(job)).toEqual({ run: { steps, ingredients: BASE.ingredients }, transcript: job });
+		expect(buildJobExport(job)).toEqual({ transcript: job });
 	});
 });

@@ -149,6 +149,11 @@ export async function reportDslStep(
 			JobStatus.CompletedSuccess
 		);
 
+		// Compilation is its own LLM call and can take a while — this Plan entry gives the
+		// transcript something to show for that gap instead of leaving Completed-Success as the
+		// last visible row until the draft Recipe (or a failure) eventually appears.
+		appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Plan, "Building Trial Recipe from this successful run…", now);
+
 		// A compilation failure is recorded but never flips the Job's already-Completed-Success
 		// status, and never leaves a partially-written/updated draft Recipe (R007) — createDraftRecipe
 		// itself re-validates before persisting.
@@ -170,12 +175,13 @@ export async function reportDslStep(
 				createdAt: now,
 				knownCredentialNames
 			});
+			appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Plan, `Trial Recipe "${name}" created`, now);
 		}
 		catch (err) {
 			if (!(err instanceof RecipeCompilationInvalidResponseError)) {
 				throw err;
 			}
-			appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Info, `Recipe compilation failed: ${err.message}`, now);
+			appendAutoSequencedTranscriptEntry(db, job.id, TranscriptKind.Plan, `Recipe compilation failed: ${err.message}`, now);
 		}
 
 		return { status: 200, body: { data: { jobStatusId: JobStatus.CompletedSuccess } } };

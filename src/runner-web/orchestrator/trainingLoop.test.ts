@@ -135,7 +135,7 @@ describe("runTrainingJobLoop: happy path", () => {
 
 		await runTrainingJobLoop(config, job);
 
-		expect(takeMaskedScreenshot).toHaveBeenCalledWith(expect.anything(), ["hunter2"], true);
+		expect(takeMaskedScreenshot).toHaveBeenCalledWith(expect.anything(), 42, ["hunter2"], true);
 	}, 20000);
 });
 

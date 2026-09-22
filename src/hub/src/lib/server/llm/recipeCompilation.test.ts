@@ -6,6 +6,11 @@ import { sendChatCompletion } from "./llmClient";
 import type { RecipeCompilationContext } from "./recipeCompilation";
 
 vi.mock("./llmClient", () => ({ sendChatCompletion: vi.fn() }));
+// The real virtual module is resolved once at Vite/SvelteKit startup from the developer's .env,
+// so vite.config.ts's test `env` block can't override it here — pin maxCorrectionAttempts directly.
+vi.mock("$env/dynamic/private", () => ({
+	env: { LLM_API_URL: "http://127.0.0.1:1/v1", LLM_API_KEY: "test-fake-llm-key", LLM_MODEL: "test-fake-llm-model", LLM_MAX_CORRECTION_ATTEMPTS: "2" }
+}));
 
 const mockedSendChatCompletion = vi.mocked(sendChatCompletion);
 

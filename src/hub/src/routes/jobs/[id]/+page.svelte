@@ -202,6 +202,7 @@
 				<div class="job-page-side">
 					<ResultsPanel results={job.results} />
 					<GoalsPanel goal={job.details.goal} allowlist={job.details.allowlist} />
+					<ScreenshotPanel jobId={job.id} artifacts={job.artifacts} />
 				</div>
 			</div>
 			<StartTrainingModal

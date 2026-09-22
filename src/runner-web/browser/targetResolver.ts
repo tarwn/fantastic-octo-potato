@@ -32,7 +32,9 @@ function labelPattern(value: string): RegExp {
 function toLocator(page: Page, target: ResolvedTargetElement): Locator {
 	switch (target.by) {
 		case "text":
-			return page.getByText(target.value, { exact: target.exact ?? true });
+			// getByText matches DOM text regardless of rendering, so hidden <option>s (e.g. a
+			// client-filter <select>) collide with visible text elsewhere on the page.
+			return page.getByText(target.value, { exact: target.exact ?? true }).filter({ visible: true });
 		case "label":
 			return page.getByLabel(labelPattern(target.value));
 		case "placeholder":

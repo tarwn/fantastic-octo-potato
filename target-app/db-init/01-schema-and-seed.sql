@@ -141,14 +141,21 @@ INSERT INTO bamboo_clients
 	(id, name, address1, address2, city, province, country, postal_code, website, tax_status)
 VALUES
 	(1, 'Contoso Consulting', '123 Market St', NULL, 'Springfield', 'IL', 'USA', '62701', 'https://contoso.example', 1),
-	(2, 'Fabrikam Design', '456 Oak Ave', NULL, 'Shelbyville', 'IL', 'USA', '62702', 'https://fabrikam.example', 1);
+	(2, 'Fabrikam Design', '456 Oak Ave', NULL, 'Shelbyville', 'IL', 'USA', '62702', 'https://fabrikam.example', 1),
+	(3, 'John Smith', '789 Main St', NULL, 'Chicago', 'IL', 'USA', '62703', 'https://facebook.com/12345', 1);
 
+-- tax2_rate must be set (not left NULL) even though these fixtures don't use a
+-- second tax: BambooInvoice's total/subtotal queries compute
+-- `tax1_rate/100 + tax2_rate/100` inline, so a NULL tax2_rate poisons the whole
+-- SUM(...) to NULL and the app renders the invoice total as $0.
 INSERT INTO bamboo_invoices
-	(id, client_id, invoice_number, dateIssued, payment_term, tax1_desc, tax1_rate, invoice_note, days_payment_due)
+	(id, client_id, invoice_number, dateIssued, payment_term, tax1_desc, tax1_rate, tax2_rate, invoice_note, days_payment_due)
 VALUES
-	(1, 1, 'INV-1001', '2026-01-15', 'Net 30', 'Sales Tax', 6.250, 'Seed data for the local target app', 30);
+	(1, 1, 'INV-1001', '2026-08-15', 'Net 30', 'Sales Tax', 6.250, 0.000, 'Seed data for the local target app', 30),
+	(2, 3, 'INV-1002', '2026-09-15', 'Net 30', 'Sales Tax', 6.250, 0.000, 'phone: 555-123-4567, cc: 4111-1111-1111-1111', 30);
 
 INSERT INTO bamboo_invoice_items
 	(id, invoice_id, amount, quantity, work_description, taxable)
 VALUES
-	(1, 1, 1200.00, 1, 'Website redesign - seed data', 1);
+	(1, 1, 1200.00, 1, 'Website redesign - seed data', 1),
+	(2, 2, 500.00, 1, 'Website redesign - seed data', 1);

@@ -27,7 +27,7 @@ export interface StepReportingDeps {
 // scrub still always applies (screenshotMasking.ts).
 export async function captureAndUploadArtifact(deps: StepReportingDeps, stepId: string, skipPiiPass = false): Promise<boolean> {
 	try {
-		const screenshot = await takeMaskedScreenshot(deps.page, deps.secrets, skipPiiPass);
+		const screenshot = await takeMaskedScreenshot(deps.page, deps.jobId, deps.secrets, skipPiiPass);
 		await uploadArtifact(deps.config, deps.artifactsUrl, stepId, screenshot.toString("base64"));
 		return true;
 	}

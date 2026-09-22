@@ -1,6 +1,8 @@
 import { Redactor } from "@redactpii/node";
 import type { Page } from "playwright";
 
+import { log } from "../logger.ts";
+
 interface ScannedElement {
 	text: string;
 	controlValue: string;
@@ -29,18 +31,32 @@ function isSensitive(element: { text: string; controlValue: string }, secrets: s
 // page.evaluate) so the PII-detection library never has to run in the browser's page context.
 // `skipPiiPass` (set from Training's operator-confirmed "this data is synthetic" flag) only ever
 // disables the third-party PII-detection pass — the known-secrets scrub above always still applies.
-export async function takeMaskedScreenshot(page: Page, secrets: string[], skipPiiPass = false): Promise<Buffer> {
+// Always captures the full scrollable page, not just the viewport — steps-dsl.md's point target
+// and the compiled Recipe's artifact coordinates are both defined relative to the full-page image.
+export async function takeMaskedScreenshot(page: Page, jobId: number, secrets: string[], skipPiiPass = false): Promise<Buffer> {
 	// Filtered in-browser (not just mapped) so non-visual elements and empty leaf nodes never cross
 	// the Playwright protocol boundary as part of the per-screenshot scan payload.
 	const NON_VISUAL_TAGS = new Set(["SCRIPT", "STYLE", "HEAD", "META", "LINK", "TITLE"]);
 	const elements = await page.evaluate((skipTags: string[]): ScannedElement[] => {
 		const skip = new Set(skipTags);
 		const results: ScannedElement[] = [];
+		// `el.textContent` pulls every descendant's text too, so a container (body, a wrapper div)
+		// would otherwise inherit its children's sensitive text and get its own — often full-page —
+		// rect masked along with theirs. Only an element's own direct text nodes count here.
+		const ownText = (el: Element): string => {
+			let text = "";
+			for (const node of el.childNodes) {
+				if (node.nodeType === Node.TEXT_NODE) {
+					text += node.textContent;
+				}
+			}
+			return text.trim();
+		};
 		document.querySelectorAll("*").forEach((el) => {
 			if (skip.has(el.tagName)) {
 				return;
 			}
-			const text = el.textContent?.trim() ?? "";
+			const text = ownText(el);
 			const controlValue = (el as HTMLInputElement).value ?? "";
 			if (text === "" && controlValue === "") {
 				return;
@@ -53,8 +69,15 @@ export async function takeMaskedScreenshot(page: Page, secrets: string[], skipPi
 
 	const rectsToMask = elements.filter((element) => isSensitive(element, secrets, skipPiiPass)).map((element) => element.rect);
 	if (rectsToMask.length === 0) {
-		return page.screenshot();
+		return page.screenshot({ fullPage: true });
 	}
+
+	// Debug aid for diagnosing whether an unexpectedly blank/masked screenshot is real redaction
+	// (and where) versus some other screenshot failure.
+	const rectDescriptions = rectsToMask
+		.map((rect) => `x=${rect.left} y=${rect.top} width=${rect.width} height=${rect.height}`)
+		.join(", ");
+	log(`job ${jobId}: redacting ${rectsToMask.length} element(s) from screenshot: ${rectDescriptions}`);
 
 	await page.evaluate((rects: ScannedElement["rect"][]) => {
 		const overlay = document.createElement("div");
@@ -68,12 +91,19 @@ export async function takeMaskedScreenshot(page: Page, secrets: string[], skipPi
 			patch.style.height = `${rect.height}px`;
 			patch.style.background = "black";
 			patch.style.zIndex = "2147483647";
+			patch.style.display = "flex";
+			patch.style.alignItems = "center";
+			patch.style.justifyContent = "center";
+			patch.style.overflow = "hidden";
+			patch.style.color = "white";
+			patch.style.fontSize = "12px";
+			patch.textContent = "REDACTED";
 			overlay.appendChild(patch);
 		}
 		document.body.appendChild(overlay);
 	}, rectsToMask);
 	try {
-		return await page.screenshot();
+		return await page.screenshot({ fullPage: true });
 	}
 	finally {
 		await page.evaluate(() => document.getElementById("__dsl_mask_overlay__")?.remove());

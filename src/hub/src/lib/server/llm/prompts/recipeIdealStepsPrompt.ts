@@ -18,6 +18,7 @@ Respond with ONLY a single JSON object shaped like:
 
 - Produce the shortest sequence that reliably achieves the goal from a fresh browser: drop dead
   ends, retries, failed Steps, and reads of values that are not in outputs.
+- Be cautious using new selectors that were not tested in the successful transcript
 - Every Step needs a unique id and an intent. "if" and "group" are allowed; use "if" only where the
   journal shows the page can legitimately differ between runs.
 - A read with a structured spec (extract by regex, "exact": false text target) is understood as

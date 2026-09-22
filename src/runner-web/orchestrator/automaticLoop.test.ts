@@ -134,9 +134,9 @@ describe("runRecipeJobLoop: happy path", () => {
 		// than reading it back off `mock.calls` afterwards) is what lets earlier calls be distinguished
 		// from later ones.
 		const secretsSnapshots: string[][] = [];
-		vi.mocked(takeMaskedScreenshot).mockImplementation(async (page, secrets) => {
+		vi.mocked(takeMaskedScreenshot).mockImplementation(async (page, jobId, secrets) => {
 			secretsSnapshots.push([...secrets]);
-			return realTakeMaskedScreenshot(page, secrets);
+			return realTakeMaskedScreenshot(page, jobId, secrets);
 		});
 
 		await runRecipeJobLoop(config, job, 300);

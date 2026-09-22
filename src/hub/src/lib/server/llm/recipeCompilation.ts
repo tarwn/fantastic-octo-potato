@@ -66,7 +66,7 @@ export interface CompiledRecipe {
 export async function compileRecipe(context: RecipeCompilationContext): Promise<CompiledRecipe> {
 	const schema = await runStage("schema", RECIPE_SCHEMA_SYSTEM_PROMPT, buildSchemaUserPrompt(context), (raw) => parseCompiledSchema(raw, context));
 	const steps = await runStage("steps", RECIPE_IDEAL_STEPS_SYSTEM_PROMPT, buildStepsUserPrompt(context, schema), (raw) =>
-		parseIdealSteps(raw, schema, context)
+		parseIdealSteps(raw, schema, context), true
 	);
 	const recoveries = await runStage("recoveries", RECIPE_RECOVERIES_SYSTEM_PROMPT, buildRecoveriesUserPrompt(context, schema, steps), (raw) =>
 		parseRecoveries(raw, schema, steps, context)
@@ -76,13 +76,41 @@ export async function compileRecipe(context: RecipeCompilationContext): Promise<
 }
 
 // Each stage retries on its own so a later stage never re-pays for an earlier one's valid answer.
-async function runStage<T>(stage: string, systemPrompt: string, userPrompt: string, parse: (raw: string) => T): Promise<T> {
+async function runStage<T>(stage: string, systemPrompt: string, userPrompt: string, parse: (raw: string) => T, askForCorrectionOnRetry?: boolean): Promise<T> {
 	const { maxCorrectionAttempts } = requireLlmConfig();
 	let lastError: unknown;
+	let lastRaw: string = "";
 	for (let attempt = 1; attempt <= maxCorrectionAttempts; attempt++) {
-		const raw = await sendChatCompletion({ systemPrompt, userPrompt });
+		if(!lastError || !askForCorrectionOnRetry){
+			lastRaw = await sendChatCompletion({ systemPrompt, userPrompt });
+		}
+		else if (attempt < maxCorrectionAttempts) {
+			const followUp = `
+			Your last response had an error: 
+			---
+			${(lastError as Error).message}
+			---
+
+			Your response was:
+			---
+			${lastRaw}
+			---
+
+			Use this information to correct the steps. Return the steps as pure JSON, No prose, no markdown fences.
+			`;
+			lastRaw = await sendChatCompletion({ systemPrompt, userPrompt, followUp });
+		}
+		else {
+			const followUp = `
+			Your last response had an error. To make this easier, go through the journal and identify the steps that were successful, do not access outputs that are missing from the output list, and are necessary to complete the goal. Copy those steps in the same order for the steps array in your output.
+
+			Return the steps as pure JSON, No prose, no markdown fences.
+			`;
+			lastRaw = await sendChatCompletion({ systemPrompt, userPrompt, followUp });
+		}
+
 		try {
-			return parse(raw);
+			return parse(lastRaw);
 		}
 		catch (err) {
 			lastError = err;

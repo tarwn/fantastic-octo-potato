@@ -8,6 +8,7 @@ import { requireLlmConfig } from "./llmConfig";
 export interface ChatCompletionRequest {
 	systemPrompt: string;
 	userPrompt: string;
+	followUp?: string;
 	// Base64-encoded PNG bytes (no data-URL prefix) for a masked screenshot, when the caller has
 	// one — sent as an OpenAI-scheme vision content part alongside the text prompt. The caller is
 	// responsible for masking (R011); this function never inspects the image.
@@ -24,8 +25,24 @@ function buildUserContent(userPrompt: string, userImagePngBase64: string | undef
 	];
 }
 
-export async function sendChatCompletion({ systemPrompt, userPrompt, userImagePngBase64 }: ChatCompletionRequest): Promise<string> {
+export async function sendChatCompletion({ systemPrompt, userPrompt, followUp, userImagePngBase64 }: ChatCompletionRequest): Promise<string> {
 	const { baseUrl, apiKey, model } = requireLlmConfig();
+
+	const messages = [
+		{ role: "system", content: systemPrompt },
+		{ role: "user", content: buildUserContent(userPrompt, userImagePngBase64) }
+	];
+	if(followUp) messages.push({ role: "user", content: followUp });
+
+	console.log("=== LLM Message Sending... ===");
+	console.log("System Prompt: \n" + systemPrompt);
+	console.log("--");
+	console.log("Message: \n" + messages[1].content);
+	if(followUp) {
+		console.log("--");
+		console.log("Followup: \n" + followUp);
+	}
+	console.log("=====");
 
 	const response = await fetch(`${baseUrl}/chat/completions`, {
 		method: "POST",
@@ -35,22 +52,25 @@ export async function sendChatCompletion({ systemPrompt, userPrompt, userImagePn
 		},
 		body: JSON.stringify({
 			model,
-			messages: [
-				{ role: "system", content: systemPrompt },
-				{ role: "user", content: buildUserContent(userPrompt, userImagePngBase64) }
-			]
+			messages
 		})
 	});
 
 	if (!response.ok) {
+		console.log("LLM Response !ok");
+		console.log("=====");
 		throw new Error(`LLM request failed with status ${response.status}: ${await response.text()}`);
 	}
 
 	const body: unknown = await response.json();
 	const content = extractMessageContent(body);
 	if (content === undefined) {
+		console.log("LLM Response: content undefined");
+		console.log("=====");
 		throw new Error(`LLM response did not match the expected chat-completion schema: ${JSON.stringify(body)}`);
 	}
+	console.log("LLM Response:\n" + content);
+	console.log("=====");
 	return content;
 }
 

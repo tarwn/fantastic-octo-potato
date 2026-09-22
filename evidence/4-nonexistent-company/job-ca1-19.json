@@ -1,0 +1,623 @@
+{
+  "id": 19,
+  "name": "Get active invoice details",
+  "customerApplicationXrefId": 1,
+  "jobStatusId": 3,
+  "runnerId": 1,
+  "createdAt": "2026-09-21T23:09:30.232Z",
+  "startedAt": "2026-09-21T23:09:44.003Z",
+  "heartbeatOn": "2026-09-21T23:09:50.844Z",
+  "completedAt": "2026-09-21T23:09:50.844Z",
+  "interventionOwner": null,
+  "blockedStepId": null,
+  "blockedReason": null,
+  "resumeStepId": null,
+  "jobType": 2,
+  "details": {
+    "recipeId": 12,
+    "mode": "Execute",
+    "allowlist": "http://localhost:8089",
+    "stepTimeoutMs": 15000
+  },
+  "recipe": {
+    "schemaVersion": 1,
+    "inputs": {
+      "companyName": {
+        "type": "string",
+        "description": "The company name to search for in the invoice list.",
+        "required": true,
+        "nullable": false,
+        "sensitive": false
+      },
+      "startingUrl": {
+        "type": "string",
+        "description": "The URL of the Bamboo application.",
+        "required": true,
+        "nullable": false,
+        "sensitive": false
+      }
+    },
+    "outputs": {
+      "invoice_amount": {
+        "type": "string",
+        "description": "The active invoice amount, including its currency symbol, or null if no active invoice exists.",
+        "required": true,
+        "nullable": true,
+        "sensitive": true
+      },
+      "invoice_id": {
+        "type": "string",
+        "description": "The active invoice identifier, or null if no active invoice exists.",
+        "required": true,
+        "nullable": true,
+        "sensitive": true
+      },
+      "invoice_total": {
+        "type": "string",
+        "description": "The active invoice total, including its currency symbol, or null if no active invoice exists.",
+        "required": true,
+        "nullable": true,
+        "sensitive": true
+      }
+    },
+    "steps": [
+      {
+        "id": "open_starting_url",
+        "action": "open",
+        "args": [
+          {
+            "ref": "input",
+            "name": "startingUrl"
+          }
+        ],
+        "intent": "Open Bamboo"
+      },
+      {
+        "id": "enter_login_name",
+        "action": "fill",
+        "args": [
+          {
+            "by": "css",
+            "value": "input[type='text']:nth-of-type(1)"
+          },
+          {
+            "ref": "credential",
+            "name": "username"
+          }
+        ],
+        "intent": "Enter username"
+      },
+      {
+        "id": "enter_password",
+        "action": "fill",
+        "args": [
+          {
+            "by": "label",
+            "value": "Password"
+          },
+          {
+            "ref": "credential",
+            "name": "password"
+          }
+        ],
+        "intent": "Enter password"
+      },
+      {
+        "id": "submit_credentials",
+        "action": "click",
+        "args": [
+          {
+            "by": "css",
+            "value": "form input[type='submit']"
+          }
+        ],
+        "intent": "Submit login"
+      },
+      {
+        "id": "open_invoices",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": "Invoices"
+          }
+        ],
+        "intent": "Open invoice list"
+      },
+      {
+        "id": "handle_company_invoice",
+        "action": "if",
+        "args": [
+          [
+            {
+              "when": {
+                "test": "exists",
+                "args": [
+                  {
+                    "by": "text",
+                    "value": {
+                      "ref": "input",
+                      "name": "companyName"
+                    },
+                    "exact": false
+                  }
+                ]
+              },
+              "steps": [
+                {
+                  "id": "open_company_invoice",
+                  "action": "click",
+                  "args": [
+                    {
+                      "by": "text",
+                      "value": {
+                        "ref": "input",
+                        "name": "companyName"
+                      },
+                      "exact": true
+                    }
+                  ],
+                  "intent": "Open company invoice"
+                },
+                {
+                  "id": "capture_invoice_id",
+                  "action": "read",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "body"
+                    },
+                    {
+                      "source": "text",
+                      "extract": {
+                        "by": "regex",
+                        "pattern": "Invoice\\s+(?<value>INV-[A-Za-z0-9-]+)",
+                        "group": "value"
+                      },
+                      "parse": "string"
+                    },
+                    {
+                      "ref": "output",
+                      "name": "invoice_id"
+                    }
+                  ],
+                  "intent": "Capture invoice ID"
+                },
+                {
+                  "id": "capture_invoice_amount",
+                  "action": "read",
+                  "args": [
+                    {
+                      "by": "text",
+                      "value": "Amount:",
+                      "exact": false
+                    },
+                    {
+                      "source": "text",
+                      "extract": {
+                        "by": "regex",
+                        "pattern": "Amount:\\s*(?<value>\\$\\d+\\.\\d{2})",
+                        "group": "value"
+                      },
+                      "parse": "string"
+                    },
+                    {
+                      "ref": "output",
+                      "name": "invoice_amount"
+                    }
+                  ],
+                  "intent": "Capture invoice amount"
+                },
+                {
+                  "id": "capture_invoice_total",
+                  "action": "read",
+                  "args": [
+                    {
+                      "by": "css",
+                      "value": "body"
+                    },
+                    {
+                      "source": "text",
+                      "extract": {
+                        "by": "regex",
+                        "pattern": "Total:\\s*(?<value>\\$[0-9,]+\\.\\d{2})",
+                        "group": "value"
+                      },
+                      "parse": "string"
+                    },
+                    {
+                      "ref": "output",
+                      "name": "invoice_total"
+                    }
+                  ],
+                  "intent": "Capture invoice total"
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "id": "assign_null_invoice_id",
+              "action": "assign",
+              "args": [
+                {
+                  "ref": "output",
+                  "name": "invoice_id"
+                },
+                null
+              ],
+              "intent": "Set invoice ID null"
+            },
+            {
+              "id": "assign_null_invoice_amount",
+              "action": "assign",
+              "args": [
+                {
+                  "ref": "output",
+                  "name": "invoice_amount"
+                },
+                null
+              ],
+              "intent": "Set invoice amount null"
+            },
+            {
+              "id": "assign_null_invoice_total",
+              "action": "assign",
+              "args": [
+                {
+                  "ref": "output",
+                  "name": "invoice_total"
+                },
+                null
+              ],
+              "intent": "Set invoice total null"
+            }
+          ]
+        ],
+        "intent": "Handle invoice result"
+      },
+      {
+        "id": "finish",
+        "action": "finish",
+        "args": [
+          {
+            "test": "all",
+            "args": [
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_amount"
+                  }
+                ]
+              },
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_id"
+                  }
+                ]
+              },
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_total"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "intent": "Finish invoice lookup"
+      }
+    ],
+    "recoveries": []
+  },
+  "transcript": [
+    {
+      "id": 366,
+      "jobId": 19,
+      "sequence": -2,
+      "createdAt": "2026-09-21T23:09:30.232Z",
+      "jobStatusId": 1,
+      "kind": 1,
+      "text": "Job created, queued for a Runner"
+    },
+    {
+      "id": 367,
+      "jobId": 19,
+      "sequence": -1,
+      "createdAt": "2026-09-21T23:09:44.003Z",
+      "jobStatusId": 2,
+      "kind": 1,
+      "text": "Picked up by Runner 1"
+    },
+    {
+      "id": 368,
+      "jobId": 19,
+      "sequence": 1,
+      "createdAt": "2026-09-21T23:09:45.027Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "open_starting_url",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "browser",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "open"
+      }
+    },
+    {
+      "id": 369,
+      "jobId": 19,
+      "sequence": 2,
+      "createdAt": "2026-09-21T23:09:45.723Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "enter_login_name",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "text input",
+          "selector": "id='username'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "fill"
+      }
+    },
+    {
+      "id": 370,
+      "jobId": 19,
+      "sequence": 3,
+      "createdAt": "2026-09-21T23:09:46.366Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "enter_password",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "password input",
+          "selector": "id='password'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "fill"
+      }
+    },
+    {
+      "id": 371,
+      "jobId": 19,
+      "sequence": 4,
+      "createdAt": "2026-09-21T23:09:47.282Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "submit_credentials",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "button",
+          "selector": "id='login'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "click"
+      }
+    },
+    {
+      "id": 372,
+      "jobId": 19,
+      "sequence": 5,
+      "createdAt": "2026-09-21T23:09:47.911Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "open_invoices",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "link",
+          "selector": "text='Invoices'"
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "click"
+      }
+    },
+    {
+      "id": 373,
+      "jobId": 19,
+      "sequence": 6,
+      "createdAt": "2026-09-21T23:09:48.520Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "assign_null_invoice_id",
+        "outcome": "succeeded",
+        "parentStepId": "handle_company_invoice",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "fieldName": "invoice_id",
+            "safeValue": "••••••",
+            "sensitivityType": 3
+          }
+        ],
+        "action": "assign"
+      }
+    },
+    {
+      "id": 374,
+      "jobId": 19,
+      "sequence": 7,
+      "createdAt": "2026-09-21T23:09:49.135Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "assign_null_invoice_amount",
+        "outcome": "succeeded",
+        "parentStepId": "handle_company_invoice",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "fieldName": "invoice_amount",
+            "safeValue": "••••••",
+            "sensitivityType": 3
+          }
+        ],
+        "action": "assign"
+      }
+    },
+    {
+      "id": 375,
+      "jobId": 19,
+      "sequence": 8,
+      "createdAt": "2026-09-21T23:09:49.782Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "assign_null_invoice_total",
+        "outcome": "succeeded",
+        "parentStepId": "handle_company_invoice",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [
+          {
+            "fieldName": "invoice_total",
+            "safeValue": "••••••",
+            "sensitivityType": 3
+          }
+        ],
+        "action": "assign"
+      }
+    },
+    {
+      "id": 376,
+      "jobId": 19,
+      "sequence": 9,
+      "createdAt": "2026-09-21T23:09:50.369Z",
+      "jobStatusId": null,
+      "kind": 3,
+      "text": {
+        "stepId": "finish",
+        "outcome": "succeeded",
+        "targetDescription": {
+          "component": "element",
+          "selector": ""
+        },
+        "inputs": [],
+        "outputs": [],
+        "action": "finish"
+      }
+    },
+    {
+      "id": 377,
+      "jobId": 19,
+      "sequence": 10,
+      "createdAt": "2026-09-21T23:09:50.844Z",
+      "jobStatusId": 3,
+      "kind": 1,
+      "text": "Recipe finished"
+    }
+  ],
+  "results": [
+    {
+      "fieldName": "invoice_amount",
+      "safeValue": "••••••",
+      "sensitivityType": 3
+    },
+    {
+      "fieldName": "invoice_id",
+      "safeValue": "••••••",
+      "sensitivityType": 3
+    },
+    {
+      "fieldName": "invoice_total",
+      "safeValue": "••••••",
+      "sensitivityType": 3
+    }
+  ],
+  "ingredients": [
+    {
+      "fieldName": "companyName",
+      "safeValue": "asaasda",
+      "sensitivityType": 1
+    },
+    {
+      "fieldName": "startingUrl",
+      "safeValue": "http://localhost:8089",
+      "sensitivityType": 1
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 250,
+      "stepId": "open_starting_url",
+      "createdAt": "2026-09-21T23:09:45.497Z"
+    },
+    {
+      "id": 251,
+      "stepId": "enter_login_name",
+      "createdAt": "2026-09-21T23:09:46.180Z"
+    },
+    {
+      "id": 252,
+      "stepId": "enter_password",
+      "createdAt": "2026-09-21T23:09:46.783Z"
+    },
+    {
+      "id": 253,
+      "stepId": "submit_credentials",
+      "createdAt": "2026-09-21T23:09:47.686Z"
+    },
+    {
+      "id": 254,
+      "stepId": "open_invoices",
+      "createdAt": "2026-09-21T23:09:48.349Z"
+    },
+    {
+      "id": 255,
+      "stepId": "assign_null_invoice_id",
+      "createdAt": "2026-09-21T23:09:49.017Z"
+    },
+    {
+      "id": 256,
+      "stepId": "assign_null_invoice_amount",
+      "createdAt": "2026-09-21T23:09:49.671Z"
+    },
+    {
+      "id": 257,
+      "stepId": "assign_null_invoice_total",
+      "createdAt": "2026-09-21T23:09:50.273Z"
+    },
+    {
+      "id": 258,
+      "stepId": "finish",
+      "createdAt": "2026-09-21T23:09:50.754Z"
+    },
+    {
+      "id": 259,
+      "stepId": "terminal",
+      "createdAt": "2026-09-21T23:09:51.400Z"
+    }
+  ]
+}

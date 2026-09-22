@@ -1,0 +1,923 @@
+{
+  "transcript": {
+    "id": 16,
+    "name": "Training Run",
+    "customerApplicationXrefId": 1,
+    "jobStatusId": 3,
+    "runnerId": 1,
+    "createdAt": "2026-09-21T22:37:05.454Z",
+    "startedAt": "2026-09-21T22:37:13.523Z",
+    "heartbeatOn": "2026-09-21T22:38:22.100Z",
+    "completedAt": "2026-09-21T22:38:22.100Z",
+    "interventionOwner": null,
+    "blockedStepId": null,
+    "blockedReason": null,
+    "resumeStepId": null,
+    "jobType": 1,
+    "details": {
+      "goal": "Find if \\\"Contoso Consulting\\\" has an active invoice and capture the invoice id, invoice amount, and invoice total. \n\nLog into Bamboo, find the list of invoices. If \\\"Contoso Consulting\\\" does not have an active invoice then set invoice_id, invoice_amount, and invoice_total to null. If there is an invoice, capture the invoice id to invoice_id and then open the invoice and find the amount to store as invoice_amount and the total to store as invoice_total. The job is complete successfully when all 3 invoice fields (invoice_id, invoice_amount, invoice_total) are set.",
+      "startingUrl": "http://localhost:8089",
+      "allowlist": "http://localhost:8089",
+      "maxSteps": 30,
+      "alternateGoals": [],
+      "syntheticDataConfirmed": true,
+      "stepTimeoutMs": 15000,
+      "credentialNames": [
+        "password",
+        "username"
+      ]
+    },
+    "steps": [
+      {
+        "id": "open_starting_url",
+        "action": "open",
+        "args": [
+          {
+            "ref": "input",
+            "name": "startingUrl"
+          }
+        ],
+        "intent": "Open the starting URL"
+      },
+      {
+        "id": "fill username",
+        "action": "fill",
+        "args": [
+          {
+            "by": "label",
+            "value": "Username"
+          },
+          {
+            "ref": "credential",
+            "name": "username"
+          }
+        ],
+        "intent": "Enter login username"
+      },
+      {
+        "id": "enter login name",
+        "action": "fill",
+        "args": [
+          {
+            "by": "css",
+            "value": "input[type='text']:nth-of-type(1)"
+          },
+          {
+            "ref": "credential",
+            "name": "username"
+          }
+        ],
+        "intent": "Enter username"
+      },
+      {
+        "id": "enter password",
+        "action": "fill",
+        "args": [
+          {
+            "by": "label",
+            "value": "Password"
+          },
+          {
+            "ref": "credential",
+            "name": "password"
+          }
+        ],
+        "intent": "Enter login password"
+      },
+      {
+        "id": "submit login",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": "Log in"
+          }
+        ],
+        "intent": "Submit login credentials"
+      },
+      {
+        "id": "click login button",
+        "action": "click",
+        "args": [
+          {
+            "by": "css",
+            "value": "button[type='submit']"
+          }
+        ],
+        "intent": "Submit login credentials"
+      },
+      {
+        "id": "press sign in",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": "Sign in"
+          }
+        ],
+        "intent": "Submit login form"
+      },
+      {
+        "id": "click login",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": "Login"
+          }
+        ],
+        "intent": "Submit login form"
+      },
+      {
+        "id": "submit credentials",
+        "action": "click",
+        "args": [
+          {
+            "by": "css",
+            "value": "form input[type='submit']"
+          }
+        ],
+        "intent": "Submit login form"
+      },
+      {
+        "id": "open invoices",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": "Invoices"
+          }
+        ],
+        "intent": "Open invoice list"
+      },
+      {
+        "id": "check company row",
+        "action": "check",
+        "args": [
+          {
+            "test": "exists",
+            "args": [
+              {
+                "by": "text",
+                "value": {
+                  "ref": "input",
+                  "name": "companyName"
+                },
+                "exact": false
+              }
+            ]
+          }
+        ],
+        "intent": "Check for company invoice"
+      },
+      {
+        "id": "open company invoice",
+        "action": "click",
+        "args": [
+          {
+            "by": "text",
+            "value": {
+              "ref": "input",
+              "name": "companyName"
+            },
+            "exact": true
+          }
+        ],
+        "intent": "Open company invoice"
+      },
+      {
+        "id": "read invoice id",
+        "action": "read",
+        "args": [
+          {
+            "by": "text",
+            "value": "Invoice ID",
+            "exact": false
+          },
+          {
+            "source": "text",
+            "extract": {
+              "by": "regex",
+              "pattern": "Invoice\\s*ID\\s*:?\\s*(?<value>\\S+)",
+              "group": "value"
+            },
+            "parse": "string"
+          },
+          {
+            "ref": "output",
+            "name": "invoice_id"
+          }
+        ],
+        "intent": "Capture invoice ID"
+      },
+      {
+        "id": "inspect invoice",
+        "action": "read",
+        "args": [
+          {
+            "by": "css",
+            "value": "body"
+          },
+          "text",
+          {
+            "ref": "output",
+            "name": "invoice_page_text"
+          }
+        ],
+        "intent": "Inspect invoice details"
+      },
+      {
+        "id": "capture invoice id",
+        "action": "read",
+        "args": [
+          {
+            "by": "css",
+            "value": "body"
+          },
+          {
+            "source": "text",
+            "extract": {
+              "by": "regex",
+              "pattern": "Invoice\\s+(?<value>INV-[A-Za-z0-9-]+)",
+              "group": "value"
+            },
+            "parse": "string"
+          },
+          {
+            "ref": "output",
+            "name": "invoice_id"
+          }
+        ],
+        "intent": "Capture invoice ID"
+      },
+      {
+        "id": "capture invoice amount",
+        "action": "read",
+        "args": [
+          {
+            "by": "text",
+            "value": "Amount:",
+            "exact": false
+          },
+          {
+            "source": "text",
+            "extract": {
+              "by": "regex",
+              "pattern": "Amount:\\s*(?<value>\\$\\d+\\.\\d{2})",
+              "group": "value"
+            },
+            "parse": "string"
+          },
+          {
+            "ref": "output",
+            "name": "invoice_amount"
+          }
+        ],
+        "intent": "Capture invoice amount"
+      },
+      {
+        "id": "capture invoice total",
+        "action": "read",
+        "args": [
+          {
+            "by": "css",
+            "value": "body"
+          },
+          {
+            "source": "text",
+            "extract": {
+              "by": "regex",
+              "pattern": "Total:\\s*(?<value>\\$[0-9,]+\\.\\d{2})",
+              "group": "value"
+            },
+            "parse": "string"
+          },
+          {
+            "ref": "output",
+            "name": "invoice_total"
+          }
+        ],
+        "intent": "Capture invoice total"
+      },
+      {
+        "id": "finish invoice lookup",
+        "action": "finish",
+        "args": [
+          {
+            "test": "all",
+            "args": [
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_id"
+                  }
+                ]
+              },
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_amount"
+                  }
+                ]
+              },
+              {
+                "test": "assigned",
+                "args": [
+                  {
+                    "ref": "output",
+                    "name": "invoice_total"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "intent": "Complete invoice lookup"
+      }
+    ],
+    "transcript": [
+      {
+        "id": 312,
+        "jobId": 16,
+        "sequence": -2,
+        "createdAt": "2026-09-21T22:37:05.454Z",
+        "jobStatusId": 1,
+        "kind": 1,
+        "text": "Job created, queued for a Runner"
+      },
+      {
+        "id": 313,
+        "jobId": 16,
+        "sequence": -1,
+        "createdAt": "2026-09-21T22:37:13.523Z",
+        "jobStatusId": 2,
+        "kind": 1,
+        "text": "Picked up by Runner 1"
+      },
+      {
+        "id": 314,
+        "jobId": 16,
+        "sequence": 1,
+        "createdAt": "2026-09-21T22:37:14.425Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "open_starting_url",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "browser",
+            "selector": ""
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "open"
+        }
+      },
+      {
+        "id": 315,
+        "jobId": 16,
+        "sequence": 2,
+        "createdAt": "2026-09-21T22:37:18.483Z",
+        "jobStatusId": null,
+        "kind": 2,
+        "text": "Step fill username failed: TARGET_NOT_FOUND: No element matched {by: \"label\", value: \"Username\"}"
+      },
+      {
+        "id": 316,
+        "jobId": 16,
+        "sequence": 3,
+        "createdAt": "2026-09-21T22:37:18.855Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "fill username",
+          "outcome": "failed",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "error": "TARGET_NOT_FOUND: No element matched {by: \"label\", value: \"Username\"}",
+          "outputs": [],
+          "action": "fill"
+        }
+      },
+      {
+        "id": 317,
+        "jobId": 16,
+        "sequence": 4,
+        "createdAt": "2026-09-21T22:37:23.144Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "enter login name",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "text input",
+            "selector": "id='username'"
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "fill"
+        }
+      },
+      {
+        "id": 318,
+        "jobId": 16,
+        "sequence": 5,
+        "createdAt": "2026-09-21T22:37:26.318Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "enter password",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "password input",
+            "selector": "id='password'"
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "fill"
+        }
+      },
+      {
+        "id": 319,
+        "jobId": 16,
+        "sequence": 6,
+        "createdAt": "2026-09-21T22:37:30.082Z",
+        "jobStatusId": null,
+        "kind": 2,
+        "text": "Step submit login failed: TARGET_NOT_FOUND: No element matched {by: \"text\", value: \"Log in\"}"
+      },
+      {
+        "id": 320,
+        "jobId": 16,
+        "sequence": 7,
+        "createdAt": "2026-09-21T22:37:30.458Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "submit login",
+          "outcome": "failed",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "error": "TARGET_NOT_FOUND: No element matched {by: \"text\", value: \"Log in\"}",
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 321,
+        "jobId": 16,
+        "sequence": 8,
+        "createdAt": "2026-09-21T22:37:33.507Z",
+        "jobStatusId": null,
+        "kind": 2,
+        "text": "Step click login button failed: TARGET_NOT_FOUND: No element matched {by: \"css\", value: \"button[type='submit']\"}"
+      },
+      {
+        "id": 322,
+        "jobId": 16,
+        "sequence": 9,
+        "createdAt": "2026-09-21T22:37:33.898Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "click login button",
+          "outcome": "failed",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "error": "TARGET_NOT_FOUND: No element matched {by: \"css\", value: \"button[type='submit']\"}",
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 323,
+        "jobId": 16,
+        "sequence": 10,
+        "createdAt": "2026-09-21T22:37:37.100Z",
+        "jobStatusId": null,
+        "kind": 2,
+        "text": "Step press sign in failed: TARGET_NOT_FOUND: No element matched {by: \"text\", value: \"Sign in\"}"
+      },
+      {
+        "id": 324,
+        "jobId": 16,
+        "sequence": 11,
+        "createdAt": "2026-09-21T22:37:37.507Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "press sign in",
+          "outcome": "failed",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "error": "TARGET_NOT_FOUND: No element matched {by: \"text\", value: \"Sign in\"}",
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 325,
+        "jobId": 16,
+        "sequence": 12,
+        "createdAt": "2026-09-21T22:37:41.059Z",
+        "jobStatusId": null,
+        "kind": 2,
+        "text": "Step click login failed: TARGET_AMBIGUOUS: 2 elements matched {by: \"text\", value: \"Login\"}, expected exactly one"
+      },
+      {
+        "id": 326,
+        "jobId": 16,
+        "sequence": 13,
+        "createdAt": "2026-09-21T22:37:41.441Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "click login",
+          "outcome": "failed",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "error": "TARGET_AMBIGUOUS: 2 elements matched {by: \"text\", value: \"Login\"}, expected exactly one",
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 327,
+        "jobId": 16,
+        "sequence": 14,
+        "createdAt": "2026-09-21T22:37:45.566Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "submit credentials",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "button",
+            "selector": "id='login'"
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 328,
+        "jobId": 16,
+        "sequence": 15,
+        "createdAt": "2026-09-21T22:37:49.367Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "open invoices",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "link",
+            "selector": "text='Invoices'"
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 329,
+        "jobId": 16,
+        "sequence": 16,
+        "createdAt": "2026-09-21T22:37:54.287Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "check company row",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "check"
+        }
+      },
+      {
+        "id": 330,
+        "jobId": 16,
+        "sequence": 17,
+        "createdAt": "2026-09-21T22:37:58.043Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "open company invoice",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "link",
+            "selector": "text='Contoso Consulting'"
+          },
+          "inputs": [],
+          "outputs": [],
+          "action": "click"
+        }
+      },
+      {
+        "id": 331,
+        "jobId": 16,
+        "sequence": 18,
+        "createdAt": "2026-09-21T22:38:02.446Z",
+        "jobStatusId": null,
+        "kind": 2,
+        "text": "Step read invoice id failed: TARGET_NOT_FOUND: No element matched {by: \"text\", value: \"Invoice ID\"}"
+      },
+      {
+        "id": 332,
+        "jobId": 16,
+        "sequence": 19,
+        "createdAt": "2026-09-21T22:38:02.843Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "read invoice id",
+          "outcome": "failed",
+          "targetDescription": {
+            "component": "element",
+            "selector": ""
+          },
+          "inputs": [],
+          "error": "TARGET_NOT_FOUND: No element matched {by: \"text\", value: \"Invoice ID\"}",
+          "outputs": [],
+          "action": "read"
+        }
+      },
+      {
+        "id": 333,
+        "jobId": 16,
+        "sequence": 20,
+        "createdAt": "2026-09-21T22:38:07.906Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "inspect invoice",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "element",
+            "selector": "text='BambooInvoice help logout Root System Invoice Summ'"
+          },
+          "inputs": [],
+          "outputs": [
+            {
+              "fieldName": "invoice_page_text",
+              "safeValue": "BambooInvoice\nhelp\nlogout\nRoot System\nInvoice Summary\nPrivate Note\nEnter Payment\nEmail Invoice\nGenerate PDF\nPrint Invoice\nEdit Invoice\nDuplicate Invoice\nDelete Invoice\n\nDid you know?\nBambooINVOICE is released under the GPL license.\n\n\nTarget App Test Fixtures INVOICE\n\n1 Fixture Way\nSpringfield , IL , USA 62701\nhttps://example.test\n\nInvoice INV-1001\nAugust 15, 2026\n\nStatus: 1 Week Overdue\n\nContoso Consulting\n\n123 Market St\nSpringfield , IL , USA 62701\nhttps://contoso.example\n\nQuantity\tWork Description\tAmount\tTotal\n\n\n1\n\n\t\n\nWebsite redesign - seed data\n\n\t\n\n$1200.00\n\n\t\n\n$1200.00\n\nAmount: $1200.00\nSales Tax (6.250%): $75.00\nTotal: $1275.00\n\n\nPayment Terms: 30 Days (September 14, 2026)\n\nSeed data for the local target app\n\nInvoice History & Private Notes\nInvoice History & Private Notes\nPayment history\nNo payments have been entered for this invoice. To enter a payment, use the \"Enter Payment\" option on your menu.\n\nDonate | BambooInvoice © 2026 (Version 0.8.9)",
+              "sensitivityType": 1
+            }
+          ],
+          "action": "read"
+        }
+      },
+      {
+        "id": 334,
+        "jobId": 16,
+        "sequence": 21,
+        "createdAt": "2026-09-21T22:38:12.546Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "capture invoice id",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "element",
+            "selector": "text='BambooInvoice help logout Root System Invoice Summ'"
+          },
+          "inputs": [],
+          "outputs": [
+            {
+              "fieldName": "invoice_id",
+              "safeValue": "INV-1001",
+              "sensitivityType": 1
+            }
+          ],
+          "action": "read"
+        }
+      },
+      {
+        "id": 335,
+        "jobId": 16,
+        "sequence": 22,
+        "createdAt": "2026-09-21T22:38:16.899Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "capture invoice amount",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "element",
+            "selector": "text contains 'Amount:'"
+          },
+          "inputs": [],
+          "outputs": [
+            {
+              "fieldName": "invoice_amount",
+              "safeValue": "$1200.00",
+              "sensitivityType": 1
+            }
+          ],
+          "action": "read"
+        }
+      },
+      {
+        "id": 336,
+        "jobId": 16,
+        "sequence": 23,
+        "createdAt": "2026-09-21T22:38:22.100Z",
+        "jobStatusId": null,
+        "kind": 3,
+        "text": {
+          "stepId": "capture invoice total",
+          "outcome": "succeeded",
+          "targetDescription": {
+            "component": "element",
+            "selector": "text='BambooInvoice help logout Root System Invoice Summ'"
+          },
+          "inputs": [],
+          "outputs": [
+            {
+              "fieldName": "invoice_total",
+              "safeValue": "$1275.00",
+              "sensitivityType": 1
+            }
+          ],
+          "action": "read"
+        }
+      },
+      {
+        "id": 337,
+        "jobId": 16,
+        "sequence": 31,
+        "createdAt": "2026-09-21T22:38:22.100Z",
+        "jobStatusId": 3,
+        "kind": 1,
+        "text": "Model issued a finish Step, marked Completed-Success"
+      },
+      {
+        "id": 338,
+        "jobId": 16,
+        "sequence": 32,
+        "createdAt": "2026-09-21T22:38:22.100Z",
+        "jobStatusId": null,
+        "kind": 7,
+        "text": "Building Trial Recipe from this successful run…"
+      },
+      {
+        "id": 339,
+        "jobId": 16,
+        "sequence": 33,
+        "createdAt": "2026-09-21T22:38:22.100Z",
+        "jobStatusId": null,
+        "kind": 7,
+        "text": "Trial Recipe \"Get active invoice details\" created"
+      }
+    ],
+    "results": [
+      {
+        "fieldName": "invoice_amount",
+        "safeValue": "$1200.00",
+        "sensitivityType": 1
+      },
+      {
+        "fieldName": "invoice_id",
+        "safeValue": "INV-1001",
+        "sensitivityType": 1
+      },
+      {
+        "fieldName": "invoice_page_text",
+        "safeValue": "BambooInvoice\nhelp\nlogout\nRoot System\nInvoice Summary\nPrivate Note\nEnter Payment\nEmail Invoice\nGenerate PDF\nPrint Invoice\nEdit Invoice\nDuplicate Invoice\nDelete Invoice\n\nDid you know?\nBambooINVOICE is released under the GPL license.\n\n\nTarget App Test Fixtures INVOICE\n\n1 Fixture Way\nSpringfield , IL , USA 62701\nhttps://example.test\n\nInvoice INV-1001\nAugust 15, 2026\n\nStatus: 1 Week Overdue\n\nContoso Consulting\n\n123 Market St\nSpringfield , IL , USA 62701\nhttps://contoso.example\n\nQuantity\tWork Description\tAmount\tTotal\n\n\n1\n\n\t\n\nWebsite redesign - seed data\n\n\t\n\n$1200.00\n\n\t\n\n$1200.00\n\nAmount: $1200.00\nSales Tax (6.250%): $75.00\nTotal: $1275.00\n\n\nPayment Terms: 30 Days (September 14, 2026)\n\nSeed data for the local target app\n\nInvoice History & Private Notes\nInvoice History & Private Notes\nPayment history\nNo payments have been entered for this invoice. To enter a payment, use the \"Enter Payment\" option on your menu.\n\nDonate | BambooInvoice © 2026 (Version 0.8.9)",
+        "sensitivityType": 1
+      },
+      {
+        "fieldName": "invoice_total",
+        "safeValue": "$1275.00",
+        "sensitivityType": 1
+      }
+    ],
+    "ingredients": [
+      {
+        "fieldName": "companyName",
+        "safeValue": "Contoso Consulting",
+        "sensitivityType": 1
+      },
+      {
+        "fieldName": "startingUrl",
+        "safeValue": "http://localhost:8089",
+        "sensitivityType": 1
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 210,
+        "stepId": "open_starting_url",
+        "createdAt": "2026-09-21T22:37:18.327Z"
+      },
+      {
+        "id": 211,
+        "stepId": "fill username",
+        "createdAt": "2026-09-21T22:37:22.992Z"
+      },
+      {
+        "id": 212,
+        "stepId": "enter login name",
+        "createdAt": "2026-09-21T22:37:26.159Z"
+      },
+      {
+        "id": 213,
+        "stepId": "enter password",
+        "createdAt": "2026-09-21T22:37:29.941Z"
+      },
+      {
+        "id": 214,
+        "stepId": "submit login",
+        "createdAt": "2026-09-21T22:37:33.394Z"
+      },
+      {
+        "id": 215,
+        "stepId": "click login button",
+        "createdAt": "2026-09-21T22:37:36.977Z"
+      },
+      {
+        "id": 216,
+        "stepId": "press sign in",
+        "createdAt": "2026-09-21T22:37:40.943Z"
+      },
+      {
+        "id": 217,
+        "stepId": "click login",
+        "createdAt": "2026-09-21T22:37:45.143Z"
+      },
+      {
+        "id": 218,
+        "stepId": "submit credentials",
+        "createdAt": "2026-09-21T22:37:49.060Z"
+      },
+      {
+        "id": 219,
+        "stepId": "open invoices",
+        "createdAt": "2026-09-21T22:37:54.145Z"
+      },
+      {
+        "id": 220,
+        "stepId": "check company row",
+        "createdAt": "2026-09-21T22:37:57.807Z"
+      },
+      {
+        "id": 221,
+        "stepId": "open company invoice",
+        "createdAt": "2026-09-21T22:38:02.307Z"
+      },
+      {
+        "id": 222,
+        "stepId": "read invoice id",
+        "createdAt": "2026-09-21T22:38:07.742Z"
+      },
+      {
+        "id": 223,
+        "stepId": "inspect invoice",
+        "createdAt": "2026-09-21T22:38:12.390Z"
+      },
+      {
+        "id": 224,
+        "stepId": "capture invoice id",
+        "createdAt": "2026-09-21T22:38:16.723Z"
+      },
+      {
+        "id": 225,
+        "stepId": "capture invoice amount",
+        "createdAt": "2026-09-21T22:38:21.940Z"
+      },
+      {
+        "id": 226,
+        "stepId": "capture invoice total",
+        "createdAt": "2026-09-21T22:38:39.888Z"
+      },
+      {
+        "id": 227,
+        "stepId": "terminal",
+        "createdAt": "2026-09-21T22:38:40.088Z"
+      }
+    ]
+  }
+}

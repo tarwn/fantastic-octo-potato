@@ -208,6 +208,9 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		expect(recipes[0]).toEqual(
 			expect.objectContaining({ name: "Compiled name", goal: "Extract invoice total", definition: COMPILED_DEFINITION, sourceTrainingRunId: String(jobId) })
 		);
+		expect(listTranscriptEntries(db, jobId)).toContainEqual(
+			expect.objectContaining({ kind: TranscriptKind.Plan, text: "Trial Recipe \"Compiled name\" created" })
+		);
 	});
 
 	it("records a compilation failure on the transcript and creates no Recipe once retries are exhausted, without flipping the Job off Completed-Success (R007)", async () => {
@@ -224,7 +227,7 @@ describe("reportJobStep outcomes (Training Run Jobs)", () => {
 		expect(getJobById(db, jobId)?.jobStatusId).toBe(JobStatus.CompletedSuccess);
 		expect(listRecipesForApplication(db, 1)).toEqual([]);
 		expect(listTranscriptEntries(db, jobId)).toContainEqual(
-			expect.objectContaining({ kind: TranscriptKind.Info, text: "Recipe compilation failed: still invalid" })
+			expect.objectContaining({ kind: TranscriptKind.Plan, text: "Recipe compilation failed: still invalid" })
 		);
 	});
 
